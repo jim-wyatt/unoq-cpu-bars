@@ -155,3 +155,42 @@ rebuild produces a byte-identical binary, and an unrelated upstream sample
 **Never `rm -rf` a module directory without filtering it out first** — west
 would try to manage a project whose checkout has vanished. Change the filter,
 then delete. To get one back, add `+name` to the filter and run `west update`.
+
+## Shell setup
+
+```bash
+echo 'source ~/hybrid/env.sh' >> ~/.bashrc
+source ~/hybrid/env.sh
+```
+
+Gives you `west`, `zbuild`, `zflash`, `hpy` (MPU Python), and `mcucon`
+(live MCU console). Also puts `/opt/openocd/bin` on PATH so `west flash`
+and `west debug` work.
+
+## Idiomatic west flash / debug
+
+`west flash -r openocd` and `west debug` work, but needed a local fix:
+
+- Zephyr's openocd runner resolves board support **in-tree**, and `uno_q`
+  ships no `support/` directory. Without it the runner crashes on
+  `samefile()` (`runners/openocd.py:92`) — an upstream bug, not a config error.
+- The default flash runner is `stm32cubeprogrammer`, which is not installed.
+  Always pass `-r openocd`.
+
+The fix is `zephyr/boards/arduino/uno_q/support/openocd.cfg`. It is **not**
+upstream; a canonical copy lives in `mcu/board-support/`. After a Zephyr
+version bump, re-copy it:
+
+```bash
+cp -r ~/hybrid/mcu/board-support/support \
+      ~/zephyrproject/zephyr/boards/arduino/uno_q/
+```
+
+`~/hybrid/mcu/flash.sh` does not depend on any of this and is the more
+robust path.
+
+## Debugging in VS Code
+
+Open `~/zephyrproject`, pick **Debug (attach)** or **Debug (flash then run)**.
+`.vscode/STM32U585.svd` (8 MB, 202 peripherals) drives the peripheral-register
+viewer, so you get named register decoding for every peripheral on the chip.

@@ -1,0 +1,5 @@
+.venv/
+backup/opt-openocd/
+*.o
+*.llext
+__pycache__/

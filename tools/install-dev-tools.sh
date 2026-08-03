@@ -21,6 +21,10 @@ PROJECT="$(cd "$(dirname "$0")/.." && pwd)"
 VENV="${UNOQ_VENV:-$PROJECT/.venv}"
 BIN="${UNOQ_BIN:-$HOME/.local/bin}"
 
+# Used only when the release lookup below cannot reach the GitHub API. Bump it
+# when you bump the toolchain; it is a floor, not a pin.
+SHFMT_FALLBACK=v3.13.1
+
 case "$(uname -m)" in
   aarch64 | arm64)
     SC_ARCH=aarch64
@@ -49,7 +53,8 @@ if command -v shellcheck >/dev/null 2>&1; then
   echo "  already present: $(shellcheck --version | awk '/version:/ {print $2}')"
 else
   tmp=$(mktemp -d)
-  curl -sSL "https://github.com/koalaman/shellcheck/releases/download/stable/shellcheck-stable.linux.${SC_ARCH}.tar.xz" |
+  # -f so an HTTP error is an error, rather than an HTML page piped into tar.
+  curl -fsSL "https://github.com/koalaman/shellcheck/releases/download/stable/shellcheck-stable.linux.${SC_ARCH}.tar.xz" |
     tar -xJ -C "$tmp"
   install -m 0755 "$tmp"/shellcheck-stable/shellcheck "$BIN/shellcheck"
   rm -rf "$tmp"
@@ -60,9 +65,21 @@ echo "=== shfmt -> $BIN ==="
 if command -v shfmt >/dev/null 2>&1; then
   echo "  already present: $(shfmt --version)"
 else
-  ver=$(curl -sSL https://api.github.com/repos/mvdan/sh/releases/latest |
-    grep -oP '"tag_name": "\K[^"]+')
-  curl -sSL "https://github.com/mvdan/sh/releases/download/${ver}/shfmt_${ver}_linux_${SHFMT_ARCH}" \
+  # `\s*` rather than a literal space: the API returns compact JSON
+  # ("tag_name":"v3.13.1"), and a pattern that insisted on the space matched
+  # nothing, which under `pipefail` killed the whole install with no message.
+  #
+  # `|| true` then a pinned fallback, because this is an unauthenticated API
+  # call: CI runners share IPs and get rate-limited, and losing the lookup
+  # should cost you the newest release, not the toolchain. SHFMT_VERSION
+  # overrides both.
+  ver="${SHFMT_VERSION:-$(curl -sSL https://api.github.com/repos/mvdan/sh/releases/latest |
+    grep -oP '"tag_name":\s*"\K[^"]+' || true)}"
+  if [ -z "$ver" ]; then
+    ver="$SHFMT_FALLBACK"
+    echo "  release lookup failed - falling back to $ver"
+  fi
+  curl -fsSL "https://github.com/mvdan/sh/releases/download/${ver}/shfmt_${ver}_linux_${SHFMT_ARCH}" \
     -o "$BIN/shfmt"
   chmod +x "$BIN/shfmt"
   echo "  installed $("$BIN/shfmt" --version)"

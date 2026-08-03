@@ -85,6 +85,18 @@ into slot0 with no image header, so the bootloader refuses it. Recover with
 **`native_sim` fails with a `CONFIG_64BIT` error.**
 Use `native_sim/native/64` — the plain target is 32-bit and this is aarch64.
 
+**`Error finding board: arduino_uno_q` / `No module named 'jsonschema'`.**
+Something configured `mcu/app` with a bare `cmake` instead of `west`, so
+`list_boards.py` ran under `/usr/bin/python`. Zephyr's script dependencies live
+only in `~/zephyrproject/.venv`, which is the interpreter `west` uses.
+
+Usually the culprit is the **CMake Tools extension**: it prompts on open, writes
+`cmake.sourceDirectory` into `.vscode/settings.json` itself, and then configures
+into a stray `hybrid/build/` on every window open. It is listed under
+`unwantedRecommendations` — uninstall it, and delete both the setting and the
+directory. Build with the **MCU: build** task (`zbuild.sh`); `clangd` needs
+nothing from CMake Tools, only the `compile_commands.json` that build symlinks.
+
 ## SMP / MCUmgr
 
 **`mcumgr: command not found` in the shell.**

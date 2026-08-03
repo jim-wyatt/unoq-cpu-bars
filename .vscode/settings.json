@@ -52,5 +52,10 @@
     "editor.tabSize": 8,
     "editor.insertSpaces": false
   },
-  "cmake.sourceDirectory": "/home/arduino/hybrid/mcu/app"
+  // A Zephyr app is configured by west, not by a bare cmake - west supplies
+  // ZEPHYR_BASE, the SDK, the board, and the workspace venv that holds Zephyr's
+  // script dependencies. CMake Tools configuring mcu/app itself picks up
+  // /usr/bin/python instead and dies in list_boards.py on a missing jsonschema,
+  // so keep it out of the way: build with the "MCU: build" task (zbuild.sh).
+  "cmake.configureOnOpen": false
 }

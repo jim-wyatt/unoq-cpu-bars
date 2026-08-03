@@ -10,9 +10,14 @@
     "ms-python.debugpy"
   ],
   // Pylance was removed (~412 MB even in "light" mode); Ruff's LSP replaces it.
-  // The C/C++ extension would fight clangd for IntelliSense.
+  // The C/C++ extension would fight clangd for IntelliSense. CMake Tools
+  // configures mcu/app behind west's back - wrong Python, second build tree,
+  // and it writes its own cmake.sourceDirectory into settings.json; it also
+  // drags in cpp-devtools.
   "unwantedRecommendations": [
     "ms-python.vscode-pylance",
-    "ms-vscode.cpptools"
+    "ms-vscode.cpptools",
+    "ms-vscode.cmake-tools",
+    "ms-vscode.cpp-devtools"
   ]
 }

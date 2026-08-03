@@ -1,5 +1,8 @@
 .venv/
 backup/opt-openocd/
+# zbuild.sh builds into ~/zephyrproject/build, outside the repo. Anything named
+# build/ in here is a stray IDE configure - never source, never committed.
+/build/
 *.o
 *.llext
 __pycache__/

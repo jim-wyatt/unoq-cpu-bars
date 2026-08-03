@@ -9,3 +9,31 @@
 		zephyr,shell-uart = &lpuart1;
 	};
 };
+
+/*
+ * The 8x13 LED panel. Upstream Zephyr's board does not describe it at all -
+ * the wiring is only recorded in Arduino's core - so both halves are declared
+ * here: the port the 104 LEDs are charlieplexed across, and the timer that
+ * paces the refresh. See mcu/app/src/matrix.c.
+ */
+
+/* PF0..PF10 carry the panel. Enabling the port is what turns its clock on;
+ * matrix.c then drives MODER/BSRR directly, because the pins have to change
+ * direction every 10us. Nothing else in this build may claim PF0..PF10.
+ */
+&gpiof {
+	status = "okay";
+};
+
+/* TIM17 is otherwise unused here, and is the timer Arduino's own firmware
+ * picks for this job. Prescaler 4 divides the timer clock by 5, which leaves
+ * counter_us_to_ticks() plenty of resolution for a 10us slot.
+ */
+&timers17 {
+	status = "okay";
+	st,prescaler = <4>;
+
+	counter_matrix: counter {
+		status = "okay";
+	};
+};

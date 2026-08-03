@@ -30,6 +30,13 @@ with MCU() as mcu:
 ```
 
 ```bash
+unoq-cpu-bars                   # host CPU load, one bar per core, on the LED matrix
+```
+
+> Run it at boot with `sudo bash provision/50-cpu-bars.sh` — but note it then
+> holds `/dev/ttyHS1`, so stop the service before using the MCU shell.
+
+```bash
 tools/check.sh                  # lint, format, types, tests, coverage
 ```
 
@@ -46,6 +53,7 @@ FOTA tasks.
 | **[hardware.md](docs/hardware.md)** | Board anatomy, the two undocumented GPIOs, the two UARTs, SWD, flash layout. **Read this first.** |
 | **[mcu.md](docs/mcu.md)** | Build, flash, debug, FOTA, shell, tests, watchdog |
 | **[mpu.md](docs/mpu.md)** | Linux-side hardware access and the `unoq` API |
+| **[cpu-bars.md](docs/cpu-bars.md)** | Host CPU load on the LED matrix — both halves end to end |
 | **[setup.md](docs/setup.md)** | Provisioning a board from scratch |
 | **[quality.md](docs/quality.md)** | Lint, format, types, tests, coverage, CI |
 | **[maintenance.md](docs/maintenance.md)** | Version audit, dependency pins, rebuilding OpenOCD |
@@ -59,8 +67,9 @@ FOTA tasks.
 ├── env.sh                  shell aliases + Zephyr env   (sourced by ~/.bashrc)
 ├── docs/                   see above
 ├── mcu/                    everything for the STM32U585
-│   ├── app/                the firmware: shell + SMP + watchdog + NVS
-│   │   └── include/        app_proto.h - the MPU<->MCU contract, shared
+│   ├── app/                the firmware: shell + SMP + watchdog + NVS + LED matrix
+│   │   ├── include/        app_proto.h - the MPU<->MCU contract, shared
+│   │   └── src/            main.c, matrix.c (charlieplex driver), bars.c (rasteriser)
 │   ├── tests/              ztest suites (run on the host via native_sim)
 │   ├── board-support/      OpenOCD cfg Zephyr's west runner needs (not upstream)
 │   ├── link-up.sh          BOOT0 + UART enable   (referenced by systemd — do not move)
@@ -70,9 +79,11 @@ FOTA tasks.
 │   ├── ztest.sh            twister on native_sim
 │   └── restore-arduino-firmware.sh
 ├── python/                 MPU-side package (editable install — do not move)
-│   ├── unoq/               link.py (GPIOs), mcu.py (shell+SMP), fota.py
+│   ├── unoq/               link.py (GPIOs), mcu.py (shell+SMP), fota.py,
+│   │                       cpu.py (/proc/stat), cpubars.py (the daemon)
 │   └── tests/              pytest suite, all against fakes — no hardware
 ├── provision/              one-time root setup, numbered in order
+│                           (50-cpu-bars.sh is optional — see cpu-bars.md)
 ├── tools/                  check.sh (all gates), install-dev-tools.sh,
 │                           build-openocd.sh, check-versions.sh
 └── backup/                 stock firmware + OpenOCD (not re-downloadable)

@@ -11,12 +11,22 @@ from __future__ import annotations
 import contextlib
 import re
 import time
+from collections.abc import Sequence
 
 import serial
 
 from .link import link_up
 
 PORT = "/dev/ttyHS1"
+
+# The panel's limits, mirroring APP_BARS_* / APP_MATRIX_* in
+# mcu/app/include/app_proto.h. They cannot be imported from C, so
+# tests/test_contract.py reads that header and fails if these drift.
+BARS_MAX = 7
+BARS_PCT_MAX = 100
+MATRIX_ROWS = 8
+MATRIX_COLS = 13
+MATRIX_MAX_LEVEL = 7
 # Seconds to let the UART settle between the shell handle and the SMP handle.
 SMP_SETTLE_S = 0.4
 BAUD = 115200
@@ -134,6 +144,43 @@ class MCU:
     def blink(self, ms: int) -> None:
         """Set the LED blink period in milliseconds (10..10000)."""
         self.cmd(f"app blink {int(ms)}")
+
+    # -- LED matrix --------------------------------------------------------
+
+    def bars(self, pct: Sequence[float]) -> None:
+        """Draw one vertical bar per value on the 8x13 LED matrix.
+
+        Values are percentages, one per bar, left to right. They are rounded
+        and clamped rather than validated: the caller is normally a live
+        measurement, and a reading that arrives as 100.4 should light a full
+        bar, not raise. A wrong *number* of bars is a different matter - that
+        is a programming error, so it raises.
+        """
+        if not 1 <= len(pct) <= BARS_MAX:
+            raise ValueError(f"need 1..{BARS_MAX} values, got {len(pct)}")
+        values = " ".join(str(max(0, min(BARS_PCT_MAX, round(v)))) for v in pct)
+        self.cmd(f"app bars {values}")
+
+    def matrix_px(self, row: int, col: int, level: int = MATRIX_MAX_LEVEL) -> None:
+        """Light a single LED and blank the rest. Use it to find out which
+        corner row 0, column 0 is on a board in front of you."""
+        self.cmd(f"app matrix px {int(row)} {int(col)} {int(level)}")
+
+    def matrix_flip(self) -> bool:
+        """Rotate the panel 180 degrees and persist that. Returns the new state.
+
+        This is how you correct a display that reads upside down because of
+        how the board is mounted; the MCU remembers it across reboots.
+        """
+        out = self.cmd("app matrix flip")
+        m = re.search(r"flip=(\d+)", out[0] if out else "")
+        if not m:
+            raise MCUError(f"could not parse matrix flip: {out!r}")
+        return m.group(1) != "0"
+
+    def matrix_off(self) -> None:
+        """Blank the panel and stop its refresh timer."""
+        self.cmd("app matrix off")
 
     def uptime_ms(self) -> int:
         out = self.cmd("kernel uptime")

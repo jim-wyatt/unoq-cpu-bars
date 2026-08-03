@@ -46,7 +46,7 @@ ZTEST(link_protocol, test_blink_bounds_are_sane)
 static void render_status(char *buf, size_t len)
 {
 	snprintf(buf, len, APP_STATUS_FMT, (long long)1234, (unsigned int)5, 500, (unsigned int)2,
-		 1);
+		 1, 0, (unsigned int)9620);
 }
 
 ZTEST(link_protocol, test_status_line_is_parseable)
@@ -73,7 +73,8 @@ ZTEST(link_protocol, test_status_line_carries_the_expected_keys)
 	/* unoq.MCU.status() looks these up by name; renaming one breaks the MPU
 	 * side silently, because a missing key just does not appear in the dict.
 	 */
-	static const char *const keys[] = {"uptime_ms=", "ticks=", "blink_ms=", "boots=", "wdt="};
+	static const char *const keys[] = {
+		"uptime_ms=", "ticks=", "blink_ms=", "boots=", "wdt=", "flip=", "sweeps="};
 	char buf[128];
 
 	render_status(buf, sizeof(buf));
@@ -117,6 +118,83 @@ ZTEST(link_protocol, test_settings_key_is_namespaced)
 	 */
 	zassert_equal(strncmp(APP_SETTINGS_BOOTS, "app/", 4), 0,
 		      "boot counter key must live under the app/ subtree");
+	zassert_equal(strncmp(APP_SETTINGS_FLIP, "app/", 4), 0,
+		      "panel orientation key must live under the app/ subtree");
+	zassert_not_equal(strcmp(APP_SETTINGS_BOOTS, APP_SETTINGS_FLIP), 0,
+			  "two settings sharing a key would overwrite each other");
+}
+
+/* --- the bars contract ---------------------------------------------------- */
+
+ZTEST(link_protocol, test_bar_percentages_span_exactly_zero_to_full)
+{
+	/* unoq.MCU.bars() clamps to this range before sending. If the two ends
+	 * disagree the MPU would send values the firmware rejects, and the
+	 * panel would freeze on its last good frame with no error visible.
+	 */
+	zassert_true(app_bars_pct_valid(0), "an idle core is a legal reading");
+	zassert_true(app_bars_pct_valid(APP_BARS_PCT_MAX), "a pegged core is a legal reading");
+	zassert_false(app_bars_pct_valid(-1), "negative load is not a thing");
+	zassert_false(app_bars_pct_valid(APP_BARS_PCT_MAX + 1), "over 100%% must be rejected");
+}
+
+ZTEST(link_protocol, test_bar_count_matches_what_the_panel_can_show)
+{
+	zassert_true(app_bars_count_valid(1), "one bar must be allowed");
+	zassert_true(app_bars_count_valid(APP_BARS_MAX), "the advertised maximum must be allowed");
+	zassert_false(app_bars_count_valid(0), "nothing to draw is a usage error");
+	zassert_false(app_bars_count_valid(APP_BARS_MAX + 1), "above the maximum must be rejected");
+
+	/* Each bar needs a column and each pair of bars a blank column between
+	 * them. If APP_BARS_MAX ever exceeds that, the layout silently loses
+	 * the gaps and separate cores read as one bar. */
+	zassert_true(2 * APP_BARS_MAX - 1 <= APP_MATRIX_COLS,
+		     "%d bars cannot be drawn with gaps in %d columns", APP_BARS_MAX,
+		     APP_MATRIX_COLS);
+
+	/* The UNO Q's own MPU has four cores; a cap below that would make this
+	 * firmware unable to display the board it is soldered to. */
+	zassert_true(APP_BARS_MAX >= 4, "must be able to show four CPU cores");
+}
+
+ZTEST(link_protocol, test_matrix_geometry_is_self_consistent)
+{
+	zassert_equal(APP_MATRIX_LEDS, APP_MATRIX_ROWS * APP_MATRIX_COLS,
+		      "LED count must equal the grid it indexes");
+
+	/* matrix.c walks pixel indices 0..APP_MATRIX_LEDS-1 against a phase
+	 * counter of 0..APP_MATRIX_MAX_LEVEL-1; a max level of zero would make
+	 * that modulo a division by zero in the refresh ISR. */
+	zassert_true(APP_MATRIX_MAX_LEVEL > 0, "grayscale needs at least one step");
+
+	zassert_true(app_matrix_level_valid(0), "off is a valid level");
+	zassert_true(app_matrix_level_valid(APP_MATRIX_MAX_LEVEL), "full brightness is valid");
+	zassert_false(app_matrix_level_valid(APP_MATRIX_MAX_LEVEL + 1), "above full is not");
+	zassert_false(app_matrix_level_valid(-1), "negative brightness is not");
+}
+
+ZTEST(link_protocol, test_matrix_pixel_bounds_cover_the_panel_and_no_more)
+{
+	zassert_true(app_matrix_pixel_valid(0, 0), "the first pixel must be addressable");
+	zassert_true(app_matrix_pixel_valid(APP_MATRIX_ROWS - 1, APP_MATRIX_COLS - 1),
+		     "the last pixel must be addressable");
+	zassert_false(app_matrix_pixel_valid(APP_MATRIX_ROWS, 0), "one row past the end");
+	zassert_false(app_matrix_pixel_valid(0, APP_MATRIX_COLS), "one column past the end");
+	zassert_false(app_matrix_pixel_valid(-1, 0), "negative row");
+	zassert_false(app_matrix_pixel_valid(0, -1), "negative column");
+}
+
+ZTEST(link_protocol, test_documented_sweep_rate_matches_the_geometry)
+{
+	/* APP_MATRIX_SWEEPS_PER_S is what docs and `app status` are checked
+	 * against, so it has to follow from the panel size and the 10us slot
+	 * matrix.c programs - not from whatever a board happened to measure.
+	 */
+	int expected = 1000000 / (APP_MATRIX_LEDS * 10);
+
+	zassert_within(APP_MATRIX_SWEEPS_PER_S, expected, 5,
+		       "documented %d sweeps/s but the geometry implies %d",
+		       APP_MATRIX_SWEEPS_PER_S, expected);
 }
 
 ZTEST_SUITE(link_protocol, NULL, NULL, NULL, NULL, NULL);

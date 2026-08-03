@@ -48,6 +48,11 @@ with MCU() as mcu:
     mcu.echo('ping')           # via SMP, not the shell
     mcu.cmd('kernel threads')  # any raw shell command
     mcu.reboot()
+
+    mcu.bars([12, 3, 0, 47])   # LED matrix: one bar per value, 0..100
+    mcu.matrix_px(7, 0)        # light one LED - finds the panel's orientation
+    mcu.matrix_flip()          # rotate 180 degrees, persisted in NVS
+    mcu.matrix_off()
 ```
 
 `MCU` is a context manager **on purpose** — the UART is a single shared
@@ -55,6 +60,18 @@ resource and a stale handle blocks `tio`, `mcucon`, and SMP alike.
 
 `mcu.cmd()` reads until the shell prompt reappears rather than sleeping a fixed
 time, so slow commands (`device list`) and fast ones each cost what they should.
+
+### CPU bars
+
+```python
+from unoq import CpuSampler
+sampler = CpuSampler()         # takes the first reading
+sampler.sample()               # [12, 3, 0, 47] - busy % per core since last call
+```
+
+`/proc/stat` holds counters since boot, so a single reading is the average since
+power-on; keep one `CpuSampler` alive and take differences. The daemon that
+wires this to the panel is `unoq-cpu-bars` — see [cpu-bars.md](cpu-bars.md).
 
 ### Firmware update
 

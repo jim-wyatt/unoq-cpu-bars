@@ -9,11 +9,17 @@ unoq - talk to the Arduino UNO Q's STM32U585 from the Linux side.
         mcu.gpio_set('gpioh', 11, 1)
         print(mcu.echo('ping'))    # via SMP, not the shell
 
+        mcu.bars(CpuSampler().sample())   # CPU load on the LED matrix
+
 Wraps the Zephyr shell running on lpuart1 (/dev/ttyHS1) and the SMP/MCUmgr
 endpoint sharing the same UART. See ~/hybrid/README.md for the hardware notes.
 """
 
+# cpubars is an entry point, not part of the API, and is deliberately not
+# imported here: `python -m unoq.cpubars` warns if the package has already
+# pulled the module in. Import it directly - `from unoq import cpubars`.
 from . import fota
+from .cpu import CpuSampler, read_cpu_times
 from .link import BOOT0_LINE, LINK_ENABLE_LINE, link_state, link_up
 from .mcu import MCU, MCUError, ShellTimeout
 
@@ -26,5 +32,7 @@ __all__ = [
     "link_state",
     "BOOT0_LINE",
     "LINK_ENABLE_LINE",
+    "CpuSampler",
+    "read_cpu_times",
 ]
 __version__ = "0.1.0"

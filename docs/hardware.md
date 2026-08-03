@@ -80,6 +80,26 @@ board-to-board link.
 
 ---
 
+## The LED matrix
+
+104 blue LEDs in an 8×13 grid, wired to the **MCU** on **PF0–PF10** and
+charlieplexed: each LED is one *ordered* pair of those eleven pins, lit by
+driving one high, one low, and leaving the other nine as inputs. Eleven pins
+give 110 ordered pairs; the panel uses the first 104, in that order.
+
+Upstream Zephyr's `arduino_uno_q` board **does not mention the matrix at all**,
+and neither does the datasheet. The wiring is recorded in exactly one place —
+Arduino's own core (`ArduinoCore-zephyr`, `loader/matrix.inc`) — which is where
+this project's pin map and 10 µs refresh slot come from. Nothing else from that
+core is used; the driver is
+[`mcu/app/src/matrix.c`](../mcu/app/src/matrix.c) and the devicetree nodes it
+needs (`gpiof`, `timers17`) are declared in the app's board overlay.
+
+PF11–PF15 are *not* part of the panel — PF14/PF15 reach the Arduino header — so
+the driver masks only the low eleven pins when it tri-states the port.
+
+See [cpu-bars.md](cpu-bars.md) for the display built on this.
+
 ## How the MPU flashes the MCU
 
 There is no external debug probe. The MPU bit-bangs SWD on its own GPIO lines

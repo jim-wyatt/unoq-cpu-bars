@@ -117,6 +117,78 @@ def test_uptime_ms_extracts_the_first_number(mcu_factory: Any) -> None:
     assert mcu.uptime_ms() == 123456
 
 
+# -- LED matrix -------------------------------------------------------------
+
+
+def test_bars_sends_one_value_per_bar(mcu_factory: Any) -> None:
+    mcu = mcu_factory({"app bars 10 20 30 40": ["ok bars=4"]})
+    mcu.bars([10, 20, 30, 40])
+    assert mcu._s.written == ["app bars 10 20 30 40"]
+
+
+def test_bars_rounds_floats(mcu_factory: Any) -> None:
+    # The sampler produces percentages, and `app bars` takes integers.
+    mcu = mcu_factory({"app bars 33 67": ["ok bars=2"]})
+    mcu.bars([33.4, 66.6])
+    assert mcu._s.written == ["app bars 33 67"]
+
+
+def test_bars_clamps_rather_than_raising(mcu_factory: Any) -> None:
+    # A live measurement that arrives as 100.4 should light a full bar. The
+    # firmware rejects out-of-range values, so clamping has to happen here.
+    mcu = mcu_factory({"app bars 0 100": ["ok bars=2"]})
+    mcu.bars([-3, 104])
+    assert mcu._s.written == ["app bars 0 100"]
+
+
+def test_bars_rejects_a_count_the_panel_cannot_show(mcu_factory: Any) -> None:
+    # Unlike a stray percentage, this is a programming error: it cannot come
+    # from a noisy reading, only from asking for the wrong thing.
+    mcu = mcu_factory({})
+    with pytest.raises(ValueError, match=r"need 1\.\.7 values"):
+        mcu.bars([50] * 8)
+
+
+def test_bars_rejects_an_empty_reading(mcu_factory: Any) -> None:
+    mcu = mcu_factory({})
+    with pytest.raises(ValueError, match=r"need 1\.\.7 values"):
+        mcu.bars([])
+
+
+def test_matrix_px_coerces_its_coordinates(mcu_factory: Any) -> None:
+    mcu = mcu_factory({"app matrix px 7 0 7": ["ok px row=7 col=0 level=7"]})
+    mcu.matrix_px(7.0, 0.0)
+    assert mcu._s.written == ["app matrix px 7 0 7"]
+
+
+def test_matrix_flip_reports_the_new_state(mcu_factory: Any) -> None:
+    mcu = mcu_factory({"app matrix flip": ["ok flip=1"]})
+    assert mcu.matrix_flip() is True
+
+
+def test_matrix_flip_reports_being_flipped_back(mcu_factory: Any) -> None:
+    mcu = mcu_factory({"app matrix flip": ["ok flip=0"]})
+    assert mcu.matrix_flip() is False
+
+
+def test_matrix_flip_raises_on_an_unparseable_reply(mcu_factory: Any) -> None:
+    mcu = mcu_factory({"app matrix flip": ["what"]})
+    with pytest.raises(MCUError, match="could not parse matrix flip"):
+        mcu.matrix_flip()
+
+
+def test_matrix_flip_raises_on_no_reply(mcu_factory: Any) -> None:
+    mcu = mcu_factory({"app matrix flip": []})
+    with pytest.raises(MCUError, match="could not parse matrix flip"):
+        mcu.matrix_flip()
+
+
+def test_matrix_off_blanks_the_panel(mcu_factory: Any) -> None:
+    mcu = mcu_factory({"app matrix off": ["ok matrix off"]})
+    mcu.matrix_off()
+    assert mcu._s.written == ["app matrix off"]
+
+
 def test_uptime_ms_raises_when_there_is_no_number(mcu_factory: Any) -> None:
     mcu = mcu_factory({"kernel uptime": ["no idea"]})
     with pytest.raises(MCUError, match="could not parse kernel uptime"):

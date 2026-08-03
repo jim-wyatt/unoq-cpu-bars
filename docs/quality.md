@@ -21,7 +21,7 @@ than the first thing to break. Exit status is non-zero if any failed.
 | shell lint | `shellcheck -x` | every tracked `*.sh` |
 | shell format | `shfmt -i 2 -ci` | every tracked `*.sh` |
 | C format | `clang-format` | `mcu/**/*.[ch]`, Zephyr's own style |
-| MCU tests | `ztest` on `native_sim` | `mcu/app/include/app_proto.h` |
+| MCU tests | `ztest` on `native_sim` | `mcu/app/include/app_proto.h`, `mcu/app/src/bars.c` |
 
 ---
 
@@ -51,9 +51,9 @@ every commit. Skip it once with `git commit --no-verify`.
 ## Tests
 
 ```bash
-cd ~/hybrid/python && ../.venv/bin/pytest      # 66 tests, 100% coverage
+cd ~/hybrid/python && ../.venv/bin/pytest      # 110 tests, 100% coverage
 ../.venv/bin/pytest -m hardware                # opt-in: needs a live MCU
-~/hybrid/mcu/ztest.sh                          # MCU suite on native_sim
+~/hybrid/mcu/ztest.sh                          # MCU suites on native_sim (30 cases)
 ```
 
 **Nothing in the default suite touches hardware.** Every serial port and GPIO
@@ -66,13 +66,17 @@ prompt rarely lands in the first read.
 Checks that genuinely need a board live behind `-m hardware` and are deselected
 by default.
 
-Two suites are not about behaviour at all:
+Three suites are not about behaviour at all:
 
 - **The GPIO line numbers** (`test_link.py`) are pinned because nothing
   upstream records them. A "tidy up" has no source of truth to check against
   except that test.
 - **The unsigned-image guard** (`test_fota.py`) is pinned because getting it
   wrong stops the board booting.
+- **The panel constants** (`test_contract.py`) are pinned across languages: C
+  macros cannot be imported into Python, so `unoq/mcu.py` holds a second copy
+  of the LED matrix geometry. That test parses `app_proto.h` and fails if the
+  two drift, which is what makes the duplication safe to have.
 
 Coverage gates at 100%, which is where it currently sits. That is a deliberate
 ratchet — new code needs a test — and it is one line in `pyproject.toml` if you

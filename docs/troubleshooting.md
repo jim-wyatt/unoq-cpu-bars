@@ -112,6 +112,41 @@ scripts must close, sleep, then open.
 `CONFIG_CRC`. Kconfig warns but the build succeeds — check the generated
 `.config`, not just the build log.
 
+## LED matrix
+
+**The panel stays dark.**
+It starts lazily — nothing is lit until the first `app bars` or `app matrix px`.
+After that, check `sweeps` in `app status` is climbing by ~962/s: a count stuck
+at zero means the refresh timer never started, and the boot log says `LED matrix
+unavailable` if `gpiof` or `timers17` were missing from the devicetree.
+
+**The bars hang from the top instead of standing on the bottom.**
+The panel's orientation depends on how the board is mounted and the firmware
+cannot know it. `app matrix flip` rotates 180° and stores that in NVS.
+
+**`app bars` says `range` or `usage`.**
+One to seven values, each 0..100. `unoq.MCU.bars()` clamps percentages for you
+but raises on the wrong *number* of bars — see [cpu-bars.md](cpu-bars.md).
+
+**Something else on PF0..PF10 misbehaves.**
+Those eleven pins are the matrix. The refresh ISR retakes them every 10 µs, so
+any other user of them will lose. PF11–PF15 are untouched.
+
+**`/dev/ttyHS1` is suddenly "device busy" — `mcucon`, `tio` and `unoq.MCU` all
+fail.**
+The boot service is probably running and holding the port open; pyserial opens
+it exclusively. `sudo systemctl stop unoq-cpu-bars`. Flashing over SWD is
+unaffected.
+
+**The panel is stuck showing an old frame.**
+Something killed the daemon with SIGTERM instead of SIGINT, so the cleanup that
+blanks it never ran. `app matrix off`, or `hpy -c "from unoq import MCU;
+MCU().matrix_off()"`. The systemd unit sets `KillSignal=SIGINT` to avoid this.
+
+**`unoq-cpu-bars: command not found`.**
+The console script only appears after re-running the editable install.
+`python -m unoq.cpubars` works regardless.
+
 ## Toolchain
 
 **`apt install openocd` does not work.**

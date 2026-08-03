@@ -89,8 +89,12 @@ mcucon                         # or the env.sh helper (Ctrl-C)
 
 ```
 unoq:~$ app status
-uptime_ms=12216 ticks=25 blink_ms=500 boots=7 wdt=1
+uptime_ms=12216 ticks=25 blink_ms=500 boots=7 wdt=1 flip=0 sweeps=1043712
+unoq:~$ app bars 100 50 25 0
+ok bars=4
 ```
+
+`sweeps` counts LED-matrix refresh passes — see [cpu-bars.md](cpu-bars.md).
 
 Command groups: `app` (yours), `gpio`, `i2c`, `device`, `kernel`, `devmem` —
 poke hardware without rebuilding. Drive it from Python via [`unoq.MCU`](mpu.md).
@@ -114,6 +118,11 @@ peripheral registers decoded from `.vscode/STM32U585.svd` (202 peripherals).
 
 Use `native_sim/native/64`; plain `native_sim` is 32-bit and fails on aarch64
 with a `CONFIG_64BIT` error.
+
+Two suites run: `link_protocol` and `bars`. The second compiles
+[`mcu/app/src/bars.c`](../mcu/app/src/bars.c) — the firmware's own rasteriser,
+not a copy — and checks the drawing rules on the host, because a charlieplexed
+panel cannot be read back on the board.
 
 The suite tests [`mcu/app/include/app_proto.h`](../mcu/app/include/app_proto.h)
 — the MPU↔MCU contract that `main.c`, the tests and `unoq/mcu.py` all depend on

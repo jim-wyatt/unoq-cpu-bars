@@ -5,6 +5,11 @@ description = "Talk to the Arduino UNO Q's STM32U585 from the Linux MPU"
 requires-python = ">=3.11"
 dependencies = ["pyserial", "gpiod", "smpclient"]
 
+# Re-run the editable install after adding a script here, or the command will
+# not appear on PATH: `python -m unoq.cpubars` works either way.
+[project.scripts]
+unoq-cpu-bars = "unoq.cpubars:main"
+
 # Install with:  uv pip install --python ~/hybrid/.venv/bin/python -e 'python[dev]'
 # Everything below is also what tools/check.sh runs.
 [project.optional-dependencies]
@@ -103,4 +108,10 @@ exclude_lines = [
   "pragma: no cover",
   "if TYPE_CHECKING:",
   "raise NotImplementedError",
+  # `python -m unoq.cpubars`. main() itself is tested; this line only wires it
+  # to the interpreter, and covering it would mean re-running the module.
+  'if __name__ == "__main__":',
+  # Protocol bodies are `...` - type declarations that are never executed. The
+  # implementations behind them are covered; the stubs cannot be.
+  "class .*\\(Protocol\\):",
 ]

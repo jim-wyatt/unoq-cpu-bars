@@ -56,6 +56,12 @@ def link_state(chip: str = GPIOCHIP) -> dict[str, str]:
     """Report the direction of the link lines.
 
     INPUT means the line is floating and the link is (or will be) broken.
+
+    Direction, not value, and deliberately so: reading the value means
+    requesting the line, and requesting it as an input drops the drive - the
+    read breaks the link it was meant to check. `gpioget 37` does exactly that.
+    This uses get_line_info(), which never requests the line (`gpioinfo` is the
+    equivalent from the shell).
     """
     out = {}
     c = gpiod.Chip(chip)

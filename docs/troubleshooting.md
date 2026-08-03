@@ -29,6 +29,18 @@ mdw 0x46002400 1    # CR1
 mdw 0x4600241c 1    # ISR
 ```
 
+**The link was fine until I inspected it.**
+You ran `gpioget` on line 37 or 70. It requests the line as an input, which drops
+the drive — reading these pins breaks them. The values it returns (`37=active`,
+`70=inactive`) look like a diagnosis but are just the floating state you created.
+Fix: `link-up.sh`. Check them non-destructively instead:
+
+```bash
+gpioinfo -c gpiochip1 37 70      # both must say `output`
+```
+
+See [hardware.md](hardware.md#the-two-gpios-nobody-documents).
+
 **`Device or resource busy` on `/dev/ttyHS1`.**
 Something else holds it — `tio`, `mcucon`, a stale Python handle, or (if it were
 re-enabled) `arduino-router`. Use `unoq.MCU` as a context manager.

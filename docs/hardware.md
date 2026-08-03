@@ -37,6 +37,25 @@ Pin state **persists after the `gpioset` process exits** — the SoC pinctrl kee
 driving the last value — which is why a one-shot is enough and no daemon is
 needed. BOOT0 is only sampled at MCU reset, so set it *before* resetting.
 
+> ### Never `gpioget` these two lines
+>
+> `gpioget` **requests the line as an input**, and that drops the drive the same
+> way a reboot without `unoq-link.service` would. Reading the pins is enough to
+> break the link — you get plausible-looking values back (`37=active`,
+> `70=inactive`, i.e. exactly the broken state) and the MCU goes quiet.
+>
+> Check them without touching them. `gpioinfo` only reads line *info*, never
+> requests the line:
+>
+> ```bash
+> gpioinfo -c gpiochip1 37 70      # both must say `output`
+> hpy -c "from unoq.link import link_state; print(link_state())"
+> ```
+>
+> `output` means driven. `input` means floating — run `link-up.sh`. This is why
+> `unoq.link.link_state()` reports *direction* rather than value: there is no way
+> to read the value that does not also destroy it.
+
 > `mcu/link-up.sh` is referenced by `/etc/systemd/system/unoq-link.service`.
 > **Do not move or rename it** without reinstalling that unit.
 

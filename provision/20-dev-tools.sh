@@ -8,7 +8,9 @@
 # deleted. Every step has its revert in the comment above it.
 set -uo pipefail
 
-echo "== Before =="; free -h | sed -n 2p; echo
+echo "== Before =="
+free -h | sed -n 2p
+echo
 
 # --- 1. clangd: C/C++ IntelliSense. VS Code settings already point at
 # --- /usr/bin/clangd-19 and expect compile_commands.json (west emits it).
@@ -22,7 +24,7 @@ ln -sf /usr/bin/clangd-19 /usr/bin/clangd
 # --- Frees ~105 MB and releases the UART.
 # REVERT: systemctl enable --now arduino-router arduino-app-cli
 systemctl disable --now arduino-router arduino-router-serial \
-                        arduino-app-cli arduino-avahi-serial 2>/dev/null
+  arduino-app-cli arduino-avahi-serial 2>/dev/null
 
 # --- 3. Docker: you pruned all images; it now serves nothing. ~105 MB.
 # REVERT: systemctl enable --now docker docker.socket containerd
@@ -39,7 +41,9 @@ systemctl disable --now docker docker.socket containerd 2>/dev/null
 # apt-get remove -y arduino-app-cli arduino-app-lab arduino-router arduino-cli
 # apt-get autoremove -y
 
-echo; echo "== After =="; free -h | sed -n 2p
+echo
+echo "== After =="
+free -h | sed -n 2p
 echo
 echo "Verify the console is now readable:"
 echo "  ~/hybrid/.venv/bin/python -c \"import serial; s=serial.Serial('/dev/ttyHS1',115200,timeout=2); print(s.read(200))\""

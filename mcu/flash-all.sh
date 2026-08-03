@@ -25,9 +25,9 @@ APP_HEX="${1:-$WS/build/zephyr/zephyr.signed.hex}"
 if [ ! -f "$MCUBOOT_BUILD/zephyr/zephyr.hex" ]; then
   echo "MCUboot not built. Building it now..."
   ZEPHYR_TOOLCHAIN_VARIANT=zephyr \
-  ZEPHYR_SDK_INSTALL_DIR="${ZEPHYR_SDK:-$HOME/zephyr-sdk-1.0.1}" \
+    ZEPHYR_SDK_INSTALL_DIR="${ZEPHYR_SDK:-$HOME/zephyr-sdk-1.0.1}" \
     "$WS/.venv/bin/west" build -b "${BOARD:-arduino_uno_q}" \
-      "$WS/bootloader/mcuboot/boot/zephyr" -p always -d "$MCUBOOT_BUILD"
+    "$WS/bootloader/mcuboot/boot/zephyr" -p always -d "$MCUBOOT_BUILD"
 fi
 
 [ -f "$APP_HEX" ] || {

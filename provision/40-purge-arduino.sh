@@ -17,7 +17,10 @@
 set -uo pipefail
 
 echo "== openocd before =="
-ls -la /opt/openocd/bin/openocd || { echo "openocd already missing - ABORT" >&2; exit 1; }
+ls -la /opt/openocd/bin/openocd || {
+  echo "openocd already missing - ABORT" >&2
+  exit 1
+}
 
 apt-get remove -y arduino-app-cli arduino-app-lab arduino-router arduino-cli
 apt-get autoremove -y
@@ -25,11 +28,11 @@ apt-get autoremove -y
 echo
 echo "== openocd after (must still exist) =="
 if /opt/openocd/bin/openocd --version 2>&1 | head -1; then
-    echo "OK - flashing capability intact"
+  echo "OK - flashing capability intact"
 else
-    echo "openocd is GONE - restore it now:" >&2
-    echo "  sudo cp -a ~/hybrid/backup/opt-openocd /opt/openocd" >&2
-    exit 1
+  echo "openocd is GONE - restore it now:" >&2
+  echo "  sudo cp -a ~/hybrid/backup/opt-openocd /opt/openocd" >&2
+  exit 1
 fi
 
 echo

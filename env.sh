@@ -3,6 +3,10 @@
 #   source ~/hybrid/env.sh
 #
 # Add that line to ~/.bashrc to have it always available.
+#
+# This file is sourced, never executed, so it has no shebang - the directive
+# below is what tells shellcheck which shell to assume.
+# shellcheck shell=bash
 
 # uv, west, cmake, ninja (installed as uv tools) + on-board OpenOCD
 export PATH="$HOME/.local/bin:/opt/openocd/bin:$PATH"
@@ -17,15 +21,15 @@ export BOARD=arduino_uno_q
 west() { "$HOME/zephyrproject/.venv/bin/west" "$@"; }
 
 # MPU-side Python (gpiod, smbus2, pyserial, spidev)
-alias hpy="$HOME/hybrid/.venv/bin/python"
+alias hpy='$HOME/hybrid/.venv/bin/python'
 
 # MCU helpers
-alias zbuild="$HOME/hybrid/mcu/zbuild.sh"
-alias zflash="$HOME/hybrid/mcu/flash.sh"
+alias zbuild='$HOME/hybrid/mcu/zbuild.sh'
+alias zflash='$HOME/hybrid/mcu/flash.sh'
 
 # Watch the MCU console (lpuart1 -> /dev/ttyHS1). Ctrl-C to stop.
 mcucon() {
-    "$HOME/hybrid/.venv/bin/python" - <<'PY'
+  "$HOME/hybrid/.venv/bin/python" - <<'PY'
 import serial, sys
 s = serial.Serial('/dev/ttyHS1', 115200, timeout=0.5)
 print("--- /dev/ttyHS1 @115200 (Ctrl-C to stop) ---", file=sys.stderr)

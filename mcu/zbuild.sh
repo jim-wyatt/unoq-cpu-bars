@@ -29,7 +29,8 @@ SDK="${ZEPHYR_SDK:-$HOME/zephyr-sdk-1.0.1}"
 export ZEPHYR_TOOLCHAIN_VARIANT=zephyr
 export ZEPHYR_SDK_INSTALL_DIR="$SDK"
 
-APP="${1:?usage: zbuild.sh <app-path> [extra west args]}"; shift || true
+APP="${1:?usage: zbuild.sh <app-path> [extra west args]}"
+shift || true
 
 # Accept an app path relative to your cwd, or relative to the Zephyr tree
 # (e.g. samples/basic/blinky). Resolve to absolute BEFORE the cd below - west
@@ -46,8 +47,14 @@ fi
 
 # See BUILD DIRECTORY above. OWN_APP also gates the compile_commands.json link.
 case "$APP/" in
-  "$PROJECT"/*) BUILD="$WS/build";                      OWN_APP=1 ;;
-  *)            BUILD="$WS/build-$(basename "$APP")";   OWN_APP=0 ;;
+  "$PROJECT"/*)
+    BUILD="$WS/build"
+    OWN_APP=1
+    ;;
+  *)
+    BUILD="$WS/build-$(basename "$APP")"
+    OWN_APP=0
+    ;;
 esac
 BUILD="${BUILD_DIR:-$BUILD}"
 
@@ -77,8 +84,8 @@ if grep -q "^CONFIG_BOOTLOADER_MCUBOOT=y" "$BUILD/zephyr/.config" 2>/dev/null; t
   VERSION="${IMAGE_VERSION:-0.0.0+$(date +%s 2>/dev/null || echo 0)}"
   echo "signing for MCUboot (version $VERSION)"
   "$WS/.venv/bin/west" sign -t imgtool -d "$BUILD" -p "$WS/.venv/bin/imgtool" -- \
-      --key "$WS/bootloader/mcuboot/root-rsa-2048.pem" \
-      --version "$VERSION" >/dev/null
+    --key "$WS/bootloader/mcuboot/root-rsa-2048.pem" \
+    --version "$VERSION" >/dev/null
   echo "  -> $(basename "$BUILD")/zephyr/zephyr.signed.bin  (upload with unoq.fota)"
   echo "  -> $(basename "$BUILD")/zephyr/zephyr.signed.hex  (flash to slot0 with flash.sh)"
 fi

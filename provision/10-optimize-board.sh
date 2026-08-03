@@ -10,7 +10,9 @@
 # and is commented out by default - uncomment what applies to you.
 set -uo pipefail
 
-echo "== Before =="; free -h | sed -n 2p; echo
+echo "== Before =="
+free -h | sed -n 2p
+echo
 
 # ===================== TIER 1 - safe when headless ==========================
 
@@ -47,7 +49,7 @@ usermod -aG i2c arduino
 getent group spi >/dev/null || groupadd -r spi
 usermod -aG spi arduino
 printf 'SUBSYSTEM=="spidev", GROUP="spi", MODE="0660"\n' \
-  > /etc/udev/rules.d/91-spidev-local.rules
+  >/etc/udev/rules.d/91-spidev-local.rules
 udevadm control --reload-rules
 udevadm trigger --subsystem-match=spidev
 
@@ -87,6 +89,8 @@ apt-get install -y python3.13-dev
 # --- Disabling them can leave the board unbootable. zramswap is also giving
 # --- you the 1.8 GB of compressed swap - keep it.
 
-echo; echo "== After =="; free -h | sed -n 2p
+echo
+echo "== After =="
+free -h | sed -n 2p
 echo
 echo "Run 'newgrp i2c' or log out and back in for group changes to apply."

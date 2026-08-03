@@ -20,8 +20,14 @@ PLATFORM="native_sim/native/64"
 ARGS=()
 while [ $# -gt 0 ]; do
   case "$1" in
-    -p|--platform) PLATFORM="$2"; shift 2 ;;
-    *) ARGS+=("$1"); shift ;;
+    -p | --platform)
+      PLATFORM="$2"
+      shift 2
+      ;;
+    *)
+      ARGS+=("$1")
+      shift
+      ;;
   esac
 done
 
@@ -29,8 +35,8 @@ done
 # it twister keeps every past run as twister-out.1, .2, .3 ... and /tmp here is
 # tmpfs, so each 19 MB run is 19 MB of the board's shared RAM, forever.
 exec "$WS/.venv/bin/python" "$WS/zephyr/scripts/twister" \
-    -T "$HERE/tests" \
-    -p "$PLATFORM" \
-    --outdir /tmp/twister-out \
-    --clobber-output \
-    -v "${ARGS[@]}"
+  -T "$HERE/tests" \
+  -p "$PLATFORM" \
+  --outdir /tmp/twister-out \
+  --clobber-output \
+  -v "${ARGS[@]}"

@@ -39,8 +39,8 @@ PROMOTE=0
 echo "== 1/6 build dependencies =="
 apt-get update -qq
 apt-get install -y --no-install-recommends \
-    build-essential git autoconf automake libtool pkg-config texinfo \
-    libgpiod-dev libusb-1.0-0-dev libhidapi-dev libftdi1-dev
+  build-essential git autoconf automake libtool pkg-config texinfo \
+  libgpiod-dev libusb-1.0-0-dev libhidapi-dev libftdi1-dev
 
 echo "== 2/6 source: $REPO @ $COMMIT =="
 rm -rf "$SRC"
@@ -59,11 +59,11 @@ cd "$SRC"
 # linuxgpiod is the adapter this board needs; the rest are off to keep the
 # build small and dependency-light.
 ./configure --prefix="$PREFIX" \
-    --enable-linuxgpiod \
-    --disable-jlink \
-    --disable-werror \
-    --disable-doxygen-html \
-    --disable-doxygen-pdf
+  --enable-linuxgpiod \
+  --disable-jlink \
+  --disable-werror \
+  --disable-doxygen-html \
+  --disable-doxygen-pdf
 
 echo "== 4/6 build =="
 make -j"$(nproc)"
@@ -72,37 +72,37 @@ make install
 echo "== 5/6 install the board's config files =="
 # These are plain TCL and live in this repo, not in the OpenOCD tree.
 for f in openocd_gpiod.cfg stm32u5x.cfg stm32x5x_common.cfg; do
-    install -m 0644 "$CFG_SRC/$f" "$PREFIX/$f"
-    echo "  $f"
+  install -m 0644 "$CFG_SRC/$f" "$PREFIX/$f"
+  echo "  $f"
 done
 
 echo "== 6/6 self-test: can it reach the MCU over SWD? =="
 # BOOT0 / link-enable must be sane first, or this proves nothing.
 sudo -u arduino /home/arduino/hybrid/mcu/link-up.sh || true
 if "$PREFIX/bin/openocd" -s "$PREFIX" -s "$PREFIX/share/openocd/scripts" \
-     -f "$PREFIX/openocd_gpiod.cfg" -c "init" -c "targets" -c "shutdown" 2>&1 \
-     | tee /tmp/openocd-selftest.log | grep -q "Cortex-M33"; then
-    echo
-    echo "SELF-TEST PASSED - the rebuilt binary talks to the MCU."
-    grep -E "DPIDR|Cortex-M33" /tmp/openocd-selftest.log | sed 's/^/  /'
+  -f "$PREFIX/openocd_gpiod.cfg" -c "init" -c "targets" -c "shutdown" 2>&1 |
+  tee /tmp/openocd-selftest.log | grep -q "Cortex-M33"; then
+  echo
+  echo "SELF-TEST PASSED - the rebuilt binary talks to the MCU."
+  grep -E "DPIDR|Cortex-M33" /tmp/openocd-selftest.log | sed 's/^/  /'
 else
-    echo "SELF-TEST FAILED - see /tmp/openocd-selftest.log" >&2
-    echo "/opt/openocd was NOT touched." >&2
-    exit 1
+  echo "SELF-TEST FAILED - see /tmp/openocd-selftest.log" >&2
+  echo "/opt/openocd was NOT touched." >&2
+  exit 1
 fi
 
 echo
 if [ "$PROMOTE" = "1" ]; then
-    STAMP="$(date +%Y%m%d-%H%M%S 2>/dev/null || echo backup)"
-    echo "== promoting to /opt/openocd (old one -> /opt/openocd.$STAMP) =="
-    [ -d /opt/openocd ] && mv /opt/openocd "/opt/openocd.$STAMP"
-    cp -a "$PREFIX" /opt/openocd
-    echo "done. Previous install kept at /opt/openocd.$STAMP"
-    echo "Verify:  ~/hybrid/mcu/flash.sh ~/zephyrproject/build/zephyr/zephyr.signed.hex"
+  STAMP="$(date +%Y%m%d-%H%M%S 2>/dev/null || echo backup)"
+  echo "== promoting to /opt/openocd (old one -> /opt/openocd.$STAMP) =="
+  [ -d /opt/openocd ] && mv /opt/openocd "/opt/openocd.$STAMP"
+  cp -a "$PREFIX" /opt/openocd
+  echo "done. Previous install kept at /opt/openocd.$STAMP"
+  echo "Verify:  ~/hybrid/mcu/flash.sh ~/zephyrproject/build/zephyr/zephyr.signed.hex"
 else
-    echo "Built and verified at $PREFIX (nothing replaced)."
-    echo "To use it in place of the unpackaged one:"
-    echo "    sudo bash $0 --promote"
-    echo "Or point the tooling at it without replacing anything:"
-    echo "    export OCD_ROOT=$PREFIX"
+  echo "Built and verified at $PREFIX (nothing replaced)."
+  echo "To use it in place of the unpackaged one:"
+  echo "    sudo bash $0 --promote"
+  echo "Or point the tooling at it without replacing anything:"
+  echo "    export OCD_ROOT=$PREFIX"
 fi

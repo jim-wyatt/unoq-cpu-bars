@@ -25,8 +25,14 @@ CFG="$OCD_ROOT/openocd_gpiod.cfg"
 IMG="${1:?usage: flash.sh <firmware.hex|firmware.bin> [load-address]}"
 ADDR="${2:-}"
 
-[ -f "$IMG" ]      || { echo "no such image: $IMG" >&2; exit 1; }
-[ -x "$OPENOCD" ]  || { echo "openocd missing at $OPENOCD" >&2; exit 1; }
+[ -f "$IMG" ] || {
+  echo "no such image: $IMG" >&2
+  exit 1
+}
+[ -x "$OPENOCD" ] || {
+  echo "openocd missing at $OPENOCD" >&2
+  exit 1
+}
 
 # BOOT0 (gpiochip1 line 37) is latched at MCU reset. If it is high or floating
 # the STM32 boots its ROM bootloader instead of the image we just wrote - the
@@ -47,5 +53,5 @@ esac
 
 echo "flashing $IMG ${ADDR:+@ $ADDR}"
 "$OPENOCD" -s "$OCD_ROOT" -s "$OCD_ROOT/share/openocd/scripts" \
-           -f "$CFG" -c "$PROGRAM"
+  -f "$CFG" -c "$PROGRAM"
 echo "done."

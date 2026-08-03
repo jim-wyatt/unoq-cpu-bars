@@ -15,7 +15,7 @@ apt-get install -y tio
 # These were previously held by arduino-router, which is now disabled.
 # REVERT: systemctl disable --now unoq-link.service && rm /etc/systemd/system/unoq-link.service
 install -m 0644 /home/arduino/hybrid/mcu/unoq-link.service \
-                /etc/systemd/system/unoq-link.service
+  /etc/systemd/system/unoq-link.service
 systemctl daemon-reload
 systemctl enable --now unoq-link.service
 systemctl --no-pager status unoq-link.service | head -5

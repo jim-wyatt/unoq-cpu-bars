@@ -15,11 +15,17 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 FW="$HERE/../backup/mcu-firmware/zephyr-arduino_uno_q_stm32u585xx.hex"
 
-[ -f "$FW" ] || { echo "backup firmware missing: $FW" >&2; exit 1; }
+[ -f "$FW" ] || {
+  echo "backup firmware missing: $FW" >&2
+  exit 1
+}
 
 echo "This will overwrite the MCU with the stock Arduino firmware:"
 echo "  $FW"
 read -rp "continue? [y/N] " ans
-[ "$ans" = "y" ] || { echo "aborted."; exit 0; }
+[ "$ans" = "y" ] || {
+  echo "aborted."
+  exit 0
+}
 
 exec "$HERE/flash.sh" "$FW"

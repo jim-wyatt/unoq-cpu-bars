@@ -24,8 +24,8 @@
 set -uo pipefail
 export PATH="$HOME/.local/bin:$PATH"
 
-gh_latest() { curl -sL "https://api.github.com/repos/$1/releases/latest" 2>/dev/null \
-    | python3 -c "import json,sys;print(json.load(sys.stdin).get('tag_name','?'))" 2>/dev/null; }
+gh_latest() { curl -sL "https://api.github.com/repos/$1/releases/latest" 2>/dev/null |
+  python3 -c "import json,sys;print(json.load(sys.stdin).get('tag_name','?'))" 2>/dev/null; }
 
 echo "=== Zephyr ==="
 printf '  installed %-12s latest %s\n' \
@@ -33,38 +33,46 @@ printf '  installed %-12s latest %s\n' \
   "$(gh_latest zephyrproject-rtos/zephyr)"
 
 echo "=== Zephyr SDK ==="
+# Glob into an array rather than parsing ls. An unmatched glob stays literal,
+# so check the first element exists before using it.
+sdk_dirs=("$HOME"/zephyr-sdk-*)
+sdk_installed="?"
+[ -d "${sdk_dirs[0]}" ] && sdk_installed=$(basename "${sdk_dirs[0]}" | sed 's/zephyr-sdk-/v/')
 printf '  installed %-12s latest %s\n' \
-  "$(basename "$(ls -d "$HOME"/zephyr-sdk-* 2>/dev/null | head -1)" | sed 's/zephyr-sdk-/v/')" \
+  "$sdk_installed" \
   "$(gh_latest zephyrproject-rtos/sdk-ng)"
 
 echo "=== host tools (uv-managed) ==="
 for p in uv cmake ninja west; do
   cur=$(uv tool list 2>/dev/null | awk -v p="$p" '$1==p {print $2}' | tr -d 'v')
   [ "$p" = uv ] && cur=$(uv --version 2>/dev/null | awk '{print $2}')
-  new=$(curl -sL "https://pypi.org/pypi/$p/json" 2>/dev/null \
-        | python3 -c "import json,sys;print(json.load(sys.stdin)['info']['version'])" 2>/dev/null)
-  flag=""; [ -n "$cur" ] && [ -n "$new" ] && [ "$cur" != "$new" ] && flag="  <-- update"
+  new=$(curl -sL "https://pypi.org/pypi/$p/json" 2>/dev/null |
+    python3 -c "import json,sys;print(json.load(sys.stdin)['info']['version'])" 2>/dev/null)
+  flag=""
+  [ -n "$cur" ] && [ -n "$new" ] && [ "$cur" != "$new" ] && flag="  <-- update"
   printf '  %-8s %-14s latest %s%s\n' "$p" "${cur:-?}" "${new:-?}" "$flag"
 done
 
 echo "=== MPU python (~/hybrid/.venv) ==="
-uv pip list --python "$HOME/hybrid/.venv/bin/python" --outdated 2>/dev/null | tail -n +3 \
-  | sed 's/^/  /' || true
+uv pip list --python "$HOME/hybrid/.venv/bin/python" --outdated 2>/dev/null | tail -n +3 |
+  sed 's/^/  /' || true
 echo "  (cbor2 / pydantic-core here are PINNED - see header, do not upgrade)"
 
 echo "=== Zephyr venv conformance to its own pins ==="
 (cd "$HOME/zephyrproject" && uv pip install --python .venv/bin/python \
-   -r zephyr/scripts/requirements.txt --dry-run 2>&1 | tail -2 | sed 's/^/  /')
+  -r zephyr/scripts/requirements.txt --dry-run 2>&1 | tail -2 | sed 's/^/  /')
 
 echo "=== VS Code extensions vs Marketplace ==="
-CODE="$HOME/.vscode-server/cli/servers/Stable-*/server/bin/remote-cli/code"
-CODE=$(ls $CODE 2>/dev/null | head -1)
+code_matches=("$HOME"/.vscode-server/cli/servers/Stable-*/server/bin/remote-cli/code)
+CODE="${code_matches[0]}"
+[ -x "$CODE" ] || CODE=""
 # code-server installs extensions without needing a live VS Code session; the
 # remote-cli `code` above is only reliable for listing while one is connected.
-CS="$HOME/.vscode-server/cli/servers/Stable-*/server/bin/code-server"
-CS=$(ls $CS 2>/dev/null | head -1)
-[ -x "$CODE" ] && "$CODE" --list-extensions --show-versions 2>/dev/null > /tmp/exts.txt
-[ -s /tmp/exts.txt ] || { [ -x "$CS" ] && "$CS" --list-extensions --show-versions 2>/dev/null > /tmp/exts.txt; }
+cs_matches=("$HOME"/.vscode-server/cli/servers/Stable-*/server/bin/code-server)
+CS="${cs_matches[0]}"
+[ -x "$CS" ] || CS=""
+[ -x "$CODE" ] && "$CODE" --list-extensions --show-versions 2>/dev/null >/tmp/exts.txt
+[ -s /tmp/exts.txt ] || { [ -x "$CS" ] && "$CS" --list-extensions --show-versions 2>/dev/null >/tmp/exts.txt; }
 python3 - <<'PY'
 import json, urllib.request
 
@@ -111,8 +119,8 @@ echo "=== OpenOCD ==="
 printf '  installed  %s\n' "$(/opt/openocd/bin/openocd --version 2>&1 | head -1 | cut -d' ' -f1-4)"
 printf '  pinned in build-openocd.sh: %s\n' "$(grep -oP 'OPENOCD_COMMIT:-\K[0-9a-f]+' "$HOME/hybrid/tools/build-openocd.sh" 2>/dev/null)"
 printf '  upstream master head:       %s\n' \
-  "$(curl -sL https://api.github.com/repos/openocd-org/openocd/commits/master 2>/dev/null \
-     | python3 -c "import json,sys;d=json.load(sys.stdin);print(d['sha'][:12], d['commit']['committer']['date'][:10])" 2>/dev/null)"
+  "$(curl -sL https://api.github.com/repos/openocd-org/openocd/commits/master 2>/dev/null |
+    python3 -c "import json,sys;d=json.load(sys.stdin);print(d['sha'][:12], d['commit']['committer']['date'][:10])" 2>/dev/null)"
 
 echo
 echo "Update extensions with:"

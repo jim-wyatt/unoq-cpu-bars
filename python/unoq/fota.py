@@ -22,7 +22,7 @@ import asyncio
 import contextlib
 import os
 from pathlib import Path
-from typing import TypedDict
+from typing import Any, TypedDict
 
 from smpclient import SMPClient
 from smpclient.requests.image_management import ImageStatesRead, ImageStatesWrite
@@ -55,28 +55,54 @@ async def _client(port: str, timeout: float) -> tuple[SMPClient, SMPSerialTransp
     return client, transport
 
 
-def images(port: str = PORT, timeout: float = 10.0) -> list[ImageState]:
-    """Return the MCUboot slot table."""
+def _send(
+    request: Any,
+    port: str,
+    timeout: float,
+    *,
+    expect_reply: bool = True,
+    overall: float | None = None,
+) -> Any:
+    """Connect, send one SMP request, disconnect. Returns the reply.
 
-    async def _run() -> list[ImageState]:
+    Every command here is one round trip on a UART that only one process can
+    hold, so the disconnect matters more than the reply does - it is in a
+    `finally` for that reason. `overall` bounds the whole exchange, including
+    the connect, separately from the per-request `timeout`.
+
+    smpclient is untyped, so the reply is Any and callers pin what they need.
+    """
+
+    async def _run() -> Any:
         c, t = await _client(port, timeout)
         try:
-            r = await c.request(ImageStatesRead(), timeout_s=timeout)
-            return [
-                {
-                    "slot": im.slot,
-                    "version": im.version,
-                    "active": im.active,
-                    "confirmed": im.confirmed,
-                    "pending": im.pending,
-                    "hash": im.hash.hex(),
-                }
-                for im in getattr(r, "images", [])
-            ]
+            if not expect_reply:
+                # reset() gets no answer: the device resets instead of
+                # replying, so the request never completes. That is success.
+                with contextlib.suppress(Exception):
+                    await c.request(request, timeout_s=timeout)
+                return None
+            return await c.request(request, timeout_s=timeout)
         finally:
             await t.disconnect()
 
-    return asyncio.run(asyncio.wait_for(_run(), timeout * 6))
+    return asyncio.run(asyncio.wait_for(_run(), timeout * 3 if overall is None else overall))
+
+
+def images(port: str = PORT, timeout: float = 10.0) -> list[ImageState]:
+    """Return the MCUboot slot table."""
+    r = _send(ImageStatesRead(), port, timeout, overall=timeout * 6)
+    return [
+        {
+            "slot": im.slot,
+            "version": im.version,
+            "active": im.active,
+            "confirmed": im.confirmed,
+            "pending": im.pending,
+            "hash": im.hash.hex(),
+        }
+        for im in getattr(r, "images", [])
+    ]
 
 
 def upload(
@@ -132,43 +158,14 @@ def test(image_hash: str | None = None, port: str = PORT, timeout: float = 20.0)
     if not image_hash:
         raise RuntimeError("no staged image found in the inactive slot")
 
-    async def _run() -> None:
-        c, t = await _client(port, timeout)
-        try:
-            await c.request(
-                ImageStatesWrite(hash=bytes.fromhex(image_hash), confirm=False),
-                timeout_s=timeout,
-            )
-        finally:
-            await t.disconnect()
-
-    asyncio.run(asyncio.wait_for(_run(), timeout * 3))
+    _send(ImageStatesWrite(hash=bytes.fromhex(image_hash), confirm=False), port, timeout)
 
 
 def confirm(port: str = PORT, timeout: float = 20.0) -> None:
     """Confirm the running image so MCUboot stops reverting it."""
-
-    async def _run() -> None:
-        c, t = await _client(port, timeout)
-        try:
-            await c.request(ImageStatesWrite(confirm=True), timeout_s=timeout)
-        finally:
-            await t.disconnect()
-
-    asyncio.run(asyncio.wait_for(_run(), timeout * 3))
+    _send(ImageStatesWrite(confirm=True), port, timeout)
 
 
 def reset(port: str = PORT, timeout: float = 20.0) -> None:
     """Reset the MCU over SMP (applies a pending swap)."""
-
-    async def _run() -> None:
-        c, t = await _client(port, timeout)
-        try:
-            # No reply is the success case: the device resets instead of
-            # answering, so the request never completes.
-            with contextlib.suppress(Exception):
-                await c.request(ResetWrite(), timeout_s=timeout)
-        finally:
-            await t.disconnect()
-
-    asyncio.run(asyncio.wait_for(_run(), timeout * 3))
+    _send(ResetWrite(), port, timeout, expect_reply=False)

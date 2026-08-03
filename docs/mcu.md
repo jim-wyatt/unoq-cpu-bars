@@ -198,7 +198,8 @@ cp ~/zephyrproject/zephyr/.clang-format ~/hybrid/.clang-format
   `CONFIG_BASE64` and `CONFIG_CRC`. Kconfig warns; the build still succeeds.
 - `west flash -r openocd` needs `zephyr/boards/arduino/uno_q/support/openocd.cfg`,
   which is **not** upstream — Zephyr's runner resolves board support in-tree and
-  crashes on `samefile()` without it (`runners/openocd.py:92`). A canonical copy
-  lives in `mcu/board-support/`; re-copy it after a Zephyr version bump.
+  crashes on `samefile()` without it (`runners/openocd.py:92`). The canonical
+  copy lives in `mcu/board-support/`; re-copy it with the command under
+  [Upgrading Zephyr](#upgrading-zephyr).
 - The default flash runner is `stm32cubeprogrammer`, which is not installed.
   Always pass `-r openocd`, or just use `zflash`.

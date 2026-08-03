@@ -43,12 +43,7 @@ target configuration files. Those are other people's build artefacts and are
 not this project's to redistribute, so they are not published here and have
 been removed from the git history.
 
-If you want the stock firmware back on your own board, copy it out of your
-Arduino platform tree **before** running `provision/40-purge-arduino.sh`:
-
-```bash
-mkdir -p ~/uno-q-backup
-cp ~/.arduino15/packages/arduino/hardware/zephyr/*/variants/*/*.hex ~/uno-q-backup/
-```
-
-`mcu/restore-arduino-firmware.sh` will use it if you point `STOCK_FW` at it.
+If you want the stock firmware back on your own board you need your own copy,
+taken **before** you purge the Arduino tree — see
+[Keep your own copies](README.md#keep-your-own-copies) in the README for the
+commands. `mcu/restore-arduino-firmware.sh` uses it via `STOCK_FW`.

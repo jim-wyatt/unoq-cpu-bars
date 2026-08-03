@@ -59,26 +59,50 @@ echo "=== Zephyr venv conformance to its own pins ==="
 echo "=== VS Code extensions vs Marketplace ==="
 CODE="$HOME/.vscode-server/cli/servers/Stable-*/server/bin/remote-cli/code"
 CODE=$(ls $CODE 2>/dev/null | head -1)
+# code-server installs extensions without needing a live VS Code session; the
+# remote-cli `code` above is only reliable for listing while one is connected.
+CS="$HOME/.vscode-server/cli/servers/Stable-*/server/bin/code-server"
+CS=$(ls $CS 2>/dev/null | head -1)
 [ -x "$CODE" ] && "$CODE" --list-extensions --show-versions 2>/dev/null > /tmp/exts.txt
+[ -s /tmp/exts.txt ] || { [ -x "$CS" ] && "$CS" --list-extensions --show-versions 2>/dev/null > /tmp/exts.txt; }
 python3 - <<'PY'
 import json, urllib.request
+
+# This board is linux-arm64. The Marketplace returns one entry per target
+# platform, newest first, and publishers routinely ship a version for x64 and
+# Windows days before the arm64 build - so versions[0] is usually NOT something
+# this board can install. Reporting it produced two failure modes: an
+# `--install-extension` that says "not found", and (worse) a real arm64 update
+# hidden behind that noise. Take the newest build that actually runs here:
+# an explicit linux-arm64 target, or a universal package with no target at all.
+PLATFORM = "linux-arm64"
+
 try:
     cur = dict(l.rsplit("@",1) for l in open("/tmp/exts.txt").read().split() if "@" in l)
 except Exception:
     print("  (could not read extension list)"); raise SystemExit
 url="https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery"
-body={"filters":[{"criteria":[{"filterType":7,"value":k} for k in cur]}],"flags":914}
+body={"filters":[{"criteria":[{"filterType":7,"value":k} for k in cur]}],"flags":950}
 req=urllib.request.Request(url, json.dumps(body).encode(),
     {"Content-Type":"application/json","Accept":"application/json;api-version=7.1-preview.1"})
+
+def installable(ext):
+    """Newest version with a build for this platform, and the newest overall."""
+    here = next((v["version"] for v in ext["versions"]
+                 if v.get("targetPlatform", PLATFORM) in (PLATFORM, "universal")), "?")
+    return here, ext["versions"][0]["version"]
+
 try:
     d=json.load(urllib.request.urlopen(req, timeout=60))
-    latest={e["publisher"]["publisherName"]+"."+e["extensionName"]: e["versions"][0]["version"]
+    latest={e["publisher"]["publisherName"]+"."+e["extensionName"]: installable(e)
             for e in d["results"][0]["extensions"]}
     for k,v in sorted(cur.items()):
-        L=latest.get(k,"?")
-        print(f"  {k:42} {v:14} -> {L}" + ("  <-- try update" if L not in (v,"?") else ""))
-    print("  NOTE: a newer version may be x64-only. If `--install-extension id@ver`")
-    print("        says 'not found', there is no arm64 build and you are current.")
+        L,newest = latest.get(k,("?","?"))
+        note = "  <-- try update" if L not in (v,"?") else ""
+        # Flag the trap explicitly rather than letting it read as "outdated".
+        if newest not in (L,"?") and not note:
+            note = f"  (current for {PLATFORM}; {newest} is other-platform only)"
+        print(f"  {k:42} {v:14} -> {L}{note}")
 except Exception as e:
     print("  marketplace query failed:", e)
 PY
@@ -91,5 +115,6 @@ printf '  upstream master head:       %s\n' \
      | python3 -c "import json,sys;d=json.load(sys.stdin);print(d['sha'][:12], d['commit']['committer']['date'][:10])" 2>/dev/null)"
 
 echo
-echo "Update extensions with:  code --install-extension <id>@<version> --force"
-echo "(plain --force does NOT bump the version)"
+echo "Update extensions with:"
+echo "  ${CS:-<vscode-server>/bin/code-server} --install-extension <id>@<version> --force"
+echo "(plain --force does NOT bump the version; versions above are arm64-installable)"

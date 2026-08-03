@@ -111,9 +111,20 @@ Debian ships 0.12.0 (2023), predating libgpiod v2. Rebuild from upstream master:
 Zephyr's own venv pins. See [maintenance.md](maintenance.md).
 
 **An extension "update" will not install.**
-`code --install-extension <id> --force` does not bump versions — name the
-version explicitly. If that reports *"not found"*, the newer build is x64-only
-and you are already current for arm64.
+`--install-extension <id> --force` does not bump versions — name the version
+explicitly. If that reports *"not found"*, that version has no build for this
+board (**linux-arm64**); publishers routinely ship x64 and Windows first.
+
+Do **not** read "not found" as "already current" — a newer arm64 build may
+exist *below* the version you tried. `check-versions.sh` reports the newest
+arm64-installable version, which is the one to name. To see every build:
+
+```bash
+~/hybrid/tools/check-versions.sh          # arm64-correct
+```
+
+Use `…/server/bin/code-server` to install; the `remote-cli/code` binary needs a
+live VS Code session and is not on `PATH`.
 
 ## Recovery
 

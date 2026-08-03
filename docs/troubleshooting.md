@@ -126,7 +126,7 @@ cannot know it. `app matrix flip` rotates 180° and stores that in NVS.
 
 **`app bars` says `range` or `usage`.**
 One to seven values, each 0..100. `unoq.MCU.bars()` clamps percentages for you
-but raises on the wrong *number* of bars — see [cpu-bars.md](cpu-bars.md).
+but raises on the wrong *number* of bars — see [mpu.md](mpu.md#cpu-bars-on-the-led-matrix).
 
 **Something else on PF0..PF10 misbehaves.**
 Those eleven pins are the matrix. The refresh ISR retakes them every 10 µs, so
@@ -155,7 +155,7 @@ Debian ships 0.12.0 (2023), predating libgpiod v2. Rebuild from upstream master:
 
 **Packages look outdated but must not be upgraded.**
 `cbor2` (<6 by `smp`), `pydantic-core` (pinned exactly by `pydantic`), and
-Zephyr's own venv pins. See [maintenance.md](maintenance.md).
+Zephyr's own venv pins. See [the README](../README.md#things-that-look-out-of-date-but-are-not).
 
 **An extension "update" will not install.**
 `--install-extension <id> --force` does not bump versions — name the version

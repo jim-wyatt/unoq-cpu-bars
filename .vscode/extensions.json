@@ -1,6 +1,6 @@
 {
   // Deliberately minimal - this board has 3.6 GiB of RAM shared with the
-  // Zephyr build. Every extension here earns its place; see docs/maintenance.md.
+  // Zephyr build. Every extension here earns its place; see the README.
   "recommendations": [
     "llvm-vs-code-extensions.vscode-clangd",
     "marus25.cortex-debug",

@@ -3,9 +3,9 @@
  *
  * Everything here is consumed by three parties that must agree:
  *
- *   - mcu/app/src/main.c        produces the status line, validates blink/bars
+ *   - mcu/app/src/main.c        produces the status line, validates bars
  *   - mcu/tests/link_protocol/  tests these definitions directly
- *   - python/unoq/mcu.py        parses the status line, calls `app blink`/`app bars`
+ *   - python/unoq/mcu.py        parses the status line, calls `app bars`
  *
  * The definitions used to be duplicated: main.c had the range check and the
  * format string, and the test had its own copy of both. A copy cannot fail
@@ -19,26 +19,13 @@
 
 #include <stdbool.h>
 
-/* Blink period accepted by `app blink <ms>`.
- *
- * The lower bound is not cosmetic: the main loop sleeps for this value, so 0
- * would busy-spin the CPU and starve the watchdog feed.
- */
-#define APP_BLINK_MS_MIN 10
-#define APP_BLINK_MS_MAX 10000
-
-static inline bool app_blink_ms_valid(int ms)
-{
-	return ms >= APP_BLINK_MS_MIN && ms <= APP_BLINK_MS_MAX;
-}
-
 /* The `app status` line, parsed by unoq.MCU.status() into a dict.
  *
  * Format is "key=value" pairs separated by single spaces. The parser splits on
  * whitespace and then on the first '=', so a value must never contain either.
  */
-#define APP_STATUS_FMT    "uptime_ms=%lld ticks=%u blink_ms=%d boots=%u wdt=%d flip=%d sweeps=%u"
-#define APP_STATUS_FIELDS 7
+#define APP_STATUS_FMT    "uptime_ms=%lld flip=%d sweeps=%u"
+#define APP_STATUS_FIELDS 3
 
 /* --- LED matrix ----------------------------------------------------------
  *
@@ -98,16 +85,12 @@ static inline bool app_bars_count_valid(int n)
 	return n >= 1 && n <= APP_BARS_MAX;
 }
 
-/* Settings keys (NVS, storage_partition).
+/* Settings key (NVS, storage_partition).
  *
  * The panel's orientation is persisted because it is a property of how the
  * board is mounted, not of the running session: whoever fits the board decides
  * it once with `app matrix flip` and it survives power cycles and updates.
  */
-#define APP_SETTINGS_BOOTS "app/boots"
-#define APP_SETTINGS_FLIP  "app/flip"
-
-/* Task watchdog timeout. `app hang` stops the feed to prove it bites. */
-#define APP_WDT_TIMEOUT_MS 4000
+#define APP_SETTINGS_FLIP "app/flip"
 
 #endif /* APP_PROTO_H */

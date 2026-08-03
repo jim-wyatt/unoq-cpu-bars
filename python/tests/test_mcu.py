@@ -34,8 +34,8 @@ def test_clean_returns_nothing_for_prompt_only_output() -> None:
 
 
 def test_cmd_sends_crlf_and_strips_the_echo(mcu_factory: Any) -> None:
-    mcu = mcu_factory({"app status": ["uptime_ms=1 ticks=2"]})
-    assert mcu.cmd("app status") == ["uptime_ms=1 ticks=2"]
+    mcu = mcu_factory({"app status": ["uptime_ms=1 flip=0"]})
+    assert mcu.cmd("app status") == ["uptime_ms=1 flip=0"]
     # The command itself is echoed by the shell and must not be returned.
     assert mcu._s.written == ["app status"]
 
@@ -66,29 +66,23 @@ def test_cmd_raises_on_unknown_command(mcu_factory: Any) -> None:
 
 
 def test_cmd_raises_on_error_lines(mcu_factory: Any) -> None:
-    mcu = mcu_factory({"app blink 5": ["Error: range 10..10000"]})
-    with pytest.raises(MCUError, match="range"):
-        mcu.cmd("app blink 5")
+    mcu = mcu_factory({"app bars 200": ["Error: bar 0: 200 outside 0..100"]})
+    with pytest.raises(MCUError, match="outside"):
+        mcu.cmd("app bars 200")
 
 
 # -- status -----------------------------------------------------------------
 
 
 def test_status_parses_the_firmware_status_line(mcu_factory: Any) -> None:
-    mcu = mcu_factory({"app status": ["uptime_ms=12216 ticks=25 blink_ms=250 boots=7 wdt=1"]})
-    assert mcu.status() == {
-        "uptime_ms": 12216,
-        "ticks": 25,
-        "blink_ms": 250,
-        "boots": 7,
-        "wdt": 1,
-    }
+    mcu = mcu_factory({"app status": ["uptime_ms=12216 flip=0 sweeps=1043712"]})
+    assert mcu.status() == {"uptime_ms": 12216, "flip": 0, "sweeps": 1043712}
 
 
 def test_status_keeps_unparseable_values_as_strings(mcu_factory: Any) -> None:
     # A firmware change should surface as an odd value, not a missing key.
-    mcu = mcu_factory({"app status": ["ticks=25 mode=fast"]})
-    assert mcu.status() == {"ticks": 25, "mode": "fast"}
+    mcu = mcu_factory({"app status": ["uptime_ms=25 mode=fast"]})
+    assert mcu.status() == {"uptime_ms": 25, "mode": "fast"}
 
 
 def test_status_raises_when_the_mcu_says_nothing(mcu_factory: Any) -> None:
@@ -101,20 +95,6 @@ def test_status_raises_when_no_key_value_pairs_are_present(mcu_factory: Any) -> 
     mcu = mcu_factory({"app status": ["garbage output"]})
     with pytest.raises(MCUError, match="could not parse"):
         mcu.status()
-
-
-# -- other application commands ---------------------------------------------
-
-
-def test_blink_coerces_to_int_before_sending(mcu_factory: Any) -> None:
-    mcu = mcu_factory({"app blink 250": ["ok blink_ms=250"]})
-    mcu.blink(250.9)  # a float must be coerced, not passed through
-    assert mcu._s.written == ["app blink 250"]
-
-
-def test_uptime_ms_extracts_the_first_number(mcu_factory: Any) -> None:
-    mcu = mcu_factory({"kernel uptime": ["Uptime: 123456 ms"]})
-    assert mcu.uptime_ms() == 123456
 
 
 # -- LED matrix -------------------------------------------------------------
@@ -189,69 +169,7 @@ def test_matrix_off_blanks_the_panel(mcu_factory: Any) -> None:
     assert mcu._s.written == ["app matrix off"]
 
 
-def test_uptime_ms_raises_when_there_is_no_number(mcu_factory: Any) -> None:
-    mcu = mcu_factory({"kernel uptime": ["no idea"]})
-    with pytest.raises(MCUError, match="could not parse kernel uptime"):
-        mcu.uptime_ms()
-
-
-def test_devices_parses_name_and_state(mcu_factory: Any) -> None:
-    mcu = mcu_factory(
-        {"device list": ["devices:", "- gpio@42000000 (READY)", "- lpuart1 (READY)", "noise"]}
-    )
-    assert mcu.devices() == [("gpio@42000000", "READY"), ("lpuart1", "READY")]
-
-
-def test_devices_is_empty_when_nothing_matches(mcu_factory: Any) -> None:
-    mcu = mcu_factory({"device list": ["devices:"]})
-    assert mcu.devices() == []
-
-
-# -- GPIO / I2C -------------------------------------------------------------
-
-
-def test_gpio_conf_and_set_build_the_right_commands(mcu_factory: Any) -> None:
-    mcu = mcu_factory({"gpio conf gpioh 11 o": [], "gpio set gpioh 11 1": []})
-    mcu.gpio_conf("gpioh", 11)
-    mcu.gpio_set("gpioh", 11, 5)  # any truthy value becomes 1
-    assert mcu._s.written == ["gpio conf gpioh 11 o", "gpio set gpioh 11 1"]
-
-
-def test_gpio_set_writes_zero_for_falsey_values(mcu_factory: Any) -> None:
-    mcu = mcu_factory({"gpio set gpioh 11 0": []})
-    mcu.gpio_set("gpioh", 11, 0)
-    assert mcu._s.written == ["gpio set gpioh 11 0"]
-
-
-def test_gpio_get_parses_the_trailing_value(mcu_factory: Any) -> None:
-    mcu = mcu_factory({"gpio get gpioh 11": ["Value: 1"]})
-    assert mcu.gpio_get("gpioh", 11) == 1
-
-
-def test_gpio_get_raises_on_unparseable_output(mcu_factory: Any) -> None:
-    mcu = mcu_factory({"gpio get gpioh 11": ["huh"]})
-    with pytest.raises(MCUError, match="could not parse gpio get"):
-        mcu.gpio_get("gpioh", 11)
-
-
-def test_i2c_scan_collects_two_digit_hex_addresses(mcu_factory: Any) -> None:
-    mcu = mcu_factory({"i2c scan i2c1": ["0 1 2 3", "00: -- -- 3c 4e", "2 devices found"]})
-    # Only bare two-hex-digit tokens count: "3c" and "4e", not "0"/"1" or "00:".
-    assert mcu.i2c_scan("i2c1") == [0x3C, 0x4E]
-
-
-def test_i2c_scan_is_empty_when_no_devices_answer(mcu_factory: Any) -> None:
-    mcu = mcu_factory({"i2c scan i2c1": ["0 devices found"]})
-    assert mcu.i2c_scan("i2c1") == []
-
-
 # -- lifecycle --------------------------------------------------------------
-
-
-def test_reboot_swallows_the_expected_timeout(mcu_factory: Any) -> None:
-    # The MCU resets instead of printing a prompt, so a timeout is success.
-    mcu = mcu_factory(silent=True)
-    mcu.reboot()
 
 
 def test_context_manager_closes_the_port(mcu_factory: Any) -> None:
@@ -302,90 +220,10 @@ def test_ensure_link_failure_is_not_fatal(
 def test_cmd_reassembles_a_reply_that_arrives_in_pieces(mcu_factory: Any) -> None:
     # A real UART delivers a few bytes per read, so the prompt is usually not
     # in the first chunk. cmd() must keep reading until it sees one.
-    mcu = mcu_factory({"app status": ["ticks=7"]}, chunk_size=3)
-    assert mcu.cmd("app status") == ["ticks=7"]
+    mcu = mcu_factory({"app status": ["uptime_ms=7"]}, chunk_size=3)
+    assert mcu.cmd("app status") == ["uptime_ms=7"]
 
 
 def test_cmd_handles_a_shell_that_does_not_echo(mcu_factory: Any) -> None:
-    mcu = mcu_factory({"app status": ["ticks=7"]}, echo=False)
-    assert mcu.cmd("app status") == ["ticks=7"]
-
-
-# -- echo() over SMP ---------------------------------------------------------
-
-
-class _FakeSMPTransport:
-    def __init__(self, baudrate: int = 0) -> None:
-        self.disconnected = False
-
-    async def disconnect(self) -> None:
-        self.disconnected = True
-
-
-class _FakeSMPClient:
-    """Replies to EchoWrite, optionally failing the first N attempts."""
-
-    fail_times = 0
-    attempts = 0
-
-    def __init__(self, transport: Any, port: str, timeout_s: float = 0) -> None:
-        self.transport = transport
-        self.port = port
-
-    async def connect(self, connect_timeout_s: float = 0) -> None:
-        return None
-
-    async def request(self, req: Any, timeout_s: float = 0) -> Any:
-        type(self).attempts += 1
-        if type(self).attempts <= type(self).fail_times:
-            raise TimeoutError("frame lost")
-        return type("Reply", (), {"r": req.d})()
-
-
-@pytest.fixture
-def fake_smp(monkeypatch: pytest.MonkeyPatch) -> Any:
-    """Patch the smpclient symbols echo() imports at call time."""
-    import smpclient
-    import smpclient.requests.os_management as os_mgmt
-    import smpclient.transport.serial as smp_serial
-
-    _FakeSMPClient.fail_times = 0
-    _FakeSMPClient.attempts = 0
-    monkeypatch.setattr(smpclient, "SMPClient", _FakeSMPClient)
-    monkeypatch.setattr(smp_serial, "SMPSerialTransport", _FakeSMPTransport)
-    monkeypatch.setattr(os_mgmt, "EchoWrite", lambda d: type("Echo", (), {"d": d})())
-    return _FakeSMPClient
-
-
-def test_echo_round_trips_through_smp(mcu_factory: Any, fake_smp: Any) -> None:
-    mcu = mcu_factory({})
-    assert mcu.echo("ping") == "ping"
-
-
-def test_echo_reopens_the_shell_port_afterwards(mcu_factory: Any, fake_smp: Any) -> None:
-    # The UART is one shared resource: echo() closes the shell handle, and the
-    # caller must get a working handle back.
-    mcu = mcu_factory({})
-    mcu.echo("ping")
-    assert mcu._s.is_open
-
-
-def test_echo_retries_once_before_giving_up(mcu_factory: Any, fake_smp: Any) -> None:
-    fake_smp.fail_times = 1
-    mcu = mcu_factory({})
-    assert mcu.echo("ping") == "ping"
-    assert fake_smp.attempts == 2
-
-
-def test_echo_raises_mcu_error_when_both_attempts_fail(mcu_factory: Any, fake_smp: Any) -> None:
-    fake_smp.fail_times = 99
-    mcu = mcu_factory({})
-    with pytest.raises(MCUError, match="SMP echo failed after retry"):
-        mcu.echo("ping")
-
-
-def test_echo_leaves_a_closed_port_closed(mcu_factory: Any, fake_smp: Any) -> None:
-    mcu = mcu_factory({})
-    mcu.close()
-    mcu.echo("ping")
-    assert not mcu._s.is_open
+    mcu = mcu_factory({"app status": ["uptime_ms=7"]}, echo=False)
+    assert mcu.cmd("app status") == ["uptime_ms=7"]

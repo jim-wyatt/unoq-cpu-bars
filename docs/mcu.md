@@ -11,7 +11,7 @@ Firmware for the STM32U585, built with stock Zephyr + west. No Arduino tooling.
 
 ```bash
 zbuild ~/hybrid/mcu/app                      # this project's app
-zbuild samples/basic/blinky                  # any upstream Zephyr sample
+zbuild samples/hello_world                   # any upstream Zephyr sample
 zbuild ~/hybrid/mcu/app -p always            # pristine rebuild
 ```
 
@@ -27,8 +27,8 @@ clangd works in either.
 `launch.json`. Anything else builds into `~/zephyrproject/build-<name>`:
 
 ```bash
-zbuild ~/hybrid/mcu/app       # -> ~/zephyrproject/build
-zbuild samples/basic/blinky   # -> ~/zephyrproject/build-blinky
+zbuild ~/hybrid/mcu/app        # -> ~/zephyrproject/build
+zbuild samples/hello_world     # -> ~/zephyrproject/build-hello_world
 ```
 
 So switching between apps never forces a pristine rebuild, and building a
@@ -78,6 +78,9 @@ fota.confirm()   # keep it
 rolled back on the next reset — verified: swapped to v0.2.0, reset without
 confirming, and the board returned to v0.0.0 by itself.
 
+`fota.images()` reports the slot table, and the image version in it is how you
+tell which build is actually running after a swap.
+
 ## Interactive shell
 
 The app runs a Zephyr shell on the same UART.
@@ -89,19 +92,33 @@ mcucon                         # or the env.sh helper (Ctrl-C)
 
 ```
 unoq:~$ app status
-uptime_ms=12216 ticks=25 blink_ms=500 boots=7 wdt=1 flip=0 sweeps=1043712
+uptime_ms=12216 flip=0 sweeps=1043712
 unoq:~$ app bars 100 50 25 0
 ok bars=4
 ```
 
-`sweeps` counts LED-matrix refresh passes — see [cpu-bars.md](cpu-bars.md).
+`sweeps` counts LED-matrix refresh passes — see [mpu.md](mpu.md#is-it-actually-running).
 
 Command groups: `app` (yours), `gpio`, `i2c`, `device`, `kernel`, `devmem` —
-poke hardware without rebuilding. Drive it from Python via [`unoq.MCU`](mpu.md).
+poke hardware without rebuilding. Drive any of them from Python with
+[`unoq.MCU.cmd()`](mpu.md#the-unoq-package).
 
 SMP/MCUmgr shares this UART. It registers **no** `mcumgr` command — the shell
 detects SMP frames in the byte stream, so `mcumgr: command not found` is
 expected, not a fault.
+
+## What the firmware is
+
+[`mcu/app/src/main.c`](../mcu/app/src/main.c) is the `app` shell command group
+and nothing else. `main()` loads the persisted panel orientation, brings up the
+matrix, and returns — there is no main loop, because everything that runs after
+init runs on its own: the shell has its own thread, and the panel is refreshed
+from a timer ISR inside `matrix.c`.
+
+One byte of state is persisted in NVS (`storage_partition`): the panel
+orientation set by `app matrix flip`. That is a property of how the board is
+mounted rather than of the running session, so it survives power cycles and
+firmware updates.
 
 ## Debugging
 
@@ -119,32 +136,61 @@ peripheral registers decoded from `.vscode/STM32U585.svd` (202 peripherals).
 Use `native_sim/native/64`; plain `native_sim` is 32-bit and fails on aarch64
 with a `CONFIG_64BIT` error.
 
-Two suites run: `link_protocol` and `bars`. The second compiles
-[`mcu/app/src/bars.c`](../mcu/app/src/bars.c) — the firmware's own rasteriser,
-not a copy — and checks the drawing rules on the host, because a charlieplexed
-panel cannot be read back on the board.
+Two suites run, 26 cases in total:
 
-The suite tests [`mcu/app/include/app_proto.h`](../mcu/app/include/app_proto.h)
-— the MPU↔MCU contract that `main.c`, the tests and `unoq/mcu.py` all depend on
-agreeing. It includes the same header the firmware does, so a change to the
-status format or the blink range fails here rather than silently breaking the
-Python side. **Editing that header is a protocol change**: update
-`unoq/mcu.py` and its tests in the same commit.
+- **`bars`** compiles [`mcu/app/src/bars.c`](../mcu/app/src/bars.c) — the
+  firmware's own rasteriser, not a copy — and checks the drawing rules on the
+  host, because a charlieplexed panel cannot be read back on the board. These
+  are the only place the drawing rules are checked at all, so they assert
+  properties (bars stay in their columns, height never falls as load rises,
+  rotation is a true rotation) rather than a few remembered frames.
+- **`link_protocol`** tests
+  [`mcu/app/include/app_proto.h`](../mcu/app/include/app_proto.h), the contract
+  that `main.c`, these tests and `unoq/mcu.py` all depend on agreeing.
 
-See [quality.md](quality.md) for the full gate list and `tools/check.sh`.
+### The MCU suite tests the firmware, not a copy of it
 
-## Watchdog and persistent state
-
-The app arms a 4 s task watchdog and keeps a boot counter in NVS
-(`storage_partition`).
+`app_proto.h` holds the MPU↔MCU contract: the `app status` format string, the
+panel geometry, the bar limits, the settings key. Three parties depend on it
+agreeing —
 
 ```
-unoq:~$ app hang     # stops the feeder
-# ~4s later: boots 5 -> 6, uptime reset
+mcu/app/src/main.c        produces the status line, validates bars
+mcu/tests/link_protocol/  tests these definitions directly
+python/unoq/mcu.py        parses the status line, calls `app bars`
 ```
 
-`app hang` stops the **main** loop's feeding. Blocking the shell thread instead
-would wedge only the shell while main kept feeding, and nothing would reset.
+— so the test includes the same header `main.c` does. It used to keep its own
+copy of the range check and format string, which meant it could not fail when
+the firmware changed. Confirmed by mutation: renaming `uptime_ms=` in the header
+now fails the suite.
+
+**A change to that header is a protocol change.** Update `unoq/mcu.py` and its
+tests in the same commit. On the Python side,
+`python/tests/test_contract.py` parses the header and fails if the panel
+constants in `unoq/mcu.py` drift from the firmware's.
+
+See [the README](../README.md#quality-gates) for the full gate list.
+
+## Upgrading Zephyr
+
+After a version bump, re-copy the OpenOCD board support that Zephyr's runner
+needs and that is not upstream:
+
+```bash
+cp -r ~/hybrid/mcu/board-support/support ~/zephyrproject/zephyr/boards/arduino/uno_q/
+```
+
+Also check the SDK requirement — Zephyr's `SDK_VERSION` file states it
+(v4.4.x wants SDK 1.0.1; v4.3.0 wanted 0.17.4).
+
+The C style is Zephyr's, copied into this repo the same way, so re-copy it too
+and re-run the gate — upstream does change it between releases:
+
+```bash
+cp ~/zephyrproject/zephyr/.clang-format ~/hybrid/.clang-format
+~/hybrid/tools/check.sh c
+```
 
 ## Gotchas
 

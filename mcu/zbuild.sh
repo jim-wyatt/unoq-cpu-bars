@@ -1,9 +1,9 @@
 #!/bin/bash
 # Build a Zephyr application for the Arduino UNO Q (STM32U585) with west.
 #
-#   ./zbuild.sh samples/basic/blinky            # build a Zephyr sample
+#   ./zbuild.sh samples/hello_world             # build a Zephyr sample
 #   ./zbuild.sh ~/hybrid/mcu/app                # build your own app
-#   ./zbuild.sh samples/basic/blinky -p         # pristine rebuild
+#   ./zbuild.sh samples/hello_world -p          # pristine rebuild
 #
 # Afterwards:
 #   ./flash.sh ~/zephyrproject/build/zephyr/zephyr.hex
@@ -33,7 +33,7 @@ APP="${1:?usage: zbuild.sh <app-path> [extra west args]}"
 shift || true
 
 # Accept an app path relative to your cwd, or relative to the Zephyr tree
-# (e.g. samples/basic/blinky). Resolve to absolute BEFORE the cd below - west
+# (e.g. samples/hello_world). Resolve to absolute BEFORE the cd below - west
 # runs from $WS, so a relative path would otherwise resolve against the wrong
 # directory and fail with a confusing "source directory does not exist".
 if [ -d "$APP" ]; then

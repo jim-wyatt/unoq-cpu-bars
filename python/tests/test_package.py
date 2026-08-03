@@ -55,7 +55,7 @@ def test_real_mcu_reports_status() -> None:
     with MCU() as mcu:
         status = mcu.status()
     assert "uptime_ms" in status
-    assert "boots" in status
+    assert "sweeps" in status
 
 
 @pytest.mark.hardware

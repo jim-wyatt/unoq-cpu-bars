@@ -1,6 +1,6 @@
 [Unit]
 Description=Arduino UNO Q host CPU load on the LED matrix
-Documentation=file:/home/arduino/hybrid/docs/cpu-bars.md
+Documentation=file:/home/arduino/hybrid/docs/mpu.md
 
 # /dev/ttyHS1 reads nothing until link-up.sh has driven the UART enable GPIO,
 # so this is a hard dependency rather than an ordering hint: without it the

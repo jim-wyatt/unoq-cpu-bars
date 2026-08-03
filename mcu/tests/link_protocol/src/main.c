@@ -17,36 +17,12 @@
 
 #include "app_proto.h"
 
-/* --- blink range --------------------------------------------------------- */
-
-ZTEST(link_protocol, test_blink_range_accepts_valid)
-{
-	zassert_true(app_blink_ms_valid(APP_BLINK_MS_MIN), "lower bound should be accepted");
-	zassert_true(app_blink_ms_valid(500), "typical value should be accepted");
-	zassert_true(app_blink_ms_valid(APP_BLINK_MS_MAX), "upper bound should be accepted");
-}
-
-ZTEST(link_protocol, test_blink_range_rejects_invalid)
-{
-	zassert_false(app_blink_ms_valid(APP_BLINK_MS_MIN - 1), "below range must be rejected");
-	zassert_false(app_blink_ms_valid(APP_BLINK_MS_MAX + 1), "above range must be rejected");
-	zassert_false(app_blink_ms_valid(-1), "negative must be rejected");
-	zassert_false(app_blink_ms_valid(0), "zero would busy-spin the loop");
-}
-
-ZTEST(link_protocol, test_blink_bounds_are_sane)
-{
-	zassert_true(APP_BLINK_MS_MIN > 0, "a zero period would starve the watchdog feed");
-	zassert_true(APP_BLINK_MS_MIN < APP_BLINK_MS_MAX, "bounds must not be inverted");
-}
-
 /* --- the status line ----------------------------------------------------- */
 
 /* Render APP_STATUS_FMT exactly as cmd_app_status() does. */
 static void render_status(char *buf, size_t len)
 {
-	snprintf(buf, len, APP_STATUS_FMT, (long long)1234, (unsigned int)5, 500, (unsigned int)2,
-		 1, 0, (unsigned int)9620);
+	snprintf(buf, len, APP_STATUS_FMT, (long long)1234, 0, (unsigned int)9620);
 }
 
 ZTEST(link_protocol, test_status_line_is_parseable)
@@ -73,8 +49,7 @@ ZTEST(link_protocol, test_status_line_carries_the_expected_keys)
 	/* unoq.MCU.status() looks these up by name; renaming one breaks the MPU
 	 * side silently, because a missing key just does not appear in the dict.
 	 */
-	static const char *const keys[] = {
-		"uptime_ms=", "ticks=", "blink_ms=", "boots=", "wdt=", "flip=", "sweeps="};
+	static const char *const keys[] = {"uptime_ms=", "flip=", "sweeps="};
 	char buf[128];
 
 	render_status(buf, sizeof(buf));
@@ -100,28 +75,13 @@ ZTEST(link_protocol, test_status_values_contain_no_separators)
 
 /* --- other shared constants ---------------------------------------------- */
 
-ZTEST(link_protocol, test_watchdog_timeout_leaves_room_to_feed)
-{
-	/* The loop feeds once per blink period, so the timeout must exceed the
-	 * slowest blink or a legal `app blink` would reset the board.
-	 */
-	zassert_true(APP_WDT_TIMEOUT_MS > 0, "timeout must be positive");
-	zassert_true(APP_BLINK_MS_MAX >= APP_WDT_TIMEOUT_MS,
-		     "documented caveat: a blink period above the watchdog timeout "
-		     "stops the feed in time - keep this relationship deliberate");
-}
-
 ZTEST(link_protocol, test_settings_key_is_namespaced)
 {
 	/* SETTINGS_STATIC_HANDLER_DEFINE registers the "app" subtree, so the key
 	 * must sit under it or settings_load() will never call the handler.
 	 */
-	zassert_equal(strncmp(APP_SETTINGS_BOOTS, "app/", 4), 0,
-		      "boot counter key must live under the app/ subtree");
 	zassert_equal(strncmp(APP_SETTINGS_FLIP, "app/", 4), 0,
 		      "panel orientation key must live under the app/ subtree");
-	zassert_not_equal(strcmp(APP_SETTINGS_BOOTS, APP_SETTINGS_FLIP), 0,
-			  "two settings sharing a key would overwrite each other");
 }
 
 /* --- the bars contract ---------------------------------------------------- */

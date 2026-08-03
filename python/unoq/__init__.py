@@ -5,14 +5,12 @@ unoq - talk to the Arduino UNO Q's STM32U585 from the Linux side.
 
     link_up()                      # BOOT0 low + UART enable (safe to re-run)
     with MCU() as mcu:
-        print(mcu.status())        # {'uptime_ms': 12216, 'ticks': 25, ...}
-        mcu.gpio_set('gpioh', 11, 1)
-        print(mcu.echo('ping'))    # via SMP, not the shell
-
+        print(mcu.status())        # {'uptime_ms': 12216, 'flip': 0, 'sweeps': 9620}
         mcu.bars(CpuSampler().sample())   # CPU load on the LED matrix
+        mcu.cmd('gpio set gpioh 11 1')    # or any other shell command
 
-Wraps the Zephyr shell running on lpuart1 (/dev/ttyHS1) and the SMP/MCUmgr
-endpoint sharing the same UART. See ~/hybrid/README.md for the hardware notes.
+Wraps the Zephyr shell running on lpuart1 (/dev/ttyHS1). Firmware updates over
+the same UART are in `fota`. See ~/hybrid/README.md for the hardware notes.
 """
 
 # cpubars is an entry point, not part of the API, and is deliberately not

@@ -12,28 +12,26 @@
 # libgpiod; there is no external probe). That made it a single point of failure.
 # This script removes that dependency.
 #
-# WHY NOT UPSTREAM OPENOCD
-# ------------------------
-# The installed binary reports build `ge6a2c12f4`. That commit is NOT in
-# openocd-org/openocd - it is in **arduino/OpenOCD**:
+# SOURCE
+# ------
+# Upstream openocd-org/openocd **master**, not a fork and not a release tag.
 #
-#   e6a2c12f41c9  "drivers/linuxgpiodv2: introduce new driver for libgpiod v2 API"
+#   - libgpiod v2 (this board has libgpiod.so.3) is supported on master:
+#     configure.ac does PKG_CHECK_MODULES([LIBGPIOD], [libgpiod >= 2.0]) and
+#     linuxgpiod.c uses the v2 API, falling back to v1. Master is required -
+#     the newest tag is still v0.12.0 (2023), which predates that support, so
+#     `apt install openocd` (0.12.0) will NOT work.
+#   - The STM32U5 flash driver (`stm32l4x`) is upstream.
+#   - The three .cfg files are plain TCL kept in this repo, not in OpenOCD.
 #
-# This board has libgpiod v2 (`libgpiod.so.3`); upstream OpenOCD master still
-# targets the v1 API, so `apt install openocd` will NOT work. The fork is
-# genuinely required.
-#
-# The STM32U5 flash driver itself (`stm32l4x`) IS upstream, and the three .cfg
-# files are plain TCL kept in this repo - so the fork is only needed for the
-# adapter driver.
+# The pinned commit is for reproducibility; override with OPENOCD_COMMIT, or
+# set it to `master` to track the tip.
 set -euo pipefail
 
-COMMIT="${OPENOCD_COMMIT:-e6a2c12f41c9}"
-REPO="${OPENOCD_REPO:-https://github.com/arduino/OpenOCD.git}"
+COMMIT="${OPENOCD_COMMIT:-da3920b0a52d}"
+REPO="${OPENOCD_REPO:-https://github.com/openocd-org/openocd.git}"
 PREFIX="${OPENOCD_PREFIX:-/opt/openocd-rebuilt}"
 SRC="${OPENOCD_SRC:-/tmp/openocd-src}"
-# repo.or.cz (the upstream submodule host) is unreliable; use the GitHub mirror.
-JIMTCL_MIRROR="${JIMTCL_MIRROR:-https://github.com/msteveb/jimtcl.git}"
 CFG_SRC="${CFG_SRC:-/home/arduino/hybrid/backup/mcu-firmware}"
 PROMOTE=0
 [ "${1:-}" = "--promote" ] && PROMOTE=1
@@ -49,14 +47,10 @@ rm -rf "$SRC"
 git clone "$REPO" "$SRC"
 git -C "$SRC" checkout "$COMMIT"
 
-# Submodules: all three .gitmodules entries point at repo.or.cz, which is slow
-# and frequently unreachable (it has taken down this build before). Only jimtcl
-# is actually required:
-#   jimtcl     - OpenOCD's embedded TCL interpreter. REQUIRED.
-#   libjaylink - J-Link probe driver. NOT needed; we bit-bang SWD over GPIO,
-#                and --disable-jlink below means it is never compiled.
-#   git2cl     - generates a ChangeLog. NOT needed.
-git -C "$SRC" config submodule.jimtcl.url "$JIMTCL_MIRROR"
+# Only jimtcl is required (OpenOCD's embedded TCL interpreter). libjaylink is
+# the J-Link probe driver - we bit-bang SWD over GPIO, and --disable-jlink
+# below means it is never compiled, so do not clone it. Upstream hosts jimtcl
+# on GitHub, so no mirror juggling is needed.
 git -C "$SRC" submodule update --init jimtcl
 
 echo "== 3/6 configure =="

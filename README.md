@@ -50,18 +50,17 @@ sudo bash ~/hybrid/build-openocd.sh              # build + self-test only
 sudo bash ~/hybrid/build-openocd.sh --promote    # ...then replace /opt/openocd
 ```
 
-`apt install openocd` will **not** work. The installed binary reports build
-`ge6a2c12f4`, and that commit is not in `openocd-org/openocd` — it is in
-**`arduino/OpenOCD`**:
+`apt install openocd` will **not** work: Debian ships **0.12.0** (2023), which
+predates libgpiod v2 support. This board has libgpiod v2 (`libgpiod.so.3`).
 
-```
-e6a2c12f41c9  drivers/linuxgpiodv2: introduce new driver for libgpiod v2 API
-```
+The script builds **upstream `openocd-org/openocd` master**, where
+`configure.ac` does `PKG_CHECK_MODULES([LIBGPIOD], [libgpiod >= 2.0])` and
+`linuxgpiod.c` uses the v2 API (falling back to v1). Everything else needed is
+upstream too — the STM32U5 flash driver is `stm32l4x` — and the three `.cfg`
+files are plain TCL kept in `backup/mcu-firmware/`.
 
-This board ships libgpiod v2 (`libgpiod.so.3`); upstream OpenOCD master still
-targets the v1 API. The fork is required for the *adapter driver* only — the
-STM32U5 flash driver (`stm32l4x`) is upstream, and the three `.cfg` files are
-plain TCL kept in `backup/mcu-firmware/`.
+Only the `jimtcl` submodule is cloned. `libjaylink` is the J-Link probe driver
+and `--disable-jlink` means it is never compiled.
 
 The script builds to `/opt/openocd-rebuilt`, **self-tests against the real MCU**
 (it must see `Cortex-M33`), and only replaces `/opt/openocd` with `--promote` —

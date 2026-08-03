@@ -20,18 +20,19 @@
 #include <zephyr/drivers/watchdog.h>
 #include <stdlib.h>
 
+#include "app_proto.h"
+
 static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
 
-static atomic_t blink_ms = ATOMIC_INIT(250);  /* v2 marker for FOTA test */
+static atomic_t blink_ms = ATOMIC_INIT(250); /* v2 marker for FOTA test */
 static uint32_t ticks;
-static uint32_t boot_count;   /* persisted in NVS across power cycles */
+static uint32_t boot_count; /* persisted in NVS across power cycles */
 static atomic_t feed_wdt = ATOMIC_INIT(1);
 static int wdt_channel = -1;
 
 /* --- persistent settings ------------------------------------------------- */
 
-static int app_settings_set(const char *name, size_t len,
-			    settings_read_cb read_cb, void *cb_arg)
+static int app_settings_set(const char *name, size_t len, settings_read_cb read_cb, void *cb_arg)
 {
 	if (settings_name_steq(name, "boots", NULL) && len == sizeof(boot_count)) {
 		return read_cb(cb_arg, &boot_count, sizeof(boot_count)) > 0 ? 0 : -EINVAL;
@@ -47,8 +48,7 @@ static int cmd_app_status(const struct shell *sh, size_t argc, char **argv)
 {
 	ARG_UNUSED(argc);
 	ARG_UNUSED(argv);
-	shell_print(sh, "uptime_ms=%lld ticks=%u blink_ms=%d boots=%u wdt=%d",
-		    k_uptime_get(), ticks, (int)atomic_get(&blink_ms),
+	shell_print(sh, APP_STATUS_FMT, k_uptime_get(), ticks, (int)atomic_get(&blink_ms),
 		    boot_count, wdt_channel >= 0);
 	return 0;
 }
@@ -62,8 +62,8 @@ static int cmd_app_blink(const struct shell *sh, size_t argc, char **argv)
 		return -EINVAL;
 	}
 	ms = atoi(argv[1]);
-	if (ms < 10 || ms > 10000) {
-		shell_error(sh, "range 10..10000");
+	if (!app_blink_ms_valid(ms)) {
+		shell_error(sh, "range %d..%d", APP_BLINK_MS_MIN, APP_BLINK_MS_MAX);
 		return -EINVAL;
 	}
 	atomic_set(&blink_ms, ms);
@@ -83,12 +83,12 @@ static int cmd_app_hang(const struct shell *sh, size_t argc, char **argv)
 	return 0;
 }
 
-SHELL_STATIC_SUBCMD_SET_CREATE(app_cmds,
+SHELL_STATIC_SUBCMD_SET_CREATE(
+	app_cmds,
 	SHELL_CMD(status, NULL, "uptime, ticks, blink period, boot count", cmd_app_status),
 	SHELL_CMD_ARG(blink, NULL, "Set blink period: app blink <ms>", cmd_app_blink, 2, 0),
 	SHELL_CMD(hang, NULL, "Stop feeding the watchdog (forces a reset)", cmd_app_hang),
-	SHELL_SUBCMD_SET_END
-);
+	SHELL_SUBCMD_SET_END);
 SHELL_CMD_REGISTER(app, &app_cmds, "UNO Q application commands", NULL);
 
 /* --- main ---------------------------------------------------------------- */
@@ -102,7 +102,7 @@ int main(void)
 	/* Persistent boot counter. */
 	if (settings_subsys_init() == 0 && settings_load() == 0) {
 		boot_count++;
-		settings_save_one("app/boots", &boot_count, sizeof(boot_count));
+		settings_save_one(APP_SETTINGS_BOOTS, &boot_count, sizeof(boot_count));
 		printk("boot count: %u\n", boot_count);
 	} else {
 		printk("settings unavailable - boot count not persisted\n");
@@ -111,8 +111,8 @@ int main(void)
 	/* Task watchdog. Falls back to a pure software timer if the SoC
 	 * watchdog is not exposed in the devicetree. */
 	if (task_wdt_init(wdt) == 0) {
-		wdt_channel = task_wdt_add(4000, NULL, NULL);
-		printk("watchdog armed (4s), channel %d\n", wdt_channel);
+		wdt_channel = task_wdt_add(APP_WDT_TIMEOUT_MS, NULL, NULL);
+		printk("watchdog armed (%dms), channel %d\n", APP_WDT_TIMEOUT_MS, wdt_channel);
 	} else {
 		printk("watchdog unavailable\n");
 	}

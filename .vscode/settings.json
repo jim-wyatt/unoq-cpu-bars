@@ -48,5 +48,9 @@
     "editor.formatOnSave": true
   },
   "[shellscript]": { "editor.tabSize": 4 },
-  "[c]": { "editor.tabSize": 8, "editor.insertSpaces": false }
+  "[c]": {
+    "editor.tabSize": 8,
+    "editor.insertSpaces": false
+  },
+  "cmake.sourceDirectory": "/home/arduino/hybrid/mcu/app"
 }

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Audit every toolchain dependency against what is currently released.
 #
-#   ~/hybrid/check-versions.sh
+#   ~/hybrid/tools/check-versions.sh
 #
 # Extension auto-update is deliberately OFF on this board (it caused background
 # churn on 3.6 GiB of RAM), so nothing here updates itself. Run this now and
@@ -85,7 +85,7 @@ PY
 
 echo "=== OpenOCD ==="
 printf '  installed  %s\n' "$(/opt/openocd/bin/openocd --version 2>&1 | head -1 | cut -d' ' -f1-4)"
-printf '  pinned in build-openocd.sh: %s\n' "$(grep -oP 'OPENOCD_COMMIT:-\K[0-9a-f]+' "$HOME/hybrid/build-openocd.sh" 2>/dev/null)"
+printf '  pinned in build-openocd.sh: %s\n' "$(grep -oP 'OPENOCD_COMMIT:-\K[0-9a-f]+' "$HOME/hybrid/tools/build-openocd.sh" 2>/dev/null)"
 printf '  upstream master head:       %s\n' \
   "$(curl -sL https://api.github.com/repos/openocd-org/openocd/commits/master 2>/dev/null \
      | python3 -c "import json,sys;d=json.load(sys.stdin);print(d['sha'][:12], d['commit']['committer']['date'][:10])" 2>/dev/null)"

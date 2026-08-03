@@ -1,0 +1,104 @@
+{
+  "version": "2.0.0",
+  "options": {
+    // The tooling lives in uv-managed dirs and /opt/openocd, neither of which
+    // is on a login shell's PATH inside a VS Code task.
+    "env": {
+      "PATH": "${env:HOME}/.local/bin:/opt/openocd/bin:${env:PATH}",
+      "ZEPHYR_TOOLCHAIN_VARIANT": "zephyr",
+      "ZEPHYR_SDK_INSTALL_DIR": "${env:HOME}/zephyr-sdk-1.0.1"
+    }
+  },
+  "tasks": [
+    {
+      "label": "MCU: build",
+      "type": "shell",
+      "command": "${workspaceFolder}/mcu/zbuild.sh ${workspaceFolder}/mcu/app",
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": ["$gcc"],
+      "detail": "west build + auto-sign for MCUboot + refresh compile_commands.json"
+    },
+    {
+      "label": "MCU: build (pristine)",
+      "type": "shell",
+      "command": "${workspaceFolder}/mcu/zbuild.sh ${workspaceFolder}/mcu/app -p always",
+      "group": "build",
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "MCU: flash (SWD)",
+      "type": "shell",
+      "command": "${workspaceFolder}/mcu/flash.sh ${env:HOME}/zephyrproject/build/zephyr/zephyr.signed.hex",
+      "dependsOn": "MCU: build",
+      "problemMatcher": [],
+      "detail": "Signed image to slot0. Sets BOOT0/link GPIOs first."
+    },
+    {
+      "label": "MCU: update over serial (FOTA)",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python -c \"from unoq import fota; p='${env:HOME}/zephyrproject/build/zephyr/zephyr.signed.bin'; fota.upload(p); fota.test(); fota.reset(); print('swapped - run the confirm task once it boots, or it reverts')\"",
+      "dependsOn": "MCU: build",
+      "problemMatcher": [],
+      "detail": "Upload + stage + reset. No SWD. Reverts unless confirmed."
+    },
+    {
+      "label": "MCU: confirm firmware",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python -c \"from unoq import fota; fota.confirm(); print(fota.images())\"",
+      "problemMatcher": [],
+      "detail": "Keep the running image. Without this the next reset rolls back."
+    },
+    {
+      "label": "MCU: flash bootloader + app (recovery)",
+      "type": "shell",
+      "command": "${workspaceFolder}/mcu/flash-all.sh",
+      "problemMatcher": [],
+      "detail": "Rebuilds the whole MCUboot chain over SWD."
+    },
+    {
+      "label": "MCU: console",
+      "type": "shell",
+      "command": "tio /dev/ttyHS1 -b 115200",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated", "focus": true },
+      "detail": "Interactive Zephyr shell. Ctrl-T then q to exit."
+    },
+    {
+      "label": "MCU: status",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python -c \"from unoq import MCU, link_state; print('link:', link_state()); print('mcu :', MCU().status())\"",
+      "problemMatcher": [],
+      "detail": "Quick health check of the link and the firmware."
+    },
+    {
+      "label": "MCU: link up (BOOT0 + UART enable)",
+      "type": "shell",
+      "command": "${workspaceFolder}/mcu/link-up.sh",
+      "problemMatcher": [],
+      "detail": "Run if the board looks dead or /dev/ttyHS1 is silent."
+    },
+    {
+      "label": "Test: host (native_sim)",
+      "type": "shell",
+      "command": "${workspaceFolder}/mcu/ztest.sh",
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": [],
+      "detail": "Runs natively on the MPU. No hardware, no flash cycle."
+    },
+    {
+      "label": "Test: on target",
+      "type": "shell",
+      "command": "${workspaceFolder}/mcu/ztest.sh -p arduino_uno_q",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Maint: check dependency versions",
+      "type": "shell",
+      "command": "${workspaceFolder}/tools/check-versions.sh",
+      "problemMatcher": [],
+      "detail": "Extension auto-update is off; this reports drift."
+    }
+  ]
+}

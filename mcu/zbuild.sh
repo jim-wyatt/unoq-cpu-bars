@@ -13,6 +13,7 @@
 set -euo pipefail
 
 WS="${ZEPHYR_WORKSPACE:-$HOME/zephyrproject}"
+PROJECT="$(cd "$(dirname "$0")/.." && pwd)"
 BOARD="${BOARD:-arduino_uno_q}"
 SDK="${ZEPHYR_SDK:-$HOME/zephyr-sdk-1.0.1}"
 
@@ -21,19 +22,30 @@ export ZEPHYR_SDK_INSTALL_DIR="$SDK"
 
 APP="${1:?usage: zbuild.sh <app-path> [extra west args]}"; shift || true
 
-# Allow paths relative to the Zephyr tree, e.g. samples/basic/blinky
-[ -d "$APP" ] || APP="$WS/zephyr/$APP"
-[ -d "$APP" ] || { echo "no such app: $APP" >&2; exit 1; }
+# Accept an app path relative to your cwd, or relative to the Zephyr tree
+# (e.g. samples/basic/blinky). Resolve to absolute BEFORE the cd below - west
+# runs from $WS, so a relative path would otherwise resolve against the wrong
+# directory and fail with a confusing "source directory does not exist".
+if [ -d "$APP" ]; then
+  APP="$(cd "$APP" && pwd)"
+elif [ -d "$WS/zephyr/$APP" ]; then
+  APP="$(cd "$WS/zephyr/$APP" && pwd)"
+else
+  echo "no such app: $APP" >&2
+  exit 1
+fi
 
 cd "$WS"
 echo "building $APP for $BOARD"
 ./.venv/bin/west build -b "$BOARD" "$APP" "$@"
 
 # clangd reads compile_commands.json from the workspace root. west writes it
-# into build/, so link it up to give the editor working IntelliSense.
+# into build/, so link it into both folders you might have open: the Zephyr
+# workspace, and this project.
 if [ -f "$WS/build/compile_commands.json" ]; then
   ln -sf "$WS/build/compile_commands.json" "$WS/compile_commands.json"
-  echo "linked compile_commands.json -> build/"
+  ln -sf "$WS/build/compile_commands.json" "$PROJECT/compile_commands.json"
+  echo "linked compile_commands.json (zephyrproject + hybrid)"
 fi
 
 # If the app is built for MCUboot it links into slot0 and MUST be signed -

@@ -1,0 +1,52 @@
+{
+  // Workspace settings for ~/hybrid. Machine-scoped settings in
+  // ~/.vscode-server/data/Machine/settings.json cover the board-wide tuning;
+  // these are the bits specific to this project.
+
+  // clangd reads compile_commands.json from the workspace root. `zbuild.sh`
+  // symlinks it here from the west build directory - so build once and
+  // IntelliSense works for mcu/app.
+  "clangd.arguments": [
+    "--compile-commands-dir=${workspaceFolder}",
+    "--background-index=false",
+    "--clang-tidy=false",
+    "--header-insertion=never",
+    "--pch-storage=disk",
+    "-j=2"
+  ],
+
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  "python.languageServer": "None",
+
+  "files.associations": {
+    "*.overlay": "dts",
+    "*.dtsi": "dts",
+    "prj.conf": "properties",
+    "*.conf": "properties",
+    "*.ld": "linkerscript"
+  },
+
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.egg-info": true
+  },
+  "search.exclude": {
+    ".venv": true,
+    "backup/opt-openocd": true,
+    "compile_commands.json": true
+  },
+  // backup/ holds firmware images and a copy of /opt/openocd - large, binary,
+  // and never edited.
+  "files.watcherExclude": {
+    "**/.venv/**": true,
+    "**/backup/**": true,
+    "**/__pycache__/**": true
+  },
+
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true
+  },
+  "[shellscript]": { "editor.tabSize": 4 },
+  "[c]": { "editor.tabSize": 8, "editor.insertSpaces": false }
+}

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Memory optimization for a headless Arduino UNO Q used as a Linux+MCU dev board.
 #
-#   sudo bash ~/hybrid/optimize-board.sh
+#   sudo bash ~/hybrid/provision/10-optimize-board.sh
 #
 # sudo needs a password and this box sets `use_pty`, so it must be run from a
 # real terminal. Every change has its revert command in the comment above it.

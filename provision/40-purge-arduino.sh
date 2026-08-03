@@ -1,7 +1,7 @@
 #!/bin/bash
 # Remove the remaining Arduino Debian packages.
 #
-#   sudo bash ~/hybrid/purge-arduino.sh
+#   sudo bash ~/hybrid/provision/40-purge-arduino.sh
 #
 # Their services are already disabled, so this only reclaims disk - it does not
 # change behaviour. Run it when you are confident you will not go back.

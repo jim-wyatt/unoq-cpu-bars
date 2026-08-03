@@ -1,0 +1,50 @@
+{
+  // On-chip debugging for the STM32U585 over SWD, bit-banged on the MPU's own
+  // GPIO lines. OpenOCD runs locally on the board - there is no external probe.
+  //
+  // Build first (Ctrl-Shift-B) so build/zephyr/zephyr.elf matches what is
+  // flashed, or the symbols will not line up with the code on the chip.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug (attach to running MCU)",
+      "type": "cortex-debug",
+      "request": "attach",
+      "cwd": "${workspaceFolder}",
+      "servertype": "openocd",
+      "executable": "${env:HOME}/zephyrproject/build/zephyr/zephyr.elf",
+      "serverpath": "/opt/openocd/bin/openocd",
+      "gdbPath": "${env:HOME}/zephyr-sdk-1.0.1/arm-zephyr-eabi/bin/arm-zephyr-eabi-gdb",
+      "searchDir": ["/opt/openocd", "/opt/openocd/share/openocd/scripts"],
+      "configFiles": ["/opt/openocd/openocd_gpiod.cfg"],
+      "svdFile": "${workspaceFolder}/.vscode/STM32U585.svd",
+      "showDevDebugOutput": "none",
+      "preLaunchTask": "MCU: link up (BOOT0 + UART enable)"
+    },
+    {
+      "name": "Debug (flash then run)",
+      "type": "cortex-debug",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "servertype": "openocd",
+      "executable": "${env:HOME}/zephyrproject/build/zephyr/zephyr.elf",
+      "serverpath": "/opt/openocd/bin/openocd",
+      "gdbPath": "${env:HOME}/zephyr-sdk-1.0.1/arm-zephyr-eabi/bin/arm-zephyr-eabi-gdb",
+      "searchDir": ["/opt/openocd", "/opt/openocd/share/openocd/scripts"],
+      "configFiles": ["/opt/openocd/openocd_gpiod.cfg"],
+      "svdFile": "${workspaceFolder}/.vscode/STM32U585.svd",
+      "runToEntryPoint": "main",
+      "showDevDebugOutput": "none",
+      "preLaunchTask": "MCU: build"
+    },
+    {
+      "name": "Python: current file (MPU)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "justMyCode": false
+    }
+  ]
+}

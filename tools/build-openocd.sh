@@ -1,8 +1,8 @@
 #!/bin/bash
 # Rebuild the OpenOCD that flashes this board's MCU, from source.
 #
-#   sudo bash ~/hybrid/build-openocd.sh              # build + self-test
-#   sudo bash ~/hybrid/build-openocd.sh --promote    # ...and replace /opt/openocd
+#   sudo bash ~/hybrid/tools/build-openocd.sh              # build + self-test
+#   sudo bash ~/hybrid/tools/build-openocd.sh --promote    # ...and replace /opt/openocd
 #
 # WHY
 # ---

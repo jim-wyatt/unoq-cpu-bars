@@ -3,3 +3,5 @@ backup/opt-openocd/
 *.o
 *.llext
 __pycache__/
+compile_commands.json
+.cache/

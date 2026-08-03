@@ -1,5 +1,5 @@
 #!/bin/bash
-# Final conveniences. Run:  sudo bash ~/hybrid/finish-setup2.sh
+# Final conveniences. Run:  sudo bash ~/hybrid/provision/30-mcu-link.sh
 set -uo pipefail
 
 # --- 1. tio: a far better serial terminal than the minicom that ships here.

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Final root-level steps for the west-based dev environment.
 #
-#   sudo bash ~/hybrid/finish-setup.sh
+#   sudo bash ~/hybrid/provision/20-dev-tools.sh
 #
 # Safe to run now: the west toolchain has been verified end-to-end
 # (build -> flash -> verified -> running) with the Arduino tree already

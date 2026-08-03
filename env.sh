@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 # Development environment for the Arduino UNO Q (MPU + STM32U585 MCU).
 #
 #   source ~/hybrid/env.sh

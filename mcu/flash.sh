@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 # Flash the UNO Q's STM32U585 over SWD, bit-banged on the MPU's own GPIO lines.
 #
 #   ./flash.sh build/zephyr/zephyr.hex          # flash a west build

@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 # Flash the complete MCUboot chain over SWD: bootloader + signed application.
 #
 #   ./flash-all.sh

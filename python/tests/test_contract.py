@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 """The MPU<->MCU contract, checked against the firmware's own header.
 
 unoq/mcu.py has to know the panel's limits, and there is no way to import a C

@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 tests:
   unoq.link_protocol:
     platform_allow:

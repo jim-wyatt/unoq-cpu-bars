@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 """Tests for the CPU-bars runner.
 
 The runner's job is glue: sample, clamp, send, and leave the panel dark on the

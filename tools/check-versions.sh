@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 # Audit every toolchain dependency against what is currently released.
 #
 #   ~/hybrid/tools/check-versions.sh

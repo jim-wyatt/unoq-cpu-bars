@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 """Package-level guarantees: the public surface and the real-hardware smoke test."""
 
 from __future__ import annotations

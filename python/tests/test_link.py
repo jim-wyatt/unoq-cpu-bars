@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 """Tests for the two MPU GPIO lines the MCU depends on.
 
 These are the highest-consequence constants in the project: with either line

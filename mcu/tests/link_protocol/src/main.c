@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2026 Jim Wyatt
+ * SPDX-License-Identifier: MIT
+ *
  * Host-runnable tests for the MPU <-> MCU contract in app_proto.h.
  *
  * These test the definitions the firmware actually ships: the header included

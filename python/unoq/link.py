@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 """
 The two MPU GPIO lines the MCU depends on.
 

@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 # Optional: show host CPU load on the LED matrix at every boot.
 # Run:  sudo bash ~/hybrid/provision/50-cpu-bars.sh
 #

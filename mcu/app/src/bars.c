@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2026 Jim Wyatt
+ * SPDX-License-Identifier: MIT
+ *
  * Percentages -> grayscale pixels. See include/bars.h for the contract.
  *
  * No Zephyr headers on purpose: mcu/tests/bars/ compiles this file directly

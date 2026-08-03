@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2026 Jim Wyatt
+ * SPDX-License-Identifier: MIT
+ *
  * MCU side of the UNO Q hybrid link.
  *
  * Console + interactive shell + SMP/MCUmgr all share lpuart1, the UART wired

@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 # Final root-level steps for the west-based dev environment.
 #
 #   sudo bash ~/hybrid/provision/20-dev-tools.sh
@@ -34,8 +36,9 @@ systemctl disable --now docker docker.socket containerd 2>/dev/null
 # --- framework, App Lab web UI, arduino-cli and the router).
 # ---
 # --- SAFE: /opt/openocd is owned by NO package (`dpkg -S` finds nothing),
-# --- so apt will not remove it. It is also backed up at
-# --- ~/hybrid/backup/opt-openocd in case anything ever does.
+# --- so apt will not remove it. Copy it aside first anyway
+# --- (cp -a /opt/openocd ~/uno-q-backup/); tools/build-openocd.sh rebuilds it
+# --- from source if you ever lose it.
 # ---
 # --- Uncomment to remove. REVERT: apt-get install -y arduino-app-cli ...
 # apt-get remove -y arduino-app-cli arduino-app-lab arduino-router arduino-cli

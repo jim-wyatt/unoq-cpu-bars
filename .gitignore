@@ -1,5 +1,10 @@
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 .venv/
-backup/opt-openocd/
+# Local scratch for things that cannot be re-downloaded and are not ours to
+# redistribute: the stock Arduino firmware image and a copy of /opt/openocd.
+# See THIRD-PARTY.md.
+backup/
 # zbuild.sh builds into ~/zephyrproject/build, outside the repo. Anything named
 # build/ in here is a stray IDE configure - never source, never committed.
 /build/

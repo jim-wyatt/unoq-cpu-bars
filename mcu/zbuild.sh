@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 # Build a Zephyr application for the Arduino UNO Q (STM32U585) with west.
 #
 #   ./zbuild.sh samples/hello_world             # build a Zephyr sample

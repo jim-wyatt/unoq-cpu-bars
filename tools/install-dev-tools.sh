@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 # Install everything tools/check.sh needs. Idempotent; safe to re-run.
 #
 #   ~/hybrid/tools/install-dev-tools.sh

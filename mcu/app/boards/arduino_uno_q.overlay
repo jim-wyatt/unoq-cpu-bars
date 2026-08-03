@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2026 Jim Wyatt
+ * SPDX-License-Identifier: MIT
+ *
  * Route the Zephyr console to lpuart1 (PG7/PG8, with RTS/CTS) - the UART
  * physically wired to the Linux MPU, where it appears as /dev/ttyHS1.
  * usart1 (PB6/PB7) is the Arduino-header UART and is NOT the MPU link.

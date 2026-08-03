@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2026 Jim Wyatt
+ * SPDX-License-Identifier: MIT
+ *
  * The MPU <-> MCU contract, in one place.
  *
  * Everything here is consumed by three parties that must agree:

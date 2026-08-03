@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 name: checks
 
 # Runs the same gates as tools/check.sh, so a green CI means the same thing as

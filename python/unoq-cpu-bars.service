@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 [Unit]
 Description=Arduino UNO Q host CPU load on the LED matrix
 Documentation=file:/home/arduino/hybrid/docs/mpu.md

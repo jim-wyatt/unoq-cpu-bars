@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 """Tests for the Zephyr shell protocol and the parsing built on top of it.
 
 The parsing is the fragile part of this package: it consumes text produced by

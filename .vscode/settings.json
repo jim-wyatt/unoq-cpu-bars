@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Jim Wyatt
+// SPDX-License-Identifier: MIT
 {
   // Workspace settings for ~/hybrid. Machine-scoped settings in
   // ~/.vscode-server/data/Machine/settings.json cover the board-wide tuning;
@@ -35,8 +37,8 @@
     "backup/opt-openocd": true,
     "compile_commands.json": true
   },
-  // backup/ holds firmware images and a copy of /opt/openocd - large, binary,
-  // and never edited.
+  // backup/ is an untracked local scratch area some people keep here for
+  // firmware images and a copy of /opt/openocd - large, binary, never edited.
   "files.watcherExclude": {
     "**/.venv/**": true,
     "**/backup/**": true,

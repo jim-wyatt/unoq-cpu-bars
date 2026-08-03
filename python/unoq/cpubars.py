@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 """
 Host CPU load on the LED matrix - the whole hybrid loop in one command.
 

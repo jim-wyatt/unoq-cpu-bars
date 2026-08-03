@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 # Run every quality gate in the project. This is what CI runs.
 #
 #   ~/hybrid/tools/check.sh              # everything

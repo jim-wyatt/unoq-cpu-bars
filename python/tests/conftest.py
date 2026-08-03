@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 """Fakes for the hardware `unoq` talks to.
 
 Nothing here touches /dev/ttyHS1 or a GPIO chip. That is deliberate: the test

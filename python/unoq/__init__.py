@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 """
 unoq - talk to the Arduino UNO Q's STM32U585 from the Linux side.
 

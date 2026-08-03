@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 # Run the MCU test suites on the host - no flashing, no hardware.
 #
 #   ./ztest.sh                 # run everything under mcu/tests/

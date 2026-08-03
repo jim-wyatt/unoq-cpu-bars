@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2026 Jim Wyatt
+ * SPDX-License-Identifier: MIT
+ *
  * Charlieplex driver for the UNO Q's 8x13 LED panel.
  *
  * The 104 LEDs hang off eleven pins, PF0..PF10, as ordered pairs: LED n is lit

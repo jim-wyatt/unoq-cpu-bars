@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 """Tests for MCUboot image staging over SMP.
 
 The dangerous mistakes here are silent ones: staging an unsigned image, or

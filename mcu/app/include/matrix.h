@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2026 Jim Wyatt
+ * SPDX-License-Identifier: MIT
+ *
  * The 8x13 LED panel.
  *
  * Everything hardware about the matrix is behind these four calls, so the

@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Jim Wyatt
+// SPDX-License-Identifier: MIT
 {
   // On-chip debugging for the STM32U585 over SWD, bit-banged on the MPU's own
   // GPIO lines. OpenOCD runs locally on the board - there is no external probe.

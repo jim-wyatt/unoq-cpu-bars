@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 # Final conveniences. Run:  sudo bash ~/hybrid/provision/30-mcu-link.sh
 set -uo pipefail
 

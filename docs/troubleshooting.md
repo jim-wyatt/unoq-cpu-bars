@@ -181,4 +181,6 @@ Back to stock Arduino firmware:
 ~/hybrid/mcu/restore-arduino-firmware.sh
 ```
 
-Works even though `~/.arduino15` is gone — the image is in `backup/`.
+Works even though `~/.arduino15` is gone, provided you copied the stock image
+off the board first. It is Arduino's build, so this repository does not ship it
+— see [THIRD-PARTY.md](../THIRD-PARTY.md). Point `STOCK_FW` at your copy.

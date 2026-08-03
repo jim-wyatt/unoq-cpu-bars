@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 # Remove the remaining Arduino Debian packages.
 #
 #   sudo bash ~/hybrid/provision/40-purge-arduino.sh
@@ -7,9 +9,9 @@
 # change behaviour. Run it when you are confident you will not go back.
 #
 # SAFETY: /opt/openocd is owned by NO package (`dpkg -S /opt/openocd` finds
-# nothing), so apt cannot remove it. It is the only way to flash the MCU and
-# is additionally backed up at ~/hybrid/backup/opt-openocd. Verified below
-# before and after.
+# nothing), so apt cannot remove it. It is the only way to flash the MCU, so
+# copy it aside before running this (cp -a /opt/openocd ~/uno-q-backup/).
+# Verified below before and after.
 #
 # TO GO BACK: apt-get install -y arduino-app-cli arduino-app-lab \
 #                                arduino-router arduino-cli
@@ -31,7 +33,8 @@ if /opt/openocd/bin/openocd --version 2>&1 | head -1; then
   echo "OK - flashing capability intact"
 else
   echo "openocd is GONE - restore it now:" >&2
-  echo "  sudo cp -a ~/hybrid/backup/opt-openocd /opt/openocd" >&2
+  echo "  sudo cp -a ~/uno-q-backup/openocd /opt/openocd" >&2
+  echo "  or rebuild: sudo bash ~/hybrid/tools/build-openocd.sh --promote" >&2
   exit 1
 fi
 

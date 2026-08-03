@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 # Bring up the MPU <-> MCU hardware link on the Arduino UNO Q.
 #
 #   ~/hybrid/mcu/link-up.sh

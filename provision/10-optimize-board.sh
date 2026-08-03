@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 # Memory optimization for a headless Arduino UNO Q used as a Linux+MCU dev board.
 #
 #   sudo bash ~/hybrid/provision/10-optimize-board.sh

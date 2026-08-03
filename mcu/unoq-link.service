@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 [Unit]
 Description=Arduino UNO Q MPU<->MCU link (BOOT0 + UART enable GPIOs)
 Documentation=file:/home/arduino/hybrid/mcu/link-up.sh

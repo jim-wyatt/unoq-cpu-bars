@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2026 Jim Wyatt
+ * SPDX-License-Identifier: MIT
+ *
  * Turning percentages into pixels.
  *
  * Deliberately free of Zephyr and of hardware: this is arithmetic, so it is

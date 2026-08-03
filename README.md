@@ -1,8 +1,8 @@
-# Arduino UNO Q — hybrid MPU + MCU development
+# unoq-cpu-bars
 
-A Linux-first development environment for the UNO Q, built on stock upstream
-tooling — Zephyr, west, OpenOCD, libgpiod — instead of the Arduino App
-framework.
+Host CPU load on the Arduino UNO Q's LED matrix — and the Linux-first
+development environment that builds it, on stock upstream tooling (Zephyr,
+west, OpenOCD, libgpiod) instead of the Arduino App framework.
 
 The board is two computers: a Qualcomm QRB2210 running Debian, and an STM32U585
 running Zephyr. This project covers the full loop across both:
@@ -84,9 +84,8 @@ FOTA tasks.
 │   └── tests/              pytest suite, all against fakes — no hardware
 ├── provision/              one-time root setup, numbered in order
 │                           (50-cpu-bars.sh is optional — see mpu.md)
-├── tools/                  check.sh (all gates), install-dev-tools.sh,
-│                           build-openocd.sh, check-versions.sh
-└── backup/                 stock firmware + OpenOCD (not re-downloadable)
+└── tools/                  check.sh (all gates), install-dev-tools.sh,
+                            build-openocd.sh, check-versions.sh
 ```
 
 Three paths are load-bearing and must not move: `env.sh` (sourced by
@@ -319,7 +318,10 @@ It builds **upstream `openocd-org/openocd` master** (pinned, overridable via
 `OPENOCD_COMMIT`). Master is required: `configure.ac` checks
 `libgpiod >= 2.0` and `linuxgpiod.c` uses the v2 API, while the newest release
 predates that. Everything else needed is upstream too — the STM32U5 flash
-driver is `stm32l4x` — and the three `.cfg` files live in `backup/mcu-firmware/`.
+driver is `stm32l4x`, and the two STM32 target scripts are taken from the
+OpenOCD tree the script just built, so they always match the binary. The only
+config this repo supplies is `mcu/board-support/openocd_gpiod.cfg`, which names
+the UNO Q's SWD pins.
 
 Only the `jimtcl` submodule is cloned; `libjaylink` is the J-Link probe driver
 and `--disable-jlink` means it is never compiled.
@@ -338,19 +340,24 @@ OCD_ROOT=/opt/openocd-rebuilt ~/hybrid/mcu/flash.sh \
 Upgrading Zephyr has its own checklist — see
 [mcu.md](docs/mcu.md#upgrading-zephyr).
 
-### Backups
+### Keep your own copies
 
-`backup/` holds the things that cannot be re-downloaded:
+Two things on a provisioned board cannot be re-downloaded, and neither is this
+project's to redistribute (see [THIRD-PARTY.md](THIRD-PARTY.md)). Copy both
+aside **before** running `provision/40-purge-arduino.sh`:
 
-| | |
-|---|---|
-| `mcu-firmware/` | stock Arduino MCU firmware + the OpenOCD `.cfg` files |
-| `opt-openocd/` | a verified copy of `/opt/openocd` (gitignored — it is a binary) |
-| `remoteocd` | Arduino's flashing wrapper, kept for reference |
+```bash
+mkdir -p ~/uno-q-backup
+cp -a /opt/openocd ~/uno-q-backup/                       # rebuildable, but slow
+cp ~/.arduino15/packages/arduino/hardware/zephyr/*/variants/*/*.hex ~/uno-q-backup/
+```
 
-The repo also has an off-board remote. Push after meaningful changes — the
-hardware findings in [hardware.md](docs/hardware.md) are not written down
-anywhere else.
+The `.hex` is what `restore-arduino-firmware.sh` wants in `STOCK_FW`.
+`/opt/openocd` is rebuildable from source with `tools/build-openocd.sh`, so
+losing it costs time rather than capability.
+
+Push after meaningful changes — the hardware findings in
+[hardware.md](docs/hardware.md) are not written down anywhere else.
 
 ---
 
@@ -361,4 +368,16 @@ anywhere else.
 ~/hybrid/mcu/restore-arduino-firmware.sh   # back to stock Arduino firmware
 ```
 
-Both work even though `~/.arduino15` is gone.
+Both work even though `~/.arduino15` is gone — the second needs the stock image
+you copied aside, via `STOCK_FW`.
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE). Every first-party file carries an
+`SPDX-License-Identifier: MIT` header.
+
+A few files belong to other projects and keep their own terms — ST's SVD,
+Zephyr's `.clang-format`, and the panel wiring `matrix.c` reads out of
+ArduinoCore-zephyr. They are listed in [THIRD-PARTY.md](THIRD-PARTY.md).

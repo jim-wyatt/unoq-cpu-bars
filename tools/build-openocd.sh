@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 # Rebuild the OpenOCD that flashes this board's MCU, from source.
 #
 #   sudo bash ~/hybrid/tools/build-openocd.sh              # build + self-test
@@ -32,7 +34,8 @@ COMMIT="${OPENOCD_COMMIT:-da3920b0a52d}"
 REPO="${OPENOCD_REPO:-https://github.com/openocd-org/openocd.git}"
 PREFIX="${OPENOCD_PREFIX:-/opt/openocd-rebuilt}"
 SRC="${OPENOCD_SRC:-/tmp/openocd-src}"
-CFG_SRC="${CFG_SRC:-/home/arduino/hybrid/backup/mcu-firmware}"
+HERE="$(cd "$(dirname "$0")" && pwd)"
+GPIOD_CFG="${GPIOD_CFG:-$HERE/../mcu/board-support/openocd_gpiod.cfg}"
 PROMOTE=0
 [ "${1:-}" = "--promote" ] && PROMOTE=1
 
@@ -70,10 +73,20 @@ make -j"$(nproc)"
 make install
 
 echo "== 5/6 install the board's config files =="
-# These are plain TCL and live in this repo, not in the OpenOCD tree.
-for f in openocd_gpiod.cfg stm32u5x.cfg stm32x5x_common.cfg; do
-  install -m 0644 "$CFG_SRC/$f" "$PREFIX/$f"
-  echo "  $f"
+# openocd_gpiod.cfg is this project's - it names the UNO Q's SWD pins, which
+# are documented nowhere upstream. The two stm32 target scripts are OpenOCD's
+# own (GPL-2.0-or-later) and are taken from the tree we just built rather than
+# vendored here, so they always match the binary instead of drifting from a
+# copy taken at some past version.
+install -m 0644 "$GPIOD_CFG" "$PREFIX/openocd_gpiod.cfg"
+echo "  openocd_gpiod.cfg (this repo)"
+for f in stm32u5x.cfg stm32x5x_common.cfg; do
+  if [ ! -f "$SRC/tcl/target/$f" ]; then
+    echo "missing $f in the OpenOCD source tree ($SRC/tcl/target)" >&2
+    exit 1
+  fi
+  install -m 0644 "$SRC/tcl/target/$f" "$PREFIX/$f"
+  echo "  $f (from openocd@$COMMIT)"
 done
 
 echo "== 6/6 self-test: can it reach the MCU over SWD? =="

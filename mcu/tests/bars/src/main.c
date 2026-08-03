@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2026 Jim Wyatt
+ * SPDX-License-Identifier: MIT
+ *
  * Host-runnable tests for the bar rasteriser the firmware ships.
  *
  * A charlieplexed panel is invisible to software: nothing the MCU can read

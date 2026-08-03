@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 # Pre-commit gate. Installed by tools/install-hooks.sh.
 #
 # Runs the fast gates (lint, format, types, Python tests) but not the MCU

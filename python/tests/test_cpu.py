@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 """Tests for the /proc/stat reader.
 
 Every input here is a written-out /proc/stat, never the real one: load on the

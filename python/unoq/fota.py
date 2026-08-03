@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 """
 Firmware update over the serial link, via MCUboot + SMP. No SWD needed.
 

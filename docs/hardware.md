@@ -115,8 +115,9 @@ No root needed — your user is in the `gpiod` group.
 
 > **`/opt/openocd` is owned by no Debian package.** `dpkg -S /opt/openocd` finds
 > nothing; it was placed there by an install script, so apt will never reinstall
-> it. A verified copy is in `backup/opt-openocd`, and it is reproducible from
-> source — see [the README](../README.md#rebuilding-openocd).
+> it. Copy it somewhere safe (`cp -a /opt/openocd ~/uno-q-backup/`) before you
+> purge anything, and note that it is reproducible from source — see
+> [the README](../README.md#rebuilding-openocd).
 
 `apt install openocd` does **not** substitute: Debian ships 0.12.0 (2023), which
 predates the libgpiod v2 support this board needs.

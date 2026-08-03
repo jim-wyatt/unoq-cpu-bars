@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 """
 MCU interface: the Zephyr shell over /dev/ttyHS1.
 

@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Jim Wyatt
+// SPDX-License-Identifier: MIT
 {
   // Deliberately minimal - this board has 3.6 GiB of RAM shared with the
   // Zephyr build. Every extension here earns its place; see the README.

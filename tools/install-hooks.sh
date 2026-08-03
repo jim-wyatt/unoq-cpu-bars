@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
 # Point git's pre-commit hook at tools/pre-commit-hook.sh.
 #
 #   ~/hybrid/tools/install-hooks.sh

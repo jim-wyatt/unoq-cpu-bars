@@ -1,0 +1,30 @@
+[Unit]
+Description=Arduino UNO Q host CPU load on the LED matrix
+Documentation=file:/home/arduino/hybrid/docs/cpu-bars.md
+
+# /dev/ttyHS1 reads nothing until link-up.sh has driven the UART enable GPIO,
+# so this is a hard dependency rather than an ordering hint: without it the
+# service starts, finds a silent port, and restarts forever.
+Requires=unoq-link.service
+After=unoq-link.service
+
+[Service]
+Type=simple
+User=arduino
+Group=arduino
+ExecStart=/home/arduino/hybrid/.venv/bin/unoq-cpu-bars --interval 0.5
+
+# The MCU may still be coming up when the MPU reaches multi-user.target, and
+# the shell handshake times out if it is. Retrying is the whole recovery: the
+# next attempt a few seconds later finds a live shell.
+Restart=on-failure
+RestartSec=5
+
+# SIGTERM reaches Python as a plain kill, not KeyboardInterrupt, so the
+# finally: that blanks the panel never runs and the last frame stays lit
+# forever. SIGINT takes the same path as Ctrl-C and leaves the panel dark.
+KillSignal=SIGINT
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target

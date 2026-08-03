@@ -38,7 +38,39 @@ This needs no root — your user is in the `gpiod` group.
 > **`/opt/openocd` is owned by no Debian package.** `dpkg -S /opt/openocd` finds
 > nothing — it was placed there by an install script, so apt will never
 > reinstall it, and it is the only way to flash this MCU. A verified-working
-> copy is kept in `backup/opt-openocd`. Do not delete either one.
+> copy is kept in `backup/opt-openocd`.
+>
+> It is also **reproducible from source** — see below — so this is no longer a
+> single point of failure.
+
+### Rebuilding OpenOCD
+
+```bash
+sudo bash ~/hybrid/build-openocd.sh              # build + self-test only
+sudo bash ~/hybrid/build-openocd.sh --promote    # ...then replace /opt/openocd
+```
+
+`apt install openocd` will **not** work. The installed binary reports build
+`ge6a2c12f4`, and that commit is not in `openocd-org/openocd` — it is in
+**`arduino/OpenOCD`**:
+
+```
+e6a2c12f41c9  drivers/linuxgpiodv2: introduce new driver for libgpiod v2 API
+```
+
+This board ships libgpiod v2 (`libgpiod.so.3`); upstream OpenOCD master still
+targets the v1 API. The fork is required for the *adapter driver* only — the
+STM32U5 flash driver (`stm32l4x`) is upstream, and the three `.cfg` files are
+plain TCL kept in `backup/mcu-firmware/`.
+
+The script builds to `/opt/openocd-rebuilt`, **self-tests against the real MCU**
+(it must see `Cortex-M33`), and only replaces `/opt/openocd` with `--promote` —
+keeping the old install as `/opt/openocd.<timestamp>`. All tooling honours
+`OCD_ROOT`, so you can trial the rebuild without replacing anything:
+
+```bash
+OCD_ROOT=/opt/openocd-rebuilt ~/hybrid/mcu/flash.sh build/zephyr/zephyr.signed.hex
+```
 
 ### The two GPIOs nobody documents — read this before you debug anything
 

@@ -4,15 +4,21 @@
 #   ./flash.sh build/zephyr/zephyr.hex          # flash a west build
 #   ./flash.sh firmware.bin 0x08000000          # flash a raw binary at address
 #
-# No root, no Arduino tooling. /opt/openocd is a system package (from the
-# arduino-unoq deb) and is independent of ~/.arduino15.
+# No root, no Arduino tooling needed.
+#
+# /opt/openocd is owned by NO Debian package - it was dropped in by an install
+# script. `apt install openocd` will not substitute for it: this board needs
+# the libgpiod v2 adapter driver, which only exists in arduino/OpenOCD, not in
+# upstream. Rebuild it from source with ~/hybrid/build-openocd.sh.
 #
 # SWD wiring, per /opt/openocd/openocd_gpiod.cfg - all on /dev/gpiochip1:
 #   swclk = 26   swdio = 25   srst/trst = 38
 # Your user needs to be in the `gpiod` group (it is).
 set -euo pipefail
 
-OCD_ROOT=/opt/openocd
+# Override to test a rebuilt OpenOCD without replacing the system one:
+#   OCD_ROOT=/opt/openocd-rebuilt ./flash.sh ...
+OCD_ROOT="${OCD_ROOT:-/opt/openocd}"
 OPENOCD="$OCD_ROOT/bin/openocd"
 CFG="$OCD_ROOT/openocd_gpiod.cfg"
 

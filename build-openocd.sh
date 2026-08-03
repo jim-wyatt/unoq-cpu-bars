@@ -32,6 +32,8 @@ COMMIT="${OPENOCD_COMMIT:-e6a2c12f41c9}"
 REPO="${OPENOCD_REPO:-https://github.com/arduino/OpenOCD.git}"
 PREFIX="${OPENOCD_PREFIX:-/opt/openocd-rebuilt}"
 SRC="${OPENOCD_SRC:-/tmp/openocd-src}"
+# repo.or.cz (the upstream submodule host) is unreliable; use the GitHub mirror.
+JIMTCL_MIRROR="${JIMTCL_MIRROR:-https://github.com/msteveb/jimtcl.git}"
 CFG_SRC="${CFG_SRC:-/home/arduino/hybrid/backup/mcu-firmware}"
 PROMOTE=0
 [ "${1:-}" = "--promote" ] && PROMOTE=1
@@ -44,9 +46,18 @@ apt-get install -y --no-install-recommends \
 
 echo "== 2/6 source: $REPO @ $COMMIT =="
 rm -rf "$SRC"
-git clone --recurse-submodules "$REPO" "$SRC"
+git clone "$REPO" "$SRC"
 git -C "$SRC" checkout "$COMMIT"
-git -C "$SRC" submodule update --init --recursive
+
+# Submodules: all three .gitmodules entries point at repo.or.cz, which is slow
+# and frequently unreachable (it has taken down this build before). Only jimtcl
+# is actually required:
+#   jimtcl     - OpenOCD's embedded TCL interpreter. REQUIRED.
+#   libjaylink - J-Link probe driver. NOT needed; we bit-bang SWD over GPIO,
+#                and --disable-jlink below means it is never compiled.
+#   git2cl     - generates a ChangeLog. NOT needed.
+git -C "$SRC" config submodule.jimtcl.url "$JIMTCL_MIRROR"
+git -C "$SRC" submodule update --init jimtcl
 
 echo "== 3/6 configure =="
 cd "$SRC"
@@ -55,6 +66,7 @@ cd "$SRC"
 # build small and dependency-light.
 ./configure --prefix="$PREFIX" \
     --enable-linuxgpiod \
+    --disable-jlink \
     --disable-werror \
     --disable-doxygen-html \
     --disable-doxygen-pdf

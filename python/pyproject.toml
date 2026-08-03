@@ -1,0 +1,10 @@
+[project]
+name = "unoq"
+version = "0.1.0"
+description = "Talk to the Arduino UNO Q's STM32U585 from the Linux MPU"
+requires-python = ">=3.11"
+dependencies = ["pyserial", "gpiod", "smpclient"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

@@ -25,8 +25,12 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+# --clobber-output deletes the previous outdir instead of renaming it. Without
+# it twister keeps every past run as twister-out.1, .2, .3 ... and /tmp here is
+# tmpfs, so each 19 MB run is 19 MB of the board's shared RAM, forever.
 exec "$WS/.venv/bin/python" "$WS/zephyr/scripts/twister" \
     -T "$HERE/tests" \
     -p "$PLATFORM" \
     --outdir /tmp/twister-out \
+    --clobber-output \
     -v "${ARGS[@]}"

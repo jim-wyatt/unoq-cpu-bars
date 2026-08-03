@@ -1,0 +1,150 @@
+"""
+Firmware update over the serial link, via MCUboot + SMP. No SWD needed.
+
+    from unoq import fota
+    fota.upload("~/zephyrproject/build/zephyr/zephyr.signed.bin")
+    fota.test()      # mark pending, then reset - MCUboot swaps slot1 -> slot0
+    fota.confirm()   # keep it; without this the next reset reverts
+
+The revert-on-failure behaviour is the point: an image that boots but cannot
+be confirmed (because it crashed, or you never called confirm) is rolled back
+automatically. That is what makes remote updates safe.
+
+Requires the app to be built with CONFIG_BOOTLOADER_MCUBOOT=y and signed - see
+~/hybrid/README.md.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import os
+from pathlib import Path
+
+from smpclient import SMPClient
+from smpclient.requests.image_management import ImageStatesRead, ImageStatesWrite
+from smpclient.requests.os_management import ResetWrite
+from smpclient.transport.serial import SMPSerialTransport
+
+from .mcu import BAUD, PORT
+
+
+async def _client(port: str, timeout: float) -> tuple[SMPClient, SMPSerialTransport]:
+    transport = SMPSerialTransport(baudrate=BAUD)
+    client = SMPClient(transport, port, timeout_s=timeout)
+    await client.connect(connect_timeout_s=timeout)
+    return client, transport
+
+
+def images(port: str = PORT, timeout: float = 10.0) -> list[dict]:
+    """Return the MCUboot slot table."""
+
+    async def _run():
+        c, t = await _client(port, timeout)
+        try:
+            r = await c.request(ImageStatesRead(), timeout_s=timeout)
+            return [
+                {
+                    "slot": im.slot,
+                    "version": im.version,
+                    "active": im.active,
+                    "confirmed": im.confirmed,
+                    "pending": im.pending,
+                    "hash": im.hash.hex(),
+                }
+                for im in getattr(r, "images", [])
+            ]
+        finally:
+            await t.disconnect()
+
+    return asyncio.run(asyncio.wait_for(_run(), timeout * 6))
+
+
+def upload(image: str | os.PathLike, port: str = PORT, timeout: float = 600.0,
+           progress: bool = True) -> str:
+    """Upload a *signed* image (.signed.bin) into the inactive slot.
+
+    Returns the new image's hash. This only stages it - call test() to boot it.
+    """
+    path = Path(image).expanduser()
+    if not path.exists():
+        raise FileNotFoundError(path)
+    if "signed" not in path.name:
+        raise ValueError(
+            f"{path.name} does not look signed; MCUboot will reject an unsigned "
+            "image. Use zephyr.signed.bin (see README: west sign -t imgtool)."
+        )
+    blob = path.read_bytes()
+
+    async def _run():
+        c, t = await _client(port, 20.0)
+        try:
+            last = -1
+            async for offset in c.upload(blob):
+                if progress:
+                    pct = offset * 100 // len(blob)
+                    if pct >= last + 10:
+                        last = pct
+                        print(f"  upload {pct:3d}%  ({offset}/{len(blob)})", flush=True)
+            r = await c.request(ImageStatesRead(), timeout_s=20.0)
+            for im in getattr(r, "images", []):
+                if not im.active:
+                    return im.hash.hex()
+            return ""
+        finally:
+            await t.disconnect()
+
+    return asyncio.run(asyncio.wait_for(_run(), timeout))
+
+
+def test(image_hash: str | None = None, port: str = PORT, timeout: float = 20.0) -> None:
+    """Mark the staged image pending, so the next boot swaps to it.
+
+    If it does not get confirm()ed, MCUboot reverts on the following reset.
+    """
+    if image_hash is None:
+        for im in images(port):
+            if not im["active"]:
+                image_hash = im["hash"]
+                break
+    if not image_hash:
+        raise RuntimeError("no staged image found in the inactive slot")
+
+    async def _run():
+        c, t = await _client(port, timeout)
+        try:
+            await c.request(
+                ImageStatesWrite(hash=bytes.fromhex(image_hash), confirm=False),
+                timeout_s=timeout,
+            )
+        finally:
+            await t.disconnect()
+
+    asyncio.run(asyncio.wait_for(_run(), timeout * 3))
+
+
+def confirm(port: str = PORT, timeout: float = 20.0) -> None:
+    """Confirm the running image so MCUboot stops reverting it."""
+
+    async def _run():
+        c, t = await _client(port, timeout)
+        try:
+            await c.request(ImageStatesWrite(confirm=True), timeout_s=timeout)
+        finally:
+            await t.disconnect()
+
+    asyncio.run(asyncio.wait_for(_run(), timeout * 3))
+
+
+def reset(port: str = PORT, timeout: float = 20.0) -> None:
+    """Reset the MCU over SMP (applies a pending swap)."""
+
+    async def _run():
+        c, t = await _client(port, timeout)
+        try:
+            await c.request(ResetWrite(), timeout_s=timeout)
+        except Exception:
+            pass  # the device resets instead of replying
+        finally:
+            await t.disconnect()
+
+    asyncio.run(asyncio.wait_for(_run(), timeout * 3))

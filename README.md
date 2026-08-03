@@ -275,3 +275,79 @@ Pylance is removed (~412 MB even in "light" mode). Ruff's LSP handles linting,
 formatting and imports. **It does no type inference** — no hover types, no
 go-to-definition into libraries. If you want those back cheaply, install
 `basedpyright` and set `python.languageServer` accordingly.
+
+## Firmware update over serial (MCUboot + SMP)
+
+The MCU runs MCUboot, so app updates need **no SWD** — they go over the same
+UART. Verified end to end, including the revert path.
+
+```
+0x08000000  boot_partition   64K   MCUboot (38K used)
+0x08010000  slot0           416K   running signed app
+0x08078000  slot1           416K   staged update
+0x080e0000  storage         128K   NVS (settings, boot counter)
+```
+
+```python
+from unoq import fota
+fota.upload("~/zephyrproject/build/zephyr/zephyr.signed.bin")
+fota.test()      # mark pending
+fota.reset()     # MCUboot swaps slot1 -> slot0
+fota.confirm()   # keep it
+```
+
+**The revert is the point.** An image that boots but is never confirmed is
+rolled back on the next reset. Verified: swapped to v0.2.0, reset without
+confirming, and the board came back on v0.0.0 by itself. Confirm, and it sticks.
+
+`zbuild.sh` signs automatically when `CONFIG_BOOTLOADER_MCUBOOT=y`. **Never
+flash the unsigned `zephyr.hex` over a MCUboot chain** — it links into slot0 but
+has no image header, so the bootloader refuses it. Use `zephyr.signed.hex`, or
+`mcu/flash-all.sh` to lay down bootloader + app together.
+
+Recovery from anything: `mcu/flash-all.sh` over SWD.
+
+## Python API
+
+`~/hybrid/python/unoq` (installed editable into `.venv`):
+
+```python
+from unoq import MCU, fota, link_up, link_state
+
+link_up()                      # BOOT0 low + UART enable
+with MCU() as mcu:
+    mcu.status()               # {'uptime_ms':…, 'ticks':…, 'boots':…, 'wdt':1}
+    mcu.blink(250)
+    mcu.devices()              # [('gpio@42021c00','READY'), …]
+    mcu.gpio_get('gpioh', 11)
+    mcu.echo('ping')           # via SMP, not the shell
+```
+
+`MCU` is a context manager on purpose — the UART is a single shared resource
+and a stale handle blocks `tio`, `mcucon` and SMP alike.
+
+Gotcha baked into the module: handing the port from the shell to SMP needs a
+settle delay. Reopening immediately drops the first SMP frame and times out,
+which looks exactly like a firmware fault but is a host-side race.
+
+## Watchdog and persistent state
+
+The app arms a 4 s task watchdog and keeps a boot counter in NVS.
+
+```
+$ app hang        # stops the feeder
+# ~4s later: boots 5 -> 6, uptime reset
+```
+
+`app hang` must stop the **main** loop, not block the shell thread — blocking
+the shell wedges only the shell while main keeps feeding, and nothing resets.
+
+## Tests
+
+```bash
+~/hybrid/mcu/ztest.sh                    # native_sim, no hardware
+~/hybrid/mcu/ztest.sh -p arduino_uno_q   # cross-compile for the board
+```
+
+Runs natively on the MPU — 3 cases in 0.038 s, no flash cycle. Use
+`native_sim/native/64`; plain `native_sim` is 32-bit and fails on aarch64.

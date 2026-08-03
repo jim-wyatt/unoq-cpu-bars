@@ -14,9 +14,11 @@ endpoint sharing the same UART. See ~/hybrid/README.md for the hardware notes.
 """
 
 from .link import LINK_ENABLE_LINE, BOOT0_LINE, link_up, link_state
+from . import fota
 from .mcu import MCU, MCUError, ShellTimeout
 
 __all__ = [
+    "fota",
     "MCU",
     "MCUError",
     "ShellTimeout",

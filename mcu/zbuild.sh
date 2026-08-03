@@ -36,7 +36,31 @@ if [ -f "$WS/build/compile_commands.json" ]; then
   echo "linked compile_commands.json -> build/"
 fi
 
+# If the app is built for MCUboot it links into slot0 and MUST be signed -
+# MCUboot will refuse the raw image, and flashing zephyr.hex over the
+# bootloader would brick the chain. Sign automatically so that cannot happen.
+if grep -q "^CONFIG_BOOTLOADER_MCUBOOT=y" "$WS/build/zephyr/.config" 2>/dev/null; then
+  VERSION="${IMAGE_VERSION:-0.0.0+$(date +%s 2>/dev/null || echo 0)}"
+  echo "signing for MCUboot (version $VERSION)"
+  "$WS/.venv/bin/west" sign -t imgtool -p "$WS/.venv/bin/imgtool" -- \
+      --key "$WS/bootloader/mcuboot/root-rsa-2048.pem" \
+      --version "$VERSION" >/dev/null
+  echo "  -> build/zephyr/zephyr.signed.bin  (upload with unoq.fota)"
+  echo "  -> build/zephyr/zephyr.signed.hex  (flash to slot0 with flash.sh)"
+fi
+
 echo
-ls -la "$WS/build/zephyr/zephyr.hex" "$WS/build/zephyr/zephyr.bin" 2>/dev/null || true
-echo
-echo "flash it:  ~/hybrid/mcu/flash.sh $WS/build/zephyr/zephyr.hex"
+if [ -f "$WS/build/zephyr/zephyr.signed.hex" ]; then
+  # MCUboot build: the unsigned hex must NOT be flashed - it links into slot0
+  # but has no image header, so the bootloader will refuse to boot it.
+  ls -la "$WS/build/zephyr/zephyr.signed.hex" "$WS/build/zephyr/zephyr.signed.bin" 2>/dev/null || true
+  echo
+  echo "flash over SWD :  ~/hybrid/mcu/flash.sh $WS/build/zephyr/zephyr.signed.hex"
+  echo "update over UART:  python -c \"from unoq import fota; \\"
+  echo "                     fota.upload('$WS/build/zephyr/zephyr.signed.bin'); \\"
+  echo "                     fota.test(); fota.reset()\"   # then fota.confirm()"
+else
+  ls -la "$WS/build/zephyr/zephyr.hex" "$WS/build/zephyr/zephyr.bin" 2>/dev/null || true
+  echo
+  echo "flash it:  ~/hybrid/mcu/flash.sh $WS/build/zephyr/zephyr.hex"
+fi

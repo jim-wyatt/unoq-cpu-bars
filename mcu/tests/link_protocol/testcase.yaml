@@ -1,0 +1,6 @@
+tests:
+  unoq.link_protocol:
+    platform_allow:
+      - native_sim/native/64
+      - arduino_uno_q
+    tags: unoq

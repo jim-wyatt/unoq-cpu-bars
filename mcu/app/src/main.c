@@ -22,7 +22,7 @@
 
 static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
 
-static atomic_t blink_ms = ATOMIC_INIT(500);
+static atomic_t blink_ms = ATOMIC_INIT(250);  /* v2 marker for FOTA test */
 static uint32_t ticks;
 static uint32_t boot_count;   /* persisted in NVS across power cycles */
 static atomic_t feed_wdt = ATOMIC_INIT(1);

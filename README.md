@@ -40,6 +40,27 @@ This needs no root — your user is in the `gpiod` group.
 > reinstall it, and it is the only way to flash this MCU. A verified-working
 > copy is kept in `backup/opt-openocd`. Do not delete either one.
 
+### The two GPIOs nobody documents — read this before you debug anything
+
+`arduino-router` used to drive two MPU GPIO lines that the MCU depends on.
+Disabling that service breaks the board in ways that look like broken firmware:
+
+| `gpiochip1` line | Function | Symptom when wrong |
+|---|---|---|
+| **37** | MCU **BOOT0** (latched at reset) | Firmware flashes and *verifies*, but never runs. PC sits around `0x0bf9xxxx` — the STM32 ROM bootloader. |
+| **70** | **UART link enable** | MCU transmits fine (`LPUART1 CR1=0x2d`, TC/TXE set) but `/dev/ttyHS1` reads 0 bytes. |
+| 25 / 26 / 38 | SWD swdio / swclk / srst | — |
+
+Fix, run once per boot:
+
+```bash
+~/hybrid/mcu/link-up.sh      # BOOT0=0, link-enable=1
+```
+
+`flash.sh` calls it automatically. The pin state persists after the `gpioset`
+process exits (SoC pinctrl holds the last driven value), which is why a
+one-shot suffices. Install `mcu/unoq-link.service` to have it applied at boot.
+
 ### The two UARTs — this matters
 
 The board has two serial ports and they are **not** interchangeable:
@@ -194,3 +215,63 @@ robust path.
 Open `~/zephyrproject`, pick **Debug (attach)** or **Debug (flash then run)**.
 `.vscode/STM32U585.svd` (8 MB, 202 peripherals) drives the peripheral-register
 viewer, so you get named register decoding for every peripheral on the chip.
+
+## MCU shell + SMP over the MPU link
+
+`mcu/app` runs a Zephyr shell **and** an SMP/MCUmgr endpoint over the single
+`lpuart1` link. Both verified working simultaneously.
+
+```bash
+mcucon                                  # live console (from env.sh)
+```
+
+Drive it from Python — the shell is a plain line protocol:
+
+```python
+import serial
+s = serial.Serial('/dev/ttyHS1', 115200, timeout=0.5)
+s.write(b"app status\r\n")        # -> uptime_ms=12216 ticks=25 blink_ms=500
+s.write(b"gpio conf gpioh 11 o\r\n")
+```
+
+Built-in command groups: `app` (yours), `gpio`, `i2c`, `device`, `kernel`,
+`devmem`. Poke hardware without a rebuild.
+
+Structured RPC via SMP (`smpclient` is installed in `.venv`):
+
+```python
+from smpclient import SMPClient
+from smpclient.transport.serial import SMPSerialTransport
+from smpclient.requests.os_management import EchoWrite
+# -> echo reply: 'round-trip-ok'
+```
+
+SMP-over-shell registers **no** `mcumgr` command — the shell sniffs SMP frame
+markers out of the byte stream. `mcumgr: command not found` is expected.
+
+`CONFIG_MCUMGR_TRANSPORT_SHELL` silently disables itself without
+`CONFIG_BASE64` and `CONFIG_CRC`. Kconfig warns; the build still succeeds.
+
+**Not done:** firmware update over SMP. That needs MCUboot in `boot_partition`
+and signed images in `slot0`, which changes the flash layout and the current
+direct-SWD workflow. The partitions already exist in the board DTS.
+
+## Fast iteration with native_sim
+
+Zephyr builds for the host, so logic can be exercised with no flash cycle:
+
+```bash
+cd ~/zephyrproject
+./.venv/bin/west build -b native_sim/native/64 zephyr/samples/hello_world -d /tmp/bnative
+/tmp/bnative/zephyr/zephyr.exe
+```
+
+Use `native_sim/native/64` — plain `native_sim` is a 32-bit target and fails on
+aarch64 with a `CONFIG_64BIT` error.
+
+## Python tooling
+
+Pylance is removed (~412 MB even in "light" mode). Ruff's LSP handles linting,
+formatting and imports. **It does no type inference** — no hover types, no
+go-to-definition into libraries. If you want those back cheaply, install
+`basedpyright` and set `python.languageServer` accordingly.

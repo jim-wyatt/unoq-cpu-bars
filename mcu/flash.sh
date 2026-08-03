@@ -22,6 +22,12 @@ ADDR="${2:-}"
 [ -f "$IMG" ]      || { echo "no such image: $IMG" >&2; exit 1; }
 [ -x "$OPENOCD" ]  || { echo "openocd missing at $OPENOCD" >&2; exit 1; }
 
+# BOOT0 (gpiochip1 line 37) is latched at MCU reset. If it is high or floating
+# the STM32 boots its ROM bootloader instead of the image we just wrote - the
+# flash succeeds and verifies, but nothing runs. Line 70 enables the UART link
+# to Linux. Both were previously held by arduino-router. See link-up.sh.
+"$(dirname "$0")/link-up.sh" || echo "warning: could not set BOOT0/link GPIOs" >&2
+
 # .hex/.elf carry their own load addresses; raw .bin needs one supplied.
 case "$IMG" in
   *.bin)

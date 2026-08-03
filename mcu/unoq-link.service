@@ -1,0 +1,14 @@
+[Unit]
+Description=Arduino UNO Q MPU<->MCU link (BOOT0 + UART enable GPIOs)
+Documentation=file:/home/arduino/hybrid/mcu/link-up.sh
+DefaultDependencies=no
+After=systemd-udev-settle.service
+Before=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/home/arduino/hybrid/mcu/link-up.sh
+
+[Install]
+WantedBy=multi-user.target

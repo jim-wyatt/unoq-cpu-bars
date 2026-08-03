@@ -5,6 +5,14 @@ DefaultDependencies=no
 After=systemd-udev-settle.service
 Before=multi-user.target
 
+# /home/arduino is its own ext4 partition (mmcblk0p69) and mounts at ~13s, but
+# DefaultDependencies=no drops the implicit ordering after sysinit/basic.target
+# and systemd reaches this unit at ~7.8s - so ExecStart pointed at a path that
+# did not exist yet and every boot died with 203/EXEC. RequiresMountsFor pulls
+# in home-arduino.mount and orders after it, which DefaultDependencies=no does
+# not override.
+RequiresMountsFor=/home/arduino
+
 [Service]
 Type=oneshot
 RemainAfterExit=yes

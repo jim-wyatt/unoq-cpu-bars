@@ -1,0 +1,48 @@
+name: checks
+
+# Runs the same gates as tools/check.sh, so a green CI means the same thing as
+# a clean local run. The MCU suite is the exception: ztest needs a full Zephyr
+# workspace and SDK (~5 GB), which is not worth installing per job - run it on
+# the board with `tools/check.sh mcu`.
+#
+# The runner is x86_64 while the board is aarch64. That is fine here: gpiod
+# ships manylinux wheels for both, and the tests use fakes rather than real
+# hardware, so nothing in this job depends on the architecture.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install dev tooling
+        # Same script the board uses; it detects the runner's architecture.
+        run: tools/install-dev-tools.sh
+
+      - name: Run gates
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          tools/check.sh python shell c

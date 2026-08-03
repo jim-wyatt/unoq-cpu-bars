@@ -94,6 +94,36 @@
       "problemMatcher": []
     },
     {
+      "label": "Test: python (pytest + coverage)",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/pytest",
+      "options": { "cwd": "${workspaceFolder}/python" },
+      "group": "test",
+      "problemMatcher": [],
+      "detail": "All fakes - touches no hardware. Coverage gates at 100%."
+    },
+    {
+      "label": "Check: all quality gates",
+      "type": "shell",
+      "command": "${workspaceFolder}/tools/check.sh",
+      "problemMatcher": [],
+      "detail": "lint, format, types, tests, coverage, C format, MCU suite."
+    },
+    {
+      "label": "Check: fast (skip the MCU build)",
+      "type": "shell",
+      "command": "${workspaceFolder}/tools/check.sh --fast",
+      "problemMatcher": [],
+      "detail": "What the pre-commit hook runs."
+    },
+    {
+      "label": "Check: reformat in place",
+      "type": "shell",
+      "command": "${workspaceFolder}/tools/check.sh --fix",
+      "problemMatcher": [],
+      "detail": "ruff format, shfmt -w, clang-format -i."
+    },
+    {
       "label": "Maint: check dependency versions",
       "type": "shell",
       "command": "${workspaceFolder}/tools/check-versions.sh",

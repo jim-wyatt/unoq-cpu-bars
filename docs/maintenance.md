@@ -62,6 +62,27 @@ cp -r ~/hybrid/mcu/board-support/support ~/zephyrproject/zephyr/boards/arduino/u
 Also check the SDK requirement — Zephyr's `SDK_VERSION` file states it
 (v4.4.x wants SDK 1.0.1; v4.3.0 wanted 0.17.4).
 
+The C style is Zephyr's, copied into this repo the same way, so re-copy it too
+and re-run the gate — upstream does change it between releases:
+
+```bash
+cp ~/zephyrproject/zephyr/.clang-format ~/hybrid/.clang-format
+~/hybrid/tools/check.sh c
+```
+
+## Dev tooling
+
+The lint/format/type/test toolchain is installed by script, not by hand:
+
+```bash
+~/hybrid/tools/install-dev-tools.sh   # idempotent, no sudo
+~/hybrid/tools/check.sh               # run every gate
+```
+
+Versions for the Python tools live in `python/pyproject.toml` under the `dev`
+extra; `shellcheck` and `shfmt` track upstream's latest release. See
+[quality.md](quality.md).
+
 ## Backups
 
 `backup/` holds the things that cannot be re-downloaded:

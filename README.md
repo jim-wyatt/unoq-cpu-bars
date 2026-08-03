@@ -29,6 +29,10 @@ with MCU() as mcu:
     print(mcu.status())         # {'uptime_ms': 12216, 'ticks': 25, 'boots': 7, 'wdt': 1}
 ```
 
+```bash
+tools/check.sh                  # lint, format, types, tests, coverage
+```
+
 In VS Code: **Ctrl-Shift-B** builds, and the Run panel has *Debug (attach)* and
 *Debug (flash then run)*. **Terminal → Run Task** has flash, console, test and
 FOTA tasks.
@@ -43,6 +47,7 @@ FOTA tasks.
 | **[mcu.md](docs/mcu.md)** | Build, flash, debug, FOTA, shell, tests, watchdog |
 | **[mpu.md](docs/mpu.md)** | Linux-side hardware access and the `unoq` API |
 | **[setup.md](docs/setup.md)** | Provisioning a board from scratch |
+| **[quality.md](docs/quality.md)** | Lint, format, types, tests, coverage, CI |
 | **[maintenance.md](docs/maintenance.md)** | Version audit, dependency pins, rebuilding OpenOCD |
 | **[troubleshooting.md](docs/troubleshooting.md)** | Symptom → cause |
 
@@ -55,6 +60,7 @@ FOTA tasks.
 ├── docs/                   see above
 ├── mcu/                    everything for the STM32U585
 │   ├── app/                the firmware: shell + SMP + watchdog + NVS
+│   │   └── include/        app_proto.h - the MPU<->MCU contract, shared
 │   ├── tests/              ztest suites (run on the host via native_sim)
 │   ├── board-support/      OpenOCD cfg Zephyr's west runner needs (not upstream)
 │   ├── link-up.sh          BOOT0 + UART enable   (referenced by systemd — do not move)
@@ -63,12 +69,12 @@ FOTA tasks.
 │   ├── flash-all.sh        bootloader + app, for recovery
 │   ├── ztest.sh            twister on native_sim
 │   └── restore-arduino-firmware.sh
-├── python/unoq/            MPU-side package (editable install — do not move)
-│   ├── link.py             the BOOT0 / link-enable GPIOs
-│   ├── mcu.py              Zephyr shell + SMP client
-│   └── fota.py             MCUboot firmware update
+├── python/                 MPU-side package (editable install — do not move)
+│   ├── unoq/               link.py (GPIOs), mcu.py (shell+SMP), fota.py
+│   └── tests/              pytest suite, all against fakes — no hardware
 ├── provision/              one-time root setup, numbered in order
-├── tools/                  build-openocd.sh, check-versions.sh
+├── tools/                  check.sh (all gates), install-dev-tools.sh,
+│                           build-openocd.sh, check-versions.sh
 └── backup/                 stock firmware + OpenOCD (not re-downloadable)
 ```
 

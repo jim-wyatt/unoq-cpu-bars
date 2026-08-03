@@ -115,6 +115,15 @@ peripheral registers decoded from `.vscode/STM32U585.svd` (202 peripherals).
 Use `native_sim/native/64`; plain `native_sim` is 32-bit and fails on aarch64
 with a `CONFIG_64BIT` error.
 
+The suite tests [`mcu/app/include/app_proto.h`](../mcu/app/include/app_proto.h)
+— the MPU↔MCU contract that `main.c`, the tests and `unoq/mcu.py` all depend on
+agreeing. It includes the same header the firmware does, so a change to the
+status format or the blink range fails here rather than silently breaking the
+Python side. **Editing that header is a protocol change**: update
+`unoq/mcu.py` and its tests in the same commit.
+
+See [quality.md](quality.md) for the full gate list and `tools/check.sh`.
+
 ## Watchdog and persistent state
 
 The app arms a 4 s task watchdog and keeps a boot counter in NVS

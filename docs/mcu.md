@@ -22,6 +22,20 @@ zbuild ~/hybrid/mcu/app -p always            # pristine rebuild
 `compile_commands.json` into both this project and the Zephyr workspace so
 clangd works in either.
 
+**Each app gets its own build directory.** This project's app builds into
+`~/zephyrproject/build` — the path named by every doc, VS Code task and
+`launch.json`. Anything else builds into `~/zephyrproject/build-<name>`:
+
+```bash
+zbuild ~/hybrid/mcu/app       # -> ~/zephyrproject/build
+zbuild samples/basic/blinky   # -> ~/zephyrproject/build-blinky
+```
+
+So switching between apps never forces a pristine rebuild, and building a
+sample never repoints this project's `compile_commands.json` at foreign code —
+which would leave clangd quietly indexing the wrong tree. Only this project's
+own app updates its index. Override the directory with `BUILD_DIR=...`.
+
 ## Flash over SWD
 
 ```bash

@@ -5,3 +5,8 @@ backup/opt-openocd/
 __pycache__/
 compile_commands.json
 .cache/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/

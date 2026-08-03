@@ -41,9 +41,7 @@ def link_up(chip: str = GPIOCHIP) -> None:
         chip,
         consumer="unoq-link",
         config={
-            BOOT0_LINE: gpiod.LineSettings(
-                direction=Direction.OUTPUT, output_value=Value.INACTIVE
-            ),
+            BOOT0_LINE: gpiod.LineSettings(direction=Direction.OUTPUT, output_value=Value.INACTIVE),
             LINK_ENABLE_LINE: gpiod.LineSettings(
                 direction=Direction.OUTPUT, output_value=Value.ACTIVE
             ),

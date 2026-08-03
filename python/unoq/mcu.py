@@ -8,6 +8,7 @@ shell command - that is expected, not a misconfiguration.
 
 from __future__ import annotations
 
+import contextlib
 import re
 import time
 
@@ -49,14 +50,14 @@ class MCU:
     single shared resource and a stale handle blocks `tio`, `mcucon` and SMP.
     """
 
-    def __init__(self, port: str = PORT, baud: int = BAUD, timeout: float = 0.3,
-                 ensure_link: bool = True):
+    def __init__(
+        self, port: str = PORT, baud: int = BAUD, timeout: float = 0.3, ensure_link: bool = True
+    ):
         if ensure_link:
             # Cheap, idempotent; without it every read silently returns b"".
-            try:
+            # Not fatal - the link may already be up, or permissions may differ.
+            with contextlib.suppress(Exception):
                 link_up()
-            except Exception:
-                pass  # not fatal - the link may already be up, or perms differ
         self._s = serial.Serial(port, baud, timeout=timeout)
         self._port = port
         time.sleep(0.15)
@@ -68,10 +69,10 @@ class MCU:
         if self._s.is_open:
             self._s.close()
 
-    def __enter__(self) -> "MCU":
+    def __enter__(self) -> MCU:
         return self
 
-    def __exit__(self, *exc) -> None:
+    def __exit__(self, *exc: object) -> None:
         self.close()
 
     # -- raw shell ---------------------------------------------------------
@@ -108,12 +109,17 @@ class MCU:
 
     # -- application commands ---------------------------------------------
 
-    def status(self) -> dict[str, int]:
-        """Parse `app status` into a dict of ints."""
+    def status(self) -> dict[str, int | str]:
+        """Parse `app status` into a dict, values converted to int where possible.
+
+        Values are ints in practice - the firmware emits counters - but a field
+        it cannot parse is kept as the raw string rather than dropped, so a
+        firmware change surfaces as an odd value instead of a missing key.
+        """
         out = self.cmd("app status")
         if not out:
             raise MCUError("app status returned nothing")
-        fields = {}
+        fields: dict[str, int | str] = {}
         for token in out[0].split():
             if "=" in token:
                 k, _, v = token.partition("=")
@@ -172,10 +178,10 @@ class MCU:
 
     def reboot(self) -> None:
         """Reboot the MCU. The serial link drops; reopen afterwards."""
-        try:
+        # A timeout is the expected outcome: it reboots instead of printing a
+        # prompt, so there is nothing to read back.
+        with contextlib.suppress(ShellTimeout):
             self.cmd("kernel reboot cold", timeout=1.0)
-        except ShellTimeout:
-            pass  # expected - it reboots instead of printing a prompt
 
     # -- SMP / MCUmgr ------------------------------------------------------
 

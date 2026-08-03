@@ -5,6 +5,102 @@ description = "Talk to the Arduino UNO Q's STM32U585 from the Linux MPU"
 requires-python = ">=3.11"
 dependencies = ["pyserial", "gpiod", "smpclient"]
 
+# Install with:  uv pip install --python ~/hybrid/.venv/bin/python -e 'python[dev]'
+# Everything below is also what tools/check.sh runs.
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-cov", "mypy", "ruff", "clang-format"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+# ---------------------------------------------------------------------------
+# Lint + format
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+  "E", "W",    # pycodestyle
+  "F",         # pyflakes
+  "I",         # import sorting
+  "UP",        # pyupgrade
+  "B",         # bugbear
+  "SIM",       # simplify
+  "C4",        # comprehensions
+  "RET",       # return consistency
+  "ARG",       # unused arguments
+  "PIE",       # misc lints
+  "PT",        # pytest style
+  "TID",       # tidy imports
+  "BLE",       # blind except
+  "RUF",       # ruff-specific
+]
+# __all__ in unoq/__init__.py is grouped by meaning (the module, the class, its
+# errors, then the link helpers) rather than alphabetically. That grouping is
+# the useful order for a reader, so do not enforce a sort on it.
+ignore = ["RUF022"]
+# This package drives hardware over a serial line. A blind `except Exception`
+# around link-up and reconnect is deliberate and commented at each site: the
+# alternative is an unusable API that raises on a board whose link is already
+# up. Each one is silenced individually with `noqa`, never blanket-disabled.
+
+[tool.ruff.lint.per-file-ignores]
+# Tests reach into private helpers on purpose, and fake hardware classes take
+# arguments they intentionally ignore.
+"tests/*" = ["ARG001", "ARG002", "ARG005"]
+# PT* are pytest-style rules and only make sense in test files. Applied to the
+# package they misfire on fota.test() - the MCUboot "mark this image pending"
+# call - which is named test() but is not a test.
+"unoq/*" = ["PT"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["unoq"]
+
+# ---------------------------------------------------------------------------
+# Type checking
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.11"
+files = ["unoq", "tests"]
+strict = true
+warn_unreachable = true
+pretty = true
+
+# pyserial, gpiod and smpclient ship no type information. Silencing the import
+# error is scoped to them rather than global, so a typo in a first-party import
+# is still an error.
+[[tool.mypy.overrides]]
+module = ["serial.*", "gpiod.*", "smpclient.*"]
+ignore_missing_imports = true
+
+# ---------------------------------------------------------------------------
+# Tests + coverage
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = [
+  "-q",
+  "--strict-markers",
+  "--strict-config",
+  # Hardware tests need a live MCU; opt in with `pytest -m hardware`.
+  "-m", "not hardware",
+  "--cov=unoq",
+  "--cov-report=term-missing",
+  "--cov-fail-under=100",
+]
+markers = ["hardware: needs a real MCU on /dev/ttyHS1 (deselected by default)"]
+
+[tool.coverage.run]
+branch = true
+source = ["unoq"]
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = [
+  "pragma: no cover",
+  "if TYPE_CHECKING:",
+  "raise NotImplementedError",
+]

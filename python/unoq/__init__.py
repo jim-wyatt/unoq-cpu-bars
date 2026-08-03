@@ -13,8 +13,8 @@ Wraps the Zephyr shell running on lpuart1 (/dev/ttyHS1) and the SMP/MCUmgr
 endpoint sharing the same UART. See ~/hybrid/README.md for the hardware notes.
 """
 
-from .link import LINK_ENABLE_LINE, BOOT0_LINE, link_up, link_state
 from . import fota
+from .link import BOOT0_LINE, LINK_ENABLE_LINE, link_state, link_up
 from .mcu import MCU, MCUError, ShellTimeout
 
 __all__ = [

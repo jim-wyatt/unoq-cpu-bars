@@ -17,8 +17,10 @@ Requires the app to be built with CONFIG_BOOTLOADER_MCUBOOT=y and signed - see
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 from pathlib import Path
+from typing import TypedDict
 
 from smpclient import SMPClient
 from smpclient.requests.image_management import ImageStatesRead, ImageStatesWrite
@@ -28,6 +30,22 @@ from smpclient.transport.serial import SMPSerialTransport
 from .mcu import BAUD, PORT
 
 
+class ImageState(TypedDict):
+    """One row of the MCUboot slot table, as reported over SMP.
+
+    `active` is the slot running now; `confirmed` is the one MCUboot will keep.
+    An image that is active but not confirmed reverts on the next reset - that
+    is the safety net, not a fault.
+    """
+
+    slot: int
+    version: str
+    active: bool
+    confirmed: bool
+    pending: bool
+    hash: str
+
+
 async def _client(port: str, timeout: float) -> tuple[SMPClient, SMPSerialTransport]:
     transport = SMPSerialTransport(baudrate=BAUD)
     client = SMPClient(transport, port, timeout_s=timeout)
@@ -35,10 +53,10 @@ async def _client(port: str, timeout: float) -> tuple[SMPClient, SMPSerialTransp
     return client, transport
 
 
-def images(port: str = PORT, timeout: float = 10.0) -> list[dict]:
+def images(port: str = PORT, timeout: float = 10.0) -> list[ImageState]:
     """Return the MCUboot slot table."""
 
-    async def _run():
+    async def _run() -> list[ImageState]:
         c, t = await _client(port, timeout)
         try:
             r = await c.request(ImageStatesRead(), timeout_s=timeout)
@@ -59,8 +77,9 @@ def images(port: str = PORT, timeout: float = 10.0) -> list[dict]:
     return asyncio.run(asyncio.wait_for(_run(), timeout * 6))
 
 
-def upload(image: str | os.PathLike, port: str = PORT, timeout: float = 600.0,
-           progress: bool = True) -> str:
+def upload(
+    image: str | os.PathLike[str], port: str = PORT, timeout: float = 600.0, progress: bool = True
+) -> str:
     """Upload a *signed* image (.signed.bin) into the inactive slot.
 
     Returns the new image's hash. This only stages it - call test() to boot it.
@@ -75,7 +94,7 @@ def upload(image: str | os.PathLike, port: str = PORT, timeout: float = 600.0,
         )
     blob = path.read_bytes()
 
-    async def _run():
+    async def _run() -> str:
         c, t = await _client(port, 20.0)
         try:
             last = -1
@@ -88,7 +107,9 @@ def upload(image: str | os.PathLike, port: str = PORT, timeout: float = 600.0,
             r = await c.request(ImageStatesRead(), timeout_s=20.0)
             for im in getattr(r, "images", []):
                 if not im.active:
-                    return im.hash.hex()
+                    # smpclient is untyped, so pin the type at the boundary.
+                    staged: str = im.hash.hex()
+                    return staged
             return ""
         finally:
             await t.disconnect()
@@ -109,7 +130,7 @@ def test(image_hash: str | None = None, port: str = PORT, timeout: float = 20.0)
     if not image_hash:
         raise RuntimeError("no staged image found in the inactive slot")
 
-    async def _run():
+    async def _run() -> None:
         c, t = await _client(port, timeout)
         try:
             await c.request(
@@ -125,7 +146,7 @@ def test(image_hash: str | None = None, port: str = PORT, timeout: float = 20.0)
 def confirm(port: str = PORT, timeout: float = 20.0) -> None:
     """Confirm the running image so MCUboot stops reverting it."""
 
-    async def _run():
+    async def _run() -> None:
         c, t = await _client(port, timeout)
         try:
             await c.request(ImageStatesWrite(confirm=True), timeout_s=timeout)
@@ -138,12 +159,13 @@ def confirm(port: str = PORT, timeout: float = 20.0) -> None:
 def reset(port: str = PORT, timeout: float = 20.0) -> None:
     """Reset the MCU over SMP (applies a pending swap)."""
 
-    async def _run():
+    async def _run() -> None:
         c, t = await _client(port, timeout)
         try:
-            await c.request(ResetWrite(), timeout_s=timeout)
-        except Exception:
-            pass  # the device resets instead of replying
+            # No reply is the success case: the device resets instead of
+            # answering, so the request never completes.
+            with contextlib.suppress(Exception):
+                await c.request(ResetWrite(), timeout_s=timeout)
         finally:
             await t.disconnect()
 

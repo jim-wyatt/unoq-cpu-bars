@@ -382,3 +382,25 @@ the shell wedges only the shell while main keeps feeding, and nothing resets.
 
 Runs natively on the MPU — 3 cases in 0.038 s, no flash cycle. Use
 `native_sim/native/64`; plain `native_sim` is 32-bit and fails on aarch64.
+
+## Keeping dependencies current
+
+```bash
+~/hybrid/check-versions.sh      # reports only, changes nothing
+```
+
+Extension auto-update is deliberately **off** (background churn on a 3.6 GiB
+board), so this is the way to notice drift.
+
+**Things that look out of date but are not:**
+
+| | Why |
+|---|---|
+| `cbor2` 5.x | `smp` requires `>=5.5.1,<6.0.0`. Upgrading breaks SMP/FOTA. |
+| `pydantic-core` | `pydantic` pins it **exactly** (`==2.46.4`). Never bump alone. |
+| Zephyr's venv | Zephyr pins its own tool versions per release. `pip list --outdated` flags them; they are deliberate. The `cryptography`/`setuptools` pins people spot live in `requirements-actions.txt`, which is **CI-only** and not part of `requirements.txt`. |
+| OpenOCD "0.12.0+dev" | We build master on purpose — the newest *release* (0.12.0, 2023) predates libgpiod v2. |
+| arm64 extensions | The Marketplace "latest" is frequently x64-only. If `--install-extension id@ver` says *"not found"*, there is no linux-arm64 build and you already have the newest usable one. |
+
+Note `code --install-extension <id> --force` does **not** bump the version — it
+reports "already installed". You must name the version explicitly.

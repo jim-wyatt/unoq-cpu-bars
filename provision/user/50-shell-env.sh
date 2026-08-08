@@ -47,14 +47,48 @@ else
 fi
 
 step "verify"
+# `shopt -s expand_aliases` is what makes this check able to pass at all.
+#
+# Bash only expands aliases in interactive shells. In a script - which is every
+# way this ever runs - the alias builtin still records zbuild, but `command -v`
+# will not report it, so the test failed on a perfectly good env.sh and told the
+# reader to go and check it by hand. It had never once succeeded.
+#
+# It is worth being precise about why it looked fine when tested interactively:
+# by then ~/.bashrc has already sourced env.sh, so zbuild is defined in the
+# testing shell before the subshell below ever runs, and the check passes for a
+# reason that has nothing to do with what it is checking.
+#
+# The three things asserted are one of each kind env.sh defines - an alias, a
+# function, an export - because they fail independently: a syntax error early in
+# the file leaves the later ones undefined, and the aliases in particular now
+# depend on resolving the checkout path correctly.
 # shellcheck source=/dev/null
 if (
   set +u
-  . "$PROJECT/env.sh" && command -v zbuild >/dev/null 2>&1
+  shopt -s expand_aliases
+  . "$PROJECT/env.sh" &&
+    command -v zbuild >/dev/null 2>&1 &&
+    command -v mcucon >/dev/null 2>&1 &&
+    [ -n "$ZEPHYR_BASE" ]
 ); then
-  skip "env.sh sources cleanly and defines zbuild"
+  skip "env.sh defines zbuild, mcucon and ZEPHYR_BASE"
+  # The aliases bake in the checkout path at source time, so a stale ~/.bashrc
+  # pointing at a previous clone is worth catching here rather than the first
+  # time zbuild runs the wrong tree.
+  ALIAS_TARGET="$(
+    set +u
+    shopt -s expand_aliases
+    . "$PROJECT/env.sh" >/dev/null 2>&1
+    alias zbuild 2>/dev/null | sed "s/.*='\{0,1\}//; s/'\{0,1\}\$//"
+  )"
+  case "$ALIAS_TARGET" in
+    "$PROJECT"/*) skip "zbuild -> $ALIAS_TARGET" ;;
+    *) warn "zbuild points at $ALIAS_TARGET, not this checkout ($PROJECT)" ;;
+  esac
 else
-  warn "env.sh did not define the expected aliases - check it by hand"
+  warn "env.sh did not source cleanly, or left zbuild/mcucon/ZEPHYR_BASE unset"
+  warn "  reproduce with: bash --norc --noprofile -c '. $PROJECT/env.sh'"
 fi
 
 summary

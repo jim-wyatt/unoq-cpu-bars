@@ -212,6 +212,53 @@ enable_unit() {
   did "$u enabled and started"
 }
 
+# backup_stock_firmware - copy the stock MCU image aside, if it is still there.
+#
+# Returns 0 if a copy now exists, 1 if there was nothing to copy. The CALLER
+# decides what that means: bootstrap.sh warns and carries on, 40-purge-arduino.sh
+# refuses, because only one of them is about to delete the original.
+#
+# WHY IT LIVES HERE
+# -----------------
+# Two callers need the same answer to "where is it, and is it saved?", and the
+# answer is not obvious: the path moved between core versions (0.55.2 has it in
+# firmwares/, older cores in variants/), which is exactly the kind of detail
+# that rots differently in two places.
+#
+# WHY BOOTSTRAP CALLS IT AT ALL
+# -----------------------------
+# The image ships in the arduino-* debs, so every factory-fresh board has one -
+# and a board that has been provisioned, purged or reflashed may not. The only
+# moment it is certain to be there is the beginning, which is not the moment
+# anyone thinks to look for it. It is 634 KB. Taking the copy on the way past
+# costs nothing and removes the single most annoying way to need a factory
+# restore.
+backup_stock_firmware() {
+  local backup_dir found
+  backup_dir="${UNOQ_BACKUP:-$TARGET_HOME/uno-q-backup}"
+
+  if compgen -G "$backup_dir/*.hex" >/dev/null; then
+    skip "stock MCU firmware already saved in $backup_dir"
+    return 0
+  fi
+
+  found="$(find "$TARGET_HOME/.arduino15/packages/arduino/hardware/zephyr" \
+    -name '*stm32u585xx*.hex' -type f 2>/dev/null | sort | head -1)"
+  [ -n "$found" ] || return 1
+
+  # Runs as root from the provision scripts and as the user from bootstrap, and
+  # the copy must end up owned by the user either way - a root-owned backup in
+  # $HOME is the thing that bites six months later, when you cannot write to it.
+  if [ "$(id -u)" = 0 ]; then
+    as_user mkdir -p "$backup_dir" && as_user cp "$found" "$backup_dir/"
+  else
+    mkdir -p "$backup_dir" && cp "$found" "$backup_dir/"
+  fi || return 1
+
+  did "stock MCU firmware saved -> $backup_dir/$(basename "$found")"
+  return 0
+}
+
 # as_user <cmd>... - run something as the owning user, with a login-ish env.
 # The user-level steps install into $TARGET_HOME and must not leave root-owned
 # files behind; that is the single most common way a bootstrap half-works.

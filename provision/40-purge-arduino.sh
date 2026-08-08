@@ -49,14 +49,11 @@ fi
 # one attempt at it, on someone else's board, with no way back.
 step "stock firmware backup"
 BACKUP_DIR="${UNOQ_BACKUP:-$TARGET_HOME/uno-q-backup}"
-STOCK_FOUND="$(find "$TARGET_HOME/.arduino15/packages/arduino/hardware/zephyr" \
-  -name '*stm32u585xx*.hex' -type f 2>/dev/null | sort | head -1)"
-if compgen -G "$BACKUP_DIR/*.hex" >/dev/null; then
-  skip "stock firmware already backed up in $BACKUP_DIR"
-elif [ -n "$STOCK_FOUND" ]; then
-  as_user mkdir -p "$BACKUP_DIR"
-  as_user cp "$STOCK_FOUND" "$BACKUP_DIR/"
-  did "backed up $(basename "$STOCK_FOUND") -> $BACKUP_DIR"
+# Finding it is lib.sh's job, shared with bootstrap.sh's preflight - the layout
+# moved between core versions and is not a detail worth having two copies of.
+# Refusing is this script's job, because this is the one that deletes the tree.
+if backup_stock_firmware; then
+  :
 elif [ "${UNOQ_ALLOW_NO_STOCK_FW:-0}" = "1" ]; then
   warn "no stock .hex found, and UNOQ_ALLOW_NO_STOCK_FW=1 - purging anyway."
   warn "restore-arduino-firmware.sh will have nothing to flash, permanently."

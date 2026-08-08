@@ -16,7 +16,11 @@ from typing import Any
 
 import pytest
 
-PROMPT = "uno_q:~$ "
+# The prompt the firmware actually prints, from CONFIG_SHELL_PROMPT_UART in
+# mcu/app/prj.conf. test_contract.py parses that file and fails if the two
+# drift - the same trick app_proto.h gets, for the same reason: a fake that
+# imitates a prompt the firmware never sends proves nothing about the parser.
+PROMPT = "unoq:~$ "
 
 
 class FakeSerial:

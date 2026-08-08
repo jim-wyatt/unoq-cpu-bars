@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from conftest import PROMPT
 
 from unoq.mcu import MCU, MCUError, ShellTimeout, _clean
 
@@ -19,7 +20,7 @@ from unoq.mcu import MCU, MCUError, ShellTimeout, _clean
 
 
 def test_clean_strips_ansi_prompt_and_blanks() -> None:
-    raw = "\x1b[1;32muno_q:~$ \x1b[0m\r\nhello\r\n\r\n  spaced  \r\nuno_q:~$ "
+    raw = f"\x1b[1;32m{PROMPT}\x1b[0m\r\nhello\r\n\r\n  spaced  \r\n{PROMPT}"
     assert _clean(raw) == ["hello", "spaced"]
 
 
@@ -29,7 +30,7 @@ def test_clean_treats_cr_as_a_line_break() -> None:
 
 
 def test_clean_returns_nothing_for_prompt_only_output() -> None:
-    assert _clean("uno_q:~$ ") == []
+    assert _clean(PROMPT) == []
 
 
 # -- cmd --------------------------------------------------------------------

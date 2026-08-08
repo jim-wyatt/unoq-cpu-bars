@@ -12,19 +12,57 @@
 set -uo pipefail
 
 PROJECT="$(git rev-parse --show-toplevel)"
+cd "$PROJECT" || exit 1
+
+# Where the unstaged changes are parked while the gates run. Inside .git/, so
+# it can never itself look like part of the tree being committed.
+PATCH="$(git rev-parse --git-dir)/pre-commit-unstaged.patch"
+SAVED=0
+
+# A patch, not `git stash push --keep-index`. The stash records the file's
+# whole change from HEAD, so popping it onto a working tree that has been reset
+# to the index conflicts whenever a file is both staged AND further edited -
+# which is exactly the case --keep-index exists to handle. Re-applying a diff
+# of index->worktree onto a tree known to equal the index always applies.
+#
+# And restoring from a trap rather than inline after check.sh: the gates take
+# long enough that people do interrupt them, and without this that left the
+# working tree looking just like the staged version with the unstaged edits
+# parked somewhere nobody had been told about.
+restore() {
+  [ "$SAVED" = 1 ] || return 0
+  SAVED=0 # so the EXIT trap does not run again after an explicit call
+  if git apply --whitespace=nowarn "$PATCH"; then
+    rm -f "$PATCH"
+    return 0
+  fi
+  echo >&2
+  echo "pre-commit: could not restore your unstaged changes automatically." >&2
+  echo "They are NOT lost - they are a patch. Recover them with:" >&2
+  echo "  git apply $PATCH" >&2
+  return 1
+}
+trap 'restore' EXIT
+trap 'restore; exit 130' INT
+trap 'restore; exit 143' TERM
 
 # Check the tree as it will exist after the commit, not the working tree:
 # a partially staged file would otherwise be judged on unstaged content.
-STASHED=0
+#
+# The && chain matters: the working tree is only discarded once the patch that
+# undoes that is safely on disk.
 if ! git diff --quiet; then
-  git stash push --keep-index --quiet --message "pre-commit: unstaged" &&
-    STASHED=1
+  git diff --binary --no-color >"$PATCH" &&
+    git checkout -- . &&
+    SAVED=1
 fi
 
 "$PROJECT/tools/check.sh" --fast
 STATUS=$?
 
-[ "$STASHED" = 1 ] && git stash pop --quiet
+# A failed restore blocks the commit too. Committing on top of a tree we could
+# not put back means committing something other than what the gates just saw.
+restore || STATUS=1
 
 if [ "$STATUS" -ne 0 ]; then
   echo

@@ -18,10 +18,13 @@ import re
 from pathlib import Path
 
 import pytest
+from conftest import PROMPT
 
 from unoq import mcu
 
-HEADER = Path(__file__).resolve().parents[2] / "mcu" / "app" / "include" / "app_proto.h"
+MCU_APP = Path(__file__).resolve().parents[2] / "mcu" / "app"
+HEADER = MCU_APP / "include" / "app_proto.h"
+PRJ_CONF = MCU_APP / "prj.conf"
 
 # `#define NAME value` - object-like macros only. The function-like ones in the
 # header (the app_*_valid inline helpers are C functions, not macros) are not
@@ -91,3 +94,38 @@ def test_the_parser_resolves_expressions_not_just_literals(firmware: dict[str, i
 
 def test_led_count_is_the_grid(firmware: dict[str, int]) -> None:
     assert firmware["APP_MATRIX_LEDS"] == firmware["APP_MATRIX_ROWS"] * firmware["APP_MATRIX_COLS"]
+
+
+# -- the shell prompt -------------------------------------------------------
+#
+# The prompt is the end-of-response marker for every command MCU.cmd() sends,
+# so it is as much a part of the contract as the status line is. It lives in
+# Kconfig on one side and in a regex plus the test fake on the other; these
+# pin all three together.
+
+
+def firmware_prompt() -> str:
+    """CONFIG_SHELL_PROMPT_UART from prj.conf, unquoted."""
+    if not PRJ_CONF.exists():  # pragma: no cover - only if the tree is cut up
+        pytest.skip(f"firmware config not found at {PRJ_CONF}")
+    m = re.search(r'^CONFIG_SHELL_PROMPT_UART="(.*)"\s*$', PRJ_CONF.read_text(), re.MULTILINE)
+    assert m, f"CONFIG_SHELL_PROMPT_UART is gone from {PRJ_CONF}"
+    return m.group(1)
+
+
+def test_the_fake_shell_uses_the_prompt_the_firmware_prints() -> None:
+    """The fake had "uno_q:~$ " while the firmware printed "unoq:~$ ". Both
+    happen to satisfy the regex, so nothing failed - which is exactly why it
+    went unnoticed. A fake imitating a prompt no firmware sends proves less
+    than it appears to."""
+    assert firmware_prompt() == PROMPT, (
+        f"tests/conftest.py PROMPT is {PROMPT!r} but the firmware prints "
+        f"{firmware_prompt()!r} - update conftest.py"
+    )
+
+
+def test_the_parser_recognises_the_real_prompt() -> None:
+    """Both places mcu.py looks for it: _clean() drops the prompt line, and
+    cmd() uses it to decide a response has finished arriving."""
+    assert mcu._PROMPT.match(firmware_prompt().strip())
+    assert re.search(r":~\$\s*$", firmware_prompt())

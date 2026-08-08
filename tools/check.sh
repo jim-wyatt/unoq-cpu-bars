@@ -63,12 +63,22 @@ run() {
   echo
 }
 
-# need <tool> <install hint> - a missing tool fails its gate rather than
-# vanishing from the report.
+# need <tool> <gate name> - a missing tool fails its gate rather than
+# vanishing from the report. For tools expected on PATH.
 need() {
   command -v "$1" >/dev/null 2>&1 && return 0
   FAILED+=("$2 (missing tool: $1)")
   printf '%s    MISSING: %s - run tools/install-dev-tools.sh%s\n' "$RED" "$1" "$OFF"
+  return 1
+}
+
+# have <tool> <gate name> - the same contract for tools in the project venv.
+# Without this, a venv missing mypy or pytest reported "All 2 gates passed" and
+# exited 0, having type-checked nothing and run no tests at all.
+have() {
+  [ -x "$VENV/bin/$1" ] && return 0
+  FAILED+=("$2 (missing tool: $VENV/bin/$1)")
+  printf '%s    MISSING: %s/bin/%s - run tools/install-dev-tools.sh%s\n' "$RED" "$VENV" "$1" "$OFF"
   return 1
 }
 
@@ -82,7 +92,7 @@ wanted() {
 
 if wanted python; then
   cd "$PROJECT/python" || exit 1
-  if [ -x "$VENV/bin/ruff" ]; then
+  if have ruff "ruff"; then
     if [ "$FIX" = 1 ]; then
       run "ruff format" "$VENV/bin/ruff" format .
       run "ruff --fix" "$VENV/bin/ruff" check --fix .
@@ -90,13 +100,10 @@ if wanted python; then
       run "ruff lint" "$VENV/bin/ruff" check .
       run "ruff format" "$VENV/bin/ruff" format --check .
     fi
-  else
-    FAILED+=("ruff (missing tool)")
-    printf '%s    MISSING: %s/bin/ruff - run tools/install-dev-tools.sh%s\n' "$RED" "$VENV" "$OFF"
   fi
-  [ -x "$VENV/bin/mypy" ] && run "mypy (strict)" "$VENV/bin/mypy"
+  have mypy "mypy (strict)" && run "mypy (strict)" "$VENV/bin/mypy"
   # Coverage threshold lives in pyproject.toml, so it fails here too.
-  [ -x "$VENV/bin/pytest" ] && run "pytest + coverage" "$VENV/bin/pytest"
+  have pytest "pytest + coverage" && run "pytest + coverage" "$VENV/bin/pytest"
 fi
 
 # --- shell -----------------------------------------------------------------

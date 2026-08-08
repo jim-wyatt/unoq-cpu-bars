@@ -90,8 +90,13 @@ for f in stm32u5x.cfg stm32x5x_common.cfg; do
 done
 
 echo "== 6/6 self-test: can it reach the MCU over SWD? =="
-# BOOT0 / link-enable must be sane first, or this proves nothing.
-sudo -u arduino /home/arduino/hybrid/mcu/link-up.sh || true
+# BOOT0 / link-enable must be sane first, or this proves nothing. Derived from
+# $HERE and $SUDO_USER rather than hardcoded: this runs under sudo, so
+# SUDO_USER is the invoking account - the one that is in the `gpiod` group.
+# Hardcoding both meant a checkout anywhere but /home/arduino/hybrid silently
+# self-tested with BOOT0 unset (the `|| true` hides it) and failed confusingly.
+LINK_UP="$HERE/../mcu/link-up.sh"
+sudo -u "${SUDO_USER:-$(stat -c %U "$HERE")}" "$LINK_UP" || true
 if "$PREFIX/bin/openocd" -s "$PREFIX" -s "$PREFIX/share/openocd/scripts" \
   -f "$PREFIX/openocd_gpiod.cfg" -c "init" -c "targets" -c "shutdown" 2>&1 |
   tee /tmp/openocd-selftest.log | grep -q "Cortex-M33"; then

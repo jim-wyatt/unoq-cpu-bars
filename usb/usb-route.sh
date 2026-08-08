@@ -26,19 +26,40 @@
 #
 # THE METRIC
 # ----------
-# 500, deliberately worse than the ~100 NetworkManager gives a real wired or
-# wireless connection. If the board also has an ethernet dongle with a genuine
-# route to the internet, that keeps winning and this one sits unused as a
-# fallback. Only when the USB cable is the board's sole link does it take over.
-# A USB gadget that silently stole the default route from a working network
-# would be a nasty thing to debug.
+# 700, chosen to lose to everything NetworkManager installs for a real link.
+# The intent has always been that this route is a fallback of last resort: if
+# the board has any genuine route to the internet, that keeps winning and this
+# one sits unused. Only when the USB cable is the board's sole link should it
+# take over. A USB gadget that silently stole the default route from a working
+# network would be a nasty thing to debug.
+#
+# This was 500, which did not achieve that, and the reasoning is worth keeping
+# because it is an easy mistake to repeat. NetworkManager does not give every
+# connection the ~100 you see on ethernet - the default metric is per device
+# type, and for wifi it is 600:
+#
+#   default via 192.168.0.1 dev wlan0 proto dhcp src 192.168.0.172 metric 600
+#
+# So on a board whose only uplink is wifi - which is the normal case for this
+# one, and the configuration you are most likely to be developing over - 500
+# beat the real connection instead of losing to it. Plugging the board into a
+# computer would hand it the default route. SSH survived (that is a connected
+# route on the LAN, not the default), so it looked fine, while every outbound
+# connection went to a host that was almost certainly not NAT-ing: apt, git and
+# anything else needing the internet simply stopped, with no error pointing
+# anywhere near USB.
+#
+# Higher metric = lower priority, so 700 loses to wifi's 600 and to ethernet's
+# 100, while still beating the 1024 the kernel hands an unconfigured route. If
+# you would rather it never touched the default route at all, the escape hatch
+# is UNOQ_USB_DEFAULT_ROUTE=0.
 set -uo pipefail
 
 ACTION="${1:-}"
 HOST_IP="${3:-}"
 
 BRIDGE="${UNOQ_USB_BRIDGE:-br-usb}"
-METRIC="${UNOQ_USB_ROUTE_METRIC:-500}"
+METRIC="${UNOQ_USB_ROUTE_METRIC:-700}"
 ENABLED="${UNOQ_USB_DEFAULT_ROUTE:-1}"
 
 [ "$ENABLED" = "1" ] || exit 0

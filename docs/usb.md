@@ -133,6 +133,42 @@ to diagnose.
 To set the computer's address by hand instead: `10.55.0.2/24`, no gateway, no
 DNS.
 
+### The board's own route out
+
+The board does not offer the computer a gateway, but it does take one *from*
+it. When dnsmasq leases the host an address, `usb-route.sh` points the board's
+default route at that address, metric **700** — so a board with no other uplink
+can reach the internet through the computer, provided the computer is NAT-ing
+(Internet Connection Sharing, or `New-NetNat`, on Windows).
+
+The metric is the whole safety story, and it is worth stating plainly because
+getting it wrong is quiet:
+
+| Link | Metric | |
+|---|---|---|
+| Ethernet (NetworkManager) | 100 | wins |
+| **Wifi** (NetworkManager) | **600** | wins |
+| USB gadget (this) | **700** | fallback only |
+
+Higher metric = lower priority, so the USB route is only ever used when the
+board has nothing better. **This was 500 and therefore beat wifi**, which is a
+bad failure to diagnose: SSH keeps working, because that is a connected route
+on the LAN rather than the default, so the board looks reachable and healthy
+while every outbound connection is being sent to a computer that probably is
+not routing. `apt`, `git` and anything else wanting the internet just stop.
+
+If you never want the gadget touching the default route:
+
+```bash
+UNOQ_USB_DEFAULT_ROUTE=0     # in the unit's environment
+```
+
+Check which route actually won, with the cable plugged in:
+
+```bash
+ip route show default        # lowest metric is the one in use
+```
+
 ### The DHCP server does not leak onto your LAN
 
 `dnsmasq` runs with `--interface=br-usb --bind-dynamic`, so it answers DHCP

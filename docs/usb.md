@@ -193,9 +193,19 @@ Three things worth knowing:
 - **The address is sticky.** The last lease is remembered in
   `/var/lib/unoq/usb-dhcp-last` and re-requested next time, so "what do I ssh
   to" has an answer you can write down. ICS honours the request in practice.
-- **`quentin.local` works too.** avahi publishes on `br-usb` like any other
-  interface, and Windows 11 and macOS both resolve `.local` natively. That one
-  survives the lease moving.
+- **Use the leased IP, not the `.local` name.** avahi does publish on `br-usb`,
+  and Windows 11 and macOS both resolve `.local` natively — but avahi advertises
+  *every* address on that bridge, and in client mode there are two:
+
+  ```
+  Registering new address record for 10.55.0.1 on br-usb.IPv4
+  Registering new address record for 192.168.137.210 on br-usb.IPv4
+  ```
+
+  A host querying over the cable gets both A records back and picks one. Half
+  the time that is `10.55.0.1`, which is the address it has no route to. The
+  name is therefore a coin flip and the address is not, which is the other
+  reason the lease is made sticky rather than left to chance.
 
 ---
 

@@ -188,16 +188,21 @@ preflight() {
   say "RECONNECT ON:  $(reconnect_address)"
 }
 
-# What to ssh to afterwards. The leased address is the answer, and the mDNS name
-# is the answer that survives the lease changing - Windows 11 and macOS both
-# resolve .local natively, and avahi publishes on this bridge like any other.
+# What to ssh to afterwards.
+#
+# The leased address, and deliberately not the mDNS name. avahi advertises every
+# address on this bridge, which in client mode is both the leased one and
+# 10.55.0.1 - so a host resolving <hostname>.local gets two A records and picks
+# one, and half the time it picks the address it has no route to. Printing a
+# name that works half the time, at the moment the radio is about to go off, is
+# worse than printing nothing.
 reconnect_address() {
   local leased
   leased="$(ip -4 -br addr show "$BRIDGE" 2>/dev/null |
     tr ' ' '\n' | grep -v '^10\.55\.0\.1/' | grep '/' | head -1)"
   leased="${leased%%/*}"
   if [ -n "$leased" ]; then
-    printf '%s@%s   (or %s.local)' "${SUDO_USER:-$USER}" "$leased" "$(hostname)"
+    printf '%s@%s' "${SUDO_USER:-$USER}" "$leased"
   else
     printf '%s@10.55.0.1  - server mode, the host reaches the board here' "${SUDO_USER:-$USER}"
   fi

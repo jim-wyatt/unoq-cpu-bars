@@ -9,6 +9,21 @@ Documentation=file:/home/arduino/hybrid/docs/usb.md
 Requires=unoq-usb-gadget.service
 After=unoq-usb-gadget.service
 
+# Let the network come up FIRST, every boot, before touching USB.
+#
+# On a board powered over the same cable that carries the gadget, the UDC is
+# present seconds into every boot, so this unit runs on every boot rather than
+# only when someone plugs a cable in. Binding re-enumerates the port, and if
+# that is going to brown the board out, it must not be able to do so before
+# there is an ssh session to diagnose it from. Ordering after the network
+# guarantees a window in which the board is reachable.
+#
+# This costs the gadget a few seconds of availability at boot and cannot
+# deadlock: wifi does not depend on USB, and NetworkManager-wait-online times
+# out on its own if there is no network to wait for.
+After=network-online.target
+Wants=network-online.target
+
 [Service]
 Type=oneshot
 
@@ -16,6 +31,11 @@ Type=oneshot
 # every plug-in, and systemd will not re-run ExecStart for a oneshot it still
 # considers active - which is exactly the trap unoq-usb-gadget.service falls
 # into, and why the binding lives here rather than there.
+# Refuses once the board has tried and failed to survive a bind several times
+# over, which is the only thing that stops a brownout loop being permanent.
+# See bind-guard.sh for why that loop has no ssh window in it.
+ExecStartPre=/home/arduino/hybrid/usb/bind-guard.sh check
+
 ExecStart=/home/arduino/hybrid/usb/gadget-up.sh
 ExecStart=/home/arduino/hybrid/usb/usb-net-up.sh
 

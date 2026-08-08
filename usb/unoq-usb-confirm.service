@@ -1,0 +1,29 @@
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
+[Unit]
+Description=Confirm the Arduino UNO Q USB gadget bind survived this boot
+Documentation=file:/home/arduino/hybrid/usb/bind-guard.sh
+
+# The whole point is to prove the board reached a state you could have logged
+# into. Waiting for the network is most of that proof: if wifi is up and this
+# unit is running, a brownout loop is not happening.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+
+# The failure this guards against is a brownout, which happens under load and
+# therefore not necessarily in the first seconds. Confirming immediately would
+# clear the counter during the very window the board is most likely to die in,
+# and the guard would never trip however many times it looped. The delay is the
+# guard: a board that resets before this fires never clears its counter.
+#
+# 120s is comfortably past boot settling on this board (/home/arduino alone
+# mounts around 13s) without being so long that a normal reboot-and-replug
+# cycle leaves the counter climbing for no reason.
+ExecStart=/bin/sleep 120
+ExecStart=/home/arduino/hybrid/usb/bind-guard.sh confirm
+
+[Install]
+WantedBy=multi-user.target

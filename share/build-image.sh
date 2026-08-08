@@ -6,7 +6,7 @@
 #   sudo bash ~/hybrid/share/build-image.sh            # create/refresh
 #   sudo bash ~/hybrid/share/build-image.sh --rw       # leave it writable
 #
-# Idempotent: an image of the right size is reused and its contents synced.
+# Idempotent: an image that is already correct is reused and its content synced.
 #
 # THE IMAGE IS THE ONLY COPY
 # --------------------------
@@ -16,6 +16,21 @@
 # $MOUNT for the web server to serve, and the same file is what
 # usb_f_mass_storage exports. One copy, one source of truth, no chance of the
 # USB drive and the web page disagreeing about what is on the board.
+#
+# WHY A PARTITION TABLE
+# ---------------------
+# The obvious thing is to mkfs the image file directly, giving a filesystem
+# that starts at sector 0 - a "superfloppy". Linux mounts that happily, which
+# is exactly why it survives testing on the board.
+#
+# Windows does not. A real USB stick has an MBR with a partition inside it, and
+# Windows is unreliable about assigning a drive letter to removable media
+# without one: the device enumerates, the mass-storage function binds, the
+# file-storage thread runs, and no drive ever appears - with nothing logged on
+# the Linux side, because from the board's point of view everything worked.
+#
+# So: MBR, one primary partition of type 0x0c (FAT32 LBA) starting at 1 MiB.
+# Everything below has to account for that offset, including the fstab entry.
 #
 # FAT32 because it is the one filesystem Windows, macOS and Linux all mount
 # with no driver and no prompting. Its 4 GB per-file limit is not a constraint
@@ -32,23 +47,103 @@ set -uo pipefail
 . "$(cd "$(dirname "$0")/.." && pwd)/provision/lib.sh"
 need_root
 
-# On the big partition: /home/arduino is its own 18 GB filesystem here, while
-# / has under 5 GB spare once Zephyr is built.
 IMG="${UNOQ_SHARE_IMG:-$TARGET_HOME/unoq-share.img}"
 MOUNT="${UNOQ_SHARE_MOUNT:-/srv/unoq-share}"
 SIZE_MB="${UNOQ_SHARE_SIZE_MB:-2600}"
 STAGING="${UNOQ_SHARE:-/var/lib/unoq-share}"
+GADGET_LUN=/sys/kernel/config/usb_gadget/unoq/functions/mass_storage.0/lun.0/file
+# 2048 sectors x 512 bytes. The conventional first-partition offset, and what
+# every partitioning tool picks by default.
+PART_OFFSET=1048576
 LEAVE_RW=0
 [ "${1:-}" = "--rw" ] && LEAVE_RW=1
 
+# --- helpers ---------------------------------------------------------------
+
+# partitioned <file> - true if the image has an MBR we wrote, rather than a
+# filesystem sitting directly on sector 0.
+partitioned() {
+  [ "$(blkid -p -o value -s PTTYPE "$1" 2>/dev/null)" = dos ]
+}
+
+# eject_gadget / insert_gadget - the mass-storage function keeps the backing
+# file open. Swapping the file underneath it is a media change, which is a
+# supported thing to do to a removable LUN and does not need a re-bind - so
+# the network half of the gadget, and any ssh session running over it, stays
+# up while the drive is replaced.
+eject_gadget() {
+  [ -w "$GADGET_LUN" ] || return 0
+  [ -s "$GADGET_LUN" ] || return 0
+  echo "" >"$GADGET_LUN" 2>/dev/null && did "gadget: medium ejected while we work"
+}
+insert_gadget() {
+  [ -w "$GADGET_LUN" ] || return 0
+  echo "$IMG" >"$GADGET_LUN" 2>/dev/null && did "gadget: medium re-inserted ($IMG)"
+}
+
+# format_and_mount <image> <mountpoint> - partition, mkfs, mount rw.
+format_and_mount() {
+  local img="$1" mnt="$2"
+  # One primary FAT32-LBA partition filling the image from 1 MiB on.
+  printf 'label: dos\nstart=2048, type=0c\n' | sfdisk -q "$img" >/dev/null ||
+    fail "could not write a partition table to $img"
+  local loop
+  loop="$(losetup -P -f --show "$img")" || fail "losetup failed for $img"
+  # -P asks the kernel to scan the table; the partition node appears as p1.
+  [ -b "${loop}p1" ] || {
+    losetup -d "$loop"
+    fail "no partition node ${loop}p1 - did the partition table not take?"
+  }
+  mkfs.vfat -F 32 -n "UNO-Q" "${loop}p1" >/dev/null || {
+    losetup -d "$loop"
+    fail "mkfs.vfat failed"
+  }
+  losetup -d "$loop"
+  mkdir -p "$mnt"
+  mount -o loop,rw,offset="$PART_OFFSET",umask=0022,utf8 "$img" "$mnt" ||
+    fail "could not mount $img at $mnt"
+}
+
+# --- tools -----------------------------------------------------------------
+
 step "tools"
-apt_install dosfstools
+apt_install dosfstools fdisk rsync
+
+# --- migrate a superfloppy image, keeping its contents ---------------------
+
+if [ -f "$IMG" ] && ! partitioned "$IMG"; then
+  step "repartitioning (image has no partition table)"
+  warn "this image was built without an MBR, which is why Windows shows no drive"
+  NEW="$IMG.new"
+  OLDMNT="$(mktemp -d)"
+  rm -f "$NEW"
+  truncate -s "${SIZE_MB}M" "$NEW" || fail "could not create $NEW"
+  format_and_mount "$NEW" "$MOUNT.new"
+
+  # Read the old one exactly as it is now - read-only, and via its own mount so
+  # we do not disturb $MOUNT or care whether it is currently mounted.
+  mount -o loop,ro "$IMG" "$OLDMNT" || fail "could not mount the old image"
+  did "copying $(du -sh "$OLDMNT" | cut -f1) across (no re-download)"
+  cp -a "$OLDMNT/." "$MOUNT.new/" || fail "copy failed - $NEW left in place, $IMG untouched"
+  sync
+  umount "$OLDMNT" && rmdir "$OLDMNT"
+  umount "$MOUNT.new" && rmdir "$MOUNT.new"
+
+  # Only now let go of the old file: everything above could have failed with
+  # the original still the one the gadget and the web server were using.
+  eject_gadget
+  mountpoint -q "$MOUNT" && umount "$MOUNT"
+  mv "$NEW" "$IMG" || fail "could not replace $IMG"
+  chown "$TARGET_USER" "$IMG"
+  did "repartitioned in place, contents preserved"
+fi
+
+# --- image file ------------------------------------------------------------
 
 step "image file"
 mkdir -p "$(dirname "$IMG")"
 if [ -f "$IMG" ]; then
-  have_mb=$(($(stat -c %s "$IMG") / 1024 / 1024))
-  skip "$IMG exists (${have_mb} MB)"
+  skip "$IMG exists ($(($(stat -c %s "$IMG") / 1024 / 1024)) MB)"
 else
   # Sparse: the file reads as $SIZE_MB but only occupies the blocks actually
   # written, so an image sized for future content costs nothing until used.
@@ -57,34 +152,39 @@ else
   did "created $IMG (${SIZE_MB} MB, sparse)"
 fi
 
-step "filesystem"
-if blkid "$IMG" 2>/dev/null | grep -q 'TYPE="vfat"'; then
-  skip "already FAT32"
+step "partition table + filesystem"
+if partitioned "$IMG" && blkid -o value -s TYPE "$IMG" 2>/dev/null | grep -q . 2>/dev/null; then
+  skip "MBR present, partition formatted"
+elif partitioned "$IMG"; then
+  skip "MBR present"
 else
-  # -F 32 forces FAT32 (mkfs would pick FAT16 for smaller images), -n the
-  # volume label the host shows in its file manager.
-  mkfs.vfat -F 32 -n "UNO-Q" "$IMG" >/dev/null || fail "mkfs.vfat failed"
-  did "formatted FAT32, label UNO-Q"
+  eject_gadget
+  mountpoint -q "$MOUNT" && umount "$MOUNT"
+  format_and_mount "$IMG" "$MOUNT"
+  did "MBR + FAT32 partition, label UNO-Q"
 fi
 
+# --- mount -----------------------------------------------------------------
+
 step "mount"
-mkdir -p "$MOUNT"
 if mountpoint -q "$MOUNT"; then
   mount -o remount,rw "$MOUNT" 2>/dev/null || {
-    umount "$MOUNT" && mount -o loop,rw "$IMG" "$MOUNT"
+    umount "$MOUNT" && mount -o loop,rw,offset="$PART_OFFSET",umask=0022,utf8 "$IMG" "$MOUNT"
   } || fail "could not remount $MOUNT rw"
   skip "$MOUNT remounted rw for the update"
 else
-  # utf8 so accented filenames survive; the mask bits make everything readable
-  # to the web server without making it executable.
-  mount -o loop,rw,umask=0022,utf8 "$IMG" "$MOUNT" || fail "could not mount $IMG"
-  did "mounted $IMG at $MOUNT"
+  mkdir -p "$MOUNT"
+  mount -o loop,rw,offset="$PART_OFFSET",umask=0022,utf8 "$IMG" "$MOUNT" ||
+    fail "could not mount $IMG at $MOUNT"
+  did "mounted $IMG (partition at +$PART_OFFSET) at $MOUNT"
 fi
+
+# --- content ---------------------------------------------------------------
 
 step "content"
 # Learning content ships in the repo, so it is versioned with everything else.
 if [ -d "$PROJECT/share/learn" ]; then
-  rsync -a --delete "$PROJECT/share/learn/" "$MOUNT/" 2>/dev/null ||
+  rsync -a "$PROJECT/share/learn/" "$MOUNT/" 2>/dev/null ||
     cp -r "$PROJECT/share/learn/." "$MOUNT/"
   did "learning content synced from share/learn/"
 else
@@ -110,17 +210,29 @@ fi
 
 sync
 
+# --- back to read-only, and hand the drive back ----------------------------
+
 step "remount read-only"
 if [ "$LEAVE_RW" = 1 ]; then
-  warn "left mounted rw (--rw). Do NOT attach the USB gadget while it is."
+  warn "left mounted rw (--rw). Do NOT let the host mount the drive while it is."
 else
   mount -o remount,ro "$MOUNT" || fail "could not remount $MOUNT read-only"
   did "$MOUNT is read-only"
 fi
 
+step "gadget"
+insert_gadget || skip "gadget not bound - nothing to re-insert"
+
 step "result"
 skip "image:   $IMG ($(du -h --apparent-size "$IMG" | cut -f1) apparent, $(du -h "$IMG" | cut -f1) on disk)"
+skip "layout:  $(blkid -p -o value -s PTTYPE "$IMG" 2>/dev/null || echo none) partition table, FAT32 at +$PART_OFFSET"
 skip "mounted: $MOUNT"
 skip "free:    $(df -h "$MOUNT" | awk 'NR==2 {print $4}') left in the image"
 
 summary
+cat <<EOF
+
+If the fstab entry predates this, it needs the partition offset adding:
+  $IMG $MOUNT vfat loop,ro,nofail,offset=$PART_OFFSET,umask=0022,utf8 0 0
+provision/70-learning-web.sh writes it correctly.
+EOF

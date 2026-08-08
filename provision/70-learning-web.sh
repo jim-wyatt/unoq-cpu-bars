@@ -48,9 +48,19 @@ step "persistent mount"
 # mount systemd knows about - so the loop mount has to be in fstab, not just
 # mounted by hand once.
 IMG="${UNOQ_SHARE_IMG:-$TARGET_HOME/unoq-share.img}"
-FSTAB_LINE="$IMG $MOUNT vfat loop,ro,nofail,umask=0022,utf8 0 0"
-if grep -qF "$MOUNT" /etc/fstab 2>/dev/null; then
+# offset= is not optional: the image carries an MBR (Windows will not reliably
+# give a drive letter to removable media without one), so the filesystem starts
+# 1 MiB in and a plain `loop` mount finds a partition table where it expects a
+# boot sector.
+FSTAB_LINE="$IMG $MOUNT vfat loop,ro,nofail,offset=1048576,umask=0022,utf8 0 0"
+if grep -q "^$IMG .*offset=1048576" /etc/fstab 2>/dev/null; then
   skip "$MOUNT already in /etc/fstab"
+elif grep -qF "$MOUNT" /etc/fstab 2>/dev/null; then
+  # An entry from before the image was partitioned would fail to mount at boot.
+  # Braces so the [[:space:]] that follows is not read as an array subscript.
+  sed -i "\#[[:space:]]${MOUNT}[[:space:]]#c\\$FSTAB_LINE" /etc/fstab
+  systemctl daemon-reload
+  did "updated the $MOUNT fstab entry with the partition offset"
 else
   # nofail: a board whose image is missing must still boot to a login prompt.
   printf '\n# Arduino UNO Q learning content + installers (share/build-image.sh)\n%s\n' \

@@ -29,6 +29,7 @@
 # how you break its internet and spend an afternoon finding out why.
 set -uo pipefail
 
+HERE="$(cd "$(dirname "$0")" && pwd)"
 BRIDGE="${UNOQ_USB_BRIDGE:-br-usb}"
 ADDR="${UNOQ_USB_ADDR:-10.55.0.1}"
 PREFIX="${UNOQ_USB_PREFIX:-24}"
@@ -115,10 +116,16 @@ else
   # --port=0 disables the DNS half entirely; this exists to answer one DHCP
   # request and nothing else. dhcp-option 3 and 6 are deliberately empty - no
   # router, no DNS - so the board never becomes the laptop's default gateway.
+  # --dhcp-script runs usb-route.sh on every lease event, which is where the
+  # board's default route out through the host gets set: the host's address is
+  # whatever we just leased it, and the lease is the only moment that is
+  # authoritative. dnsmasq also replays existing leases as `old` at startup, so
+  # restarting it re-asserts the route rather than waiting for a renewal.
   dnsmasq \
     --conf-file=/dev/null \
     --pid-file="$PIDFILE" \
     --dhcp-leasefile="$LEASEFILE" \
+    --dhcp-script="$HERE/usb-route.sh" \
     --interface="$BRIDGE" \
     --bind-dynamic \
     --except-interface=lo \

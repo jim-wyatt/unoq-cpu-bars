@@ -34,20 +34,46 @@ else
 fi
 
 # The stock MCU firmware is Arduino's build and is not redistributable, so it
-# cannot be recovered from this repo. Warn while the Arduino tree still exists
-# - after the purge, ~/.arduino15 is gone and so is the only copy.
+# cannot be recovered from this repo, or from apt, or from anywhere else once
+# this script has run: after the purge ~/.arduino15 is gone and so is the only
+# copy on the board. Getting this wrong costs a factory reset.
+#
+# The image is FOUND, not guessed at. This used to glob
+# .../hardware/zephyr/*/variants/*/*.hex, which matches nothing on core 0.55.2 -
+# the .hex is in firmwares/, and variants/ holds the board's sources. So the
+# backup silently found nothing, warned, and carried on into the purge, which
+# is the failure this step exists to prevent, dressed up as having run.
+#
+# A find over the core covers both layouts and any later rearrangement, which
+# matters because the layout is Arduino's to change and this script only gets
+# one attempt at it, on someone else's board, with no way back.
 step "stock firmware backup"
-STOCK_GLOB=("$TARGET_HOME"/.arduino15/packages/arduino/hardware/zephyr/*/variants/*/*.hex)
 BACKUP_DIR="${UNOQ_BACKUP:-$TARGET_HOME/uno-q-backup}"
+STOCK_FOUND="$(find "$TARGET_HOME/.arduino15/packages/arduino/hardware/zephyr" \
+  -name '*stm32u585xx*.hex' -type f 2>/dev/null | sort | head -1)"
 if compgen -G "$BACKUP_DIR/*.hex" >/dev/null; then
   skip "stock firmware already backed up in $BACKUP_DIR"
-elif [ -f "${STOCK_GLOB[0]}" ]; then
+elif [ -n "$STOCK_FOUND" ]; then
   as_user mkdir -p "$BACKUP_DIR"
-  as_user cp "${STOCK_GLOB[0]}" "$BACKUP_DIR/"
-  did "backed up $(basename "${STOCK_GLOB[0]}") -> $BACKUP_DIR"
+  as_user cp "$STOCK_FOUND" "$BACKUP_DIR/"
+  did "backed up $(basename "$STOCK_FOUND") -> $BACKUP_DIR"
+elif [ "${UNOQ_ALLOW_NO_STOCK_FW:-0}" = "1" ]; then
+  warn "no stock .hex found, and UNOQ_ALLOW_NO_STOCK_FW=1 - purging anyway."
+  warn "restore-arduino-firmware.sh will have nothing to flash, permanently."
 else
-  warn "no stock .hex found and none backed up."
-  warn "restore-arduino-firmware.sh will have nothing to flash. Continuing."
+  # Refuses rather than warns. Everything else here has a revert line in the
+  # comment above it; this is the one step whose damage is not undoable, so
+  # "continuing" was never the right default - a warning scrolls past in a
+  # bootstrap run and is read, if at all, after the fact.
+  fail "no stock MCU firmware found under $TARGET_HOME/.arduino15 and none in
+        $BACKUP_DIR. It is Arduino's build - not in this repo, not in apt -
+        and this script is about to delete the only copy on the board.
+
+        Find and copy it first:
+          find ~/.arduino15 -name '*stm32u585xx*.hex'
+          mkdir -p $BACKUP_DIR && cp <that file> $BACKUP_DIR/
+
+        Or accept losing it: UNOQ_ALLOW_NO_STOCK_FW=1 sudo bash $0"
 fi
 
 step "remove Arduino packages"

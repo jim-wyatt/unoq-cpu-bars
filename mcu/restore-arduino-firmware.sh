@@ -28,10 +28,14 @@ FW="${STOCK_FW:-$HOME/uno-q-backup/zephyr-arduino_uno_q_stm32u585xx.hex}"
 stock firmware not found at: $FW
 
 It is Arduino's image, so this repository does not ship it. Copy it off your
-own board BEFORE running provision/40-purge-arduino.sh:
+own board BEFORE running provision/40-purge-arduino.sh, which is the point
+after which there is no copy left anywhere:
 
   mkdir -p ~/uno-q-backup
-  cp ~/.arduino15/packages/arduino/hardware/zephyr/*/variants/*/*.hex ~/uno-q-backup/
+  find ~/.arduino15 -name '*stm32u585xx*.hex' -exec cp {} ~/uno-q-backup/ \;
+
+A find rather than a path, because the layout has moved: on core 0.55.2 the
+image is in firmwares/, not the variants/ directory this used to name.
 
 then re-run this, or set STOCK_FW=/path/to/image.hex
 EOF

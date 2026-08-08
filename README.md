@@ -176,7 +176,7 @@ sudo bash ~/hybrid/provision/70-learning-web.sh         # optional
 
 | Script | Does |
 |---|---|
-| `10-optimize-board.sh` | Drops the X11 desktop stack (~218 MB — `DP-1` is disconnected), ModemManager, fwupd, unattended apt. Adds the `i2c`/`spi`/`gpiod` group memberships and a spidev udev rule. `UNOQ_TIER2=1` also drops Bluetooth and udisks2. |
+| `10-optimize-board.sh` | Drops the X11 desktop stack (~218 MB — `DP-1` is disconnected), ModemManager, fwupd, unattended apt, and the ~2 GB of Arduino container images. Runs the one `apt-get upgrade` a restored board needs (`UNOQ_SKIP_APT_UPGRADE=1` to skip). Adds the `i2c`/`spi`/`gpiod` group memberships and a spidev udev rule. `UNOQ_TIER2=1` also drops Bluetooth and udisks2. |
 | `20-dev-tools.sh` | Installs `clangd` (version discovered, not pinned), disables the Arduino services and Docker (~210 MB), verifies `/dev/ttyHS1` is released. |
 | `user/10-host-tools.sh` | `uv`, then `cmake`, `ninja` and `west` as uv tools. |
 | `user/20-zephyr-sdk.sh` | Zephyr SDK, `arm-zephyr-eabi` only. ~1 GB. |

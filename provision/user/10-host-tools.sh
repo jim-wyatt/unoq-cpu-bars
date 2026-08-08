@@ -1,0 +1,48 @@
+#!/bin/bash
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
+# uv, and the host build tools it manages. Runs as YOU, not root.
+#
+#   bash ~/hybrid/provision/user/10-host-tools.sh
+#
+# Idempotent.
+#
+# cmake, ninja and west come from PyPI via `uv tool install` rather than apt:
+# Debian's cmake here predates what recent Zephyr wants, and uv keeps each tool
+# in its own venv so they cannot fight over dependencies.
+set -uo pipefail
+# shellcheck source=provision/lib.sh
+. "$(cd "$(dirname "$0")/.." && pwd)/lib.sh"
+
+[ "$(id -u)" = 0 ] && fail "run this WITHOUT sudo - it installs into \$HOME"
+
+export PATH="$HOME/.local/bin:$PATH"
+
+step "uv"
+if command -v uv >/dev/null 2>&1; then
+  skip "uv present: $(uv --version)"
+else
+  # The official installer; it drops uv into ~/.local/bin and needs no root.
+  curl -LsSf https://astral.sh/uv/install.sh | sh >/dev/null 2>&1 ||
+    fail "uv install failed - check network access"
+  command -v uv >/dev/null 2>&1 || fail "uv installed but not on PATH"
+  did "uv installed: $(uv --version)"
+fi
+
+step "host build tools"
+for tool in cmake ninja west; do
+  if uv tool list 2>/dev/null | grep -q "^$tool "; then
+    skip "$tool present: $(uv tool list 2>/dev/null | awk -v t="$tool" '$1==t {print $2}')"
+  else
+    uv tool install "$tool" >/dev/null 2>&1 || fail "uv tool install $tool"
+    did "$tool installed"
+  fi
+done
+
+step "verify"
+for tool in cmake ninja; do
+  command -v "$tool" >/dev/null 2>&1 ||
+    warn "$tool not on PATH - ~/.local/bin may be missing from it (env.sh adds it)"
+done
+
+summary

@@ -1,53 +1,78 @@
 #!/bin/bash
 # Copyright (c) 2026 Jim Wyatt
 # SPDX-License-Identifier: MIT
-# Final root-level steps for the west-based dev environment.
+# Root-level steps for the west-based dev environment.
 #
 #   sudo bash ~/hybrid/provision/20-dev-tools.sh
 #
-# Safe to run now: the west toolchain has been verified end-to-end
-# (build -> flash -> verified -> running) with the Arduino tree already
-# deleted. Every step has its revert in the comment above it.
+# Idempotent. Every change has its revert in the comment above it.
+#
+# This frees /dev/ttyHS1 (arduino-router holds it) and installs clangd. It does
+# NOT purge the Arduino packages - that is 40-purge-arduino.sh, deliberately
+# separate and later, because it is the step you cannot casually undo.
 set -uo pipefail
+# shellcheck source=provision/lib.sh
+. "$(cd "$(dirname "$0")" && pwd)/lib.sh"
+need_root
 
 echo "== Before =="
 free -h | sed -n 2p
-echo
 
-# --- 1. clangd: C/C++ IntelliSense. VS Code settings already point at
-# --- /usr/bin/clangd-19 and expect compile_commands.json (west emits it).
-# REVERT: apt-get remove -y clangd-19
-apt-get install -y clangd-19
-ln -sf /usr/bin/clangd-19 /usr/bin/clangd
+# --- 1. clangd: C/C++ IntelliSense. .vscode/settings.json expects it plus a
+# --- compile_commands.json, which zbuild.sh symlinks in from the west build.
+# ---
+# --- The version is discovered rather than pinned: Debian ships clangd-19
+# --- here, but a later image ships a different one and a pinned name 404s.
+# REVERT: apt-get remove -y clangd-<v> && rm /usr/bin/clangd
+step "clangd"
+if command -v clangd >/dev/null 2>&1; then
+  skip "clangd present: $(clangd --version 2>/dev/null | head -1)"
+else
+  CLANGD_PKG=""
+  for v in 19 18 17 16 15 14; do
+    if apt-cache show "clangd-$v" >/dev/null 2>&1; then
+      CLANGD_PKG="clangd-$v"
+      break
+    fi
+  done
+  [ -n "$CLANGD_PKG" ] || CLANGD_PKG=clangd
+  apt_install "$CLANGD_PKG"
+  # The unversioned name is what .vscode/settings.json and clangd extensions
+  # look for; Debian's versioned package does not provide it.
+  if [ ! -e /usr/bin/clangd ] && [ -x "/usr/bin/${CLANGD_PKG}" ]; then
+    ln -sf "/usr/bin/${CLANGD_PKG}" /usr/bin/clangd
+    did "/usr/bin/clangd -> $CLANGD_PKG"
+  fi
+fi
 
 # --- 2. Arduino services. The MCU no longer runs Arduino firmware, so the
 # --- Router Bridge has nothing to talk to. arduino-router also holds
 # --- /dev/ttyHS1 open, which blocks you from reading the Zephyr console.
 # --- Frees ~105 MB and releases the UART.
 # REVERT: systemctl enable --now arduino-router arduino-app-cli
-systemctl disable --now arduino-router arduino-router-serial \
-  arduino-app-cli arduino-avahi-serial 2>/dev/null
+step "Arduino services"
+disable_unit arduino-router.service arduino-router-serial.service \
+  arduino-app-cli.service arduino-avahi-serial.service
 
-# --- 3. Docker: you pruned all images; it now serves nothing. ~105 MB.
+# --- 3. Docker: exists only to run Arduino Brick container images. ~105 MB.
 # REVERT: systemctl enable --now docker docker.socket containerd
-systemctl disable --now docker docker.socket containerd 2>/dev/null
+step "Docker"
+disable_unit docker.service docker.socket containerd.service
 
-# --- 4. OPTIONAL: purge the Arduino debs entirely (~uninstalls the App
-# --- framework, App Lab web UI, arduino-cli and the router).
-# ---
-# --- SAFE: /opt/openocd is owned by NO package (`dpkg -S` finds nothing),
-# --- so apt will not remove it. Copy it aside first anyway
-# --- (cp -a /opt/openocd ~/uno-q-backup/); tools/build-openocd.sh rebuilds it
-# --- from source if you ever lose it.
-# ---
-# --- Uncomment to remove. REVERT: apt-get install -y arduino-app-cli ...
-# apt-get remove -y arduino-app-cli arduino-app-lab arduino-router arduino-cli
-# apt-get autoremove -y
+# --- 4. Verify the UART is actually free now. This is the whole point of the
+# --- step, and it is cheap to check rather than assert.
+step "verify /dev/ttyHS1 is free"
+if [ ! -e /dev/ttyHS1 ]; then
+  warn "/dev/ttyHS1 does not exist - is this an UNO Q?"
+elif holder=$(fuser /dev/ttyHS1 2>/dev/null | tr -s ' ' ' ' | sed 's/^ *//;s/ *$//') && [ -n "$holder" ]; then
+  # fuser pads its output, and unquoted padding turns into empty ps arguments.
+  warn "/dev/ttyHS1 held by PID(s) $holder: $(ps -o comm= -p "${holder// /,}" 2>/dev/null | tr '\n' ' ')"
+  warn "  unoq-cpu-bars holding it is expected - see provision/50-cpu-bars.sh"
+else
+  skip "/dev/ttyHS1 is free"
+fi
 
 echo
 echo "== After =="
 free -h | sed -n 2p
-echo
-echo "Verify the console is now readable:"
-echo "  ~/hybrid/.venv/bin/python -c \"import serial; s=serial.Serial('/dev/ttyHS1',115200,timeout=2); print(s.read(200))\""
-echo "  ~/hybrid/mcu/flash.sh ~/zephyrproject/build/zephyr/zephyr.hex   # re-flash to see boot banner"
+summary

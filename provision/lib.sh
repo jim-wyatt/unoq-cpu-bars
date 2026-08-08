@@ -1,0 +1,220 @@
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
+# Shared helpers for the provision scripts. Sourced, never executed.
+#
+#   . "$(dirname "$0")/lib.sh"
+#
+# This file is sourced, so it has no shebang - the directive below is what
+# tells shellcheck which shell to assume.
+# shellcheck shell=bash
+#
+# WHY THESE EXIST
+# ---------------
+# Every script here has to be safe to re-run: bootstrap.sh calls them in
+# sequence, and a half-finished board gets the same sequence again rather than
+# a different recovery path. "Idempotent" here means the second run makes no
+# changes and says so, not that it merely survives.
+#
+# They also have to work from wherever the repo was cloned. The scripts used to
+# name /home/arduino/hybrid and the `arduino` user literally, which is fine on
+# the board they were written on and wrong everywhere else.
+
+# --- who and where ---------------------------------------------------------
+
+# The repo root, derived from this file rather than assumed.
+PROVISION_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT="$(cd "$PROVISION_DIR/.." && pwd)"
+export PROVISION_DIR PROJECT
+
+# The human this board belongs to. These scripts run under sudo, so $USER is
+# root and useless; SUDO_USER is the account that invoked us, which is the one
+# that owns the checkout, holds the group memberships and gets the venv.
+TARGET_USER="${UNOQ_USER:-${SUDO_USER:-$(stat -c %U "$PROJECT")}}"
+TARGET_HOME="$(getent passwd "$TARGET_USER" | cut -d: -f6)"
+export TARGET_USER TARGET_HOME
+
+# --- output ----------------------------------------------------------------
+
+if [ -t 1 ]; then
+  P_GREEN=$'\033[32m' P_YELLOW=$'\033[33m' P_RED=$'\033[31m' P_BOLD=$'\033[1m' P_DIM=$'\033[2m' P_OFF=$'\033[0m'
+else
+  P_GREEN="" P_YELLOW="" P_RED="" P_BOLD="" P_DIM="" P_OFF=""
+fi
+
+# Counters, so a run can end with "3 changed, 9 already correct" instead of
+# leaving you to read the whole log to find out whether it did anything.
+CHANGED=0
+UNCHANGED=0
+
+step() { printf '\n%s== %s ==%s\n' "$P_BOLD" "$*" "$P_OFF"; }
+did() {
+  CHANGED=$((CHANGED + 1))
+  printf '  %schanged%s  %s\n' "$P_GREEN" "$P_OFF" "$*"
+}
+skip() {
+  UNCHANGED=$((UNCHANGED + 1))
+  printf '  %sok     %s %s\n' "$P_DIM" "$P_OFF" "$*"
+}
+warn() { printf '  %swarn%s    %s\n' "$P_YELLOW" "$P_OFF" "$*" >&2; }
+fail() {
+  printf '  %sFAILED%s  %s\n' "$P_RED" "$P_OFF" "$*" >&2
+  exit 1
+}
+
+summary() {
+  printf '\n%s%d changed, %d already correct.%s\n' "$P_BOLD" "$CHANGED" "$UNCHANGED" "$P_OFF"
+}
+
+need_root() {
+  [ "$(id -u)" = 0 ] || fail "run this with sudo: sudo bash $0"
+}
+
+# --- idempotent primitives -------------------------------------------------
+
+# apt_install <pkg>... - install only what is genuinely missing, so a re-run
+# costs nothing and does not drag in an apt-get update it does not need.
+apt_install() {
+  local missing=() p
+  for p in "$@"; do
+    dpkg-query -W -f='${Status}' "$p" 2>/dev/null | grep -q "ok installed" || missing+=("$p")
+  done
+  if [ ${#missing[@]} -eq 0 ]; then
+    skip "packages already installed: $*"
+    return 0
+  fi
+  # Only refresh the index when we are actually about to install something.
+  # Repeated `apt-get update` is the slowest part of a re-run by far.
+  apt-get update -qq
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${missing[@]}" >/dev/null ||
+    fail "apt-get install ${missing[*]}"
+  did "installed: ${missing[*]}"
+}
+
+# apt_remove <pkg>... - remove only what is actually present.
+apt_remove() {
+  local present=() p
+  for p in "$@"; do
+    dpkg-query -W -f='${Status}' "$p" 2>/dev/null | grep -q "ok installed" && present+=("$p")
+  done
+  if [ ${#present[@]} -eq 0 ]; then
+    skip "already absent: $*"
+    return 0
+  fi
+  DEBIAN_FRONTEND=noninteractive apt-get remove -y "${present[@]}" >/dev/null ||
+    fail "apt-get remove ${present[*]}"
+  did "removed: ${present[*]}"
+}
+
+# unit_exists <unit> - true if systemd knows about it at all. Guards every
+# disable/mask below: a stock board that never had lightdm should report
+# "not present", not an error the reader has to decide is harmless.
+unit_exists() {
+  systemctl list-unit-files "$1" --no-legend 2>/dev/null | grep -q . ||
+    systemctl cat "$1" >/dev/null 2>&1
+}
+
+# disable_unit <unit>... - stop, disable, and say which of those was needed.
+disable_unit() {
+  local u
+  for u in "$@"; do
+    if ! unit_exists "$u"; then
+      skip "$u not present"
+      continue
+    fi
+    if [ "$(systemctl is-enabled "$u" 2>/dev/null)" = "disabled" ] &&
+      ! systemctl is-active --quiet "$u"; then
+      skip "$u already stopped and disabled"
+      continue
+    fi
+    systemctl disable --now "$u" >/dev/null 2>&1
+    did "$u stopped and disabled"
+  done
+}
+
+# mask_unit <unit> - for services that restart themselves on demand.
+mask_unit() {
+  local u="$1"
+  if ! unit_exists "$u"; then
+    skip "$u not present"
+    return 0
+  fi
+  if [ "$(systemctl is-enabled "$u" 2>/dev/null)" = "masked" ]; then
+    skip "$u already masked"
+    return 0
+  fi
+  systemctl stop "$u" >/dev/null 2>&1
+  systemctl mask "$u" >/dev/null 2>&1
+  did "$u masked"
+}
+
+# ensure_group <group> - create as a system group if missing.
+ensure_group() {
+  if getent group "$1" >/dev/null; then
+    skip "group $1 exists"
+  else
+    groupadd -r "$1" || fail "groupadd $1"
+    did "group $1 created"
+  fi
+}
+
+# add_to_group <group> - put TARGET_USER in it, if not already.
+add_to_group() {
+  if id -nG "$TARGET_USER" | tr ' ' '\n' | grep -qx "$1"; then
+    skip "$TARGET_USER already in $1"
+  else
+    usermod -aG "$1" "$TARGET_USER" || fail "usermod -aG $1 $TARGET_USER"
+    did "$TARGET_USER added to $1 (needs re-login to take effect)"
+  fi
+}
+
+# write_file <mode> <path> - content on stdin. Writes only on a real change,
+# so re-runs neither touch mtimes nor trigger daemon reloads that watch them.
+write_file() {
+  local mode="$1" path="$2" tmp
+  tmp="$(mktemp)"
+  cat >"$tmp"
+  if [ -f "$path" ] && cmp -s "$tmp" "$path"; then
+    rm -f "$tmp"
+    skip "$path up to date"
+    return 1
+  fi
+  install -D -m "$mode" "$tmp" "$path" || fail "could not write $path"
+  rm -f "$tmp"
+  did "wrote $path"
+  return 0
+}
+
+# install_unit <source.service> - copy a unit into /etc/systemd/system with the
+# repo path and owning user substituted in, then reload only if it changed.
+#
+# The units are checked in with this board's literal paths so they stay valid,
+# readable files. Rewriting them here is what lets the repo be cloned anywhere
+# and still produce units that point at the clone.
+install_unit() {
+  local src="$1" name
+  name="$(basename "$src")"
+  if sed -e "s#/home/arduino/hybrid#$PROJECT#g" \
+    -e "s#^User=arduino\$#User=$TARGET_USER#" \
+    -e "s#^Group=arduino\$#Group=$TARGET_USER#" \
+    "$src" | write_file 0644 "/etc/systemd/system/$name"; then
+    systemctl daemon-reload
+  fi
+}
+
+# enable_unit <unit> - enable and start, if it is not already both.
+enable_unit() {
+  local u="$1"
+  if systemctl is-enabled --quiet "$u" 2>/dev/null && systemctl is-active --quiet "$u"; then
+    skip "$u already enabled and running"
+    return 0
+  fi
+  systemctl enable --now "$u" >/dev/null 2>&1 || fail "could not enable $u"
+  did "$u enabled and started"
+}
+
+# as_user <cmd>... - run something as the owning user, with a login-ish env.
+# The user-level steps install into $TARGET_HOME and must not leave root-owned
+# files behind; that is the single most common way a bootstrap half-works.
+as_user() {
+  runuser -u "$TARGET_USER" -- "$@"
+}

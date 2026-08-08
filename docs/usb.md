@@ -232,6 +232,26 @@ sudo systemctl enable --now adbd`.
 
 ## Troubleshooting
 
+Start here, because it prints everything below in one go:
+
+```bash
+~/hybrid/usb/status.sh
+```
+
+Role and power, the UDC, both configurations and their functions, the bridge
+and its ports, the DHCP lease, the default routes in priority order, the bind
+guard's counter, and the recent log. Read-only, no root.
+
+It matters more than a convenience script normally would. When the board is
+powered over the same cable that carries the gadget, every cable change is also
+a power cut — you cannot watch a plug-in happen and no session survives one, so
+whatever went wrong has always already finished by the time you can look. After
+an unexplained reset the evidence is in the **previous** boot:
+
+```bash
+journalctl -b -1 -u unoq-usb-bind -t unoq-bind-guard
+```
+
 **Nothing appears on the computer.** Check a UDC exists — if `/sys/class/udc`
 is empty the Type-C negotiation did not make the board a device. Try the other
 cable orientation, and make sure the cable is a data cable (charge-only USB-C

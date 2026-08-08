@@ -116,6 +116,26 @@ racing to work out which one the host chose, both are enslaved to a bridge
 
 ## Addressing
 
+There are two modes, and which one you want depends on whether the computer is
+sharing its internet. The mode lives in `/etc/default/unoq-usb`, which
+`60-usb-gadget.sh` writes once and never rewrites, so an edit survives
+re-provisioning:
+
+```bash
+UNOQ_USB_MODE=server     # default
+UNOQ_USB_MODE=client     # for a host that shares its connection
+sudo systemctl restart unoq-usb-gadget
+```
+
+| | `server` (default) | `client` |
+|---|---|---|
+| Board | `10.55.0.1/24` static | `10.55.0.1` **and** whatever the host leases |
+| Computer | `10.55.0.10`–`.100` by DHCP from us | its own fixed address, its own DHCP server |
+| Runs DHCP | `dnsmasq`, ours | the host's |
+| Right when | the computer is something you reach the board *from* | the computer is sharing its internet *with* the board |
+
+### Server mode
+
 | | |
 |---|---|
 | Board | `10.55.0.1/24`, static, on `br-usb` |
@@ -132,6 +152,128 @@ to diagnose.
 
 To set the computer's address by hand instead: `10.55.0.2/24`, no gateway, no
 DNS.
+
+### Client mode, and why Windows forces it
+
+Turn on Internet Connection Sharing in Windows and it stops negotiating: it
+pins the shared adapter to **`192.168.137.1/24`** and runs its own DHCP server
+there. It will never take a lease from us. macOS Internet Sharing does the same
+thing at `192.168.2.1`.
+
+So a board sitting at `10.55.0.1` in front of a host at `192.168.137.1` is two
+`/24`s on one wire with no route between them. Both ends look configured, the
+cable looks dead, and nothing logs an error — there is nothing wrong with
+either end in isolation.
+
+In client mode the board asks instead of answering:
+
+```bash
+sudo systemctl restart unoq-usb-gadget    # with UNOQ_USB_MODE=client set
+~/hybrid/usb/status.sh
+```
+
+```
+  dhcp mode              client - udhcpc is asking the host for an address
+  leased address         192.168.137.210/24
+  gateway                192.168.137.1
+```
+
+Nothing is hardcoded to Microsoft's numbering — the same code works for macOS,
+for a Linux host running its own dnsmasq, and for whatever ICS gets changed to.
+`busybox udhcpc` is the client, because this image ships no other one and
+busybox is already here.
+
+Three things worth knowing:
+
+- **`10.55.0.1` stays on the bridge in client mode too.** It is the address the
+  board still answers on when the host's DHCP server is not running. With wifi
+  off that is the difference between a fixable board and a serial console — from
+  the host, `route add 10.55.0.0 mask 255.255.255.0 192.168.137.1` (elevated)
+  gets you back to it.
+- **The address is sticky.** The last lease is remembered in
+  `/var/lib/unoq/usb-dhcp-last` and re-requested next time, so "what do I ssh
+  to" has an answer you can write down. ICS honours the request in practice.
+- **`quentin.local` works too.** avahi publishes on `br-usb` like any other
+  interface, and Windows 11 and macOS both resolve `.local` natively. That one
+  survives the lease moving.
+
+---
+
+## Running on the USB link alone
+
+The radio is the largest thing on this board that can simply be switched off,
+and on a board that is plugged into a computer anyway it is also the most
+redundant. As a device the board is a power sink at USB default current with no
+PD contract, so it is worth reclaiming.
+
+```bash
+~/hybrid/usb/wifi.sh check      # would it be safe right now?
+sudo ~/hybrid/usb/wifi.sh off
+sudo ~/hybrid/usb/wifi.sh on
+```
+
+`check` and `off` run the same preflight, and `off` refuses if it fails:
+
+```
+  gadget bound, and 192.168.137.1 answers on br-usb
+  the host is NAT-ing: the board keeps its internet over USB
+
+  RECONNECT ON:  arduino@192.168.137.210   (or quentin.local)
+```
+
+This is not a wrapper around `nmcli radio wifi off` for the sake of it. You are
+almost certainly typing that command over the wifi it is about to turn off, and
+if the USB link is not actually carrying traffic — gadget did not bind, cable is
+charge-only, host is not sharing, board is in server mode in front of an ICS
+host — then the moment the radio drops there is no path to the board at all.
+Not slow: absent.
+
+The reachability check is ARP, not ping. **Windows blocks ICMP to its ICS
+adapter by default**, so the gateway that is routing your traffic perfectly well
+does not answer a ping, and refusing on that basis would refuse in the normal
+case. A resolved neighbour proves frames cross the wire and get answered, which
+is the property "will I still be able to reach this board" actually depends on.
+
+`off` also kicks the DHCP client into renewing, because NetworkManager owns
+`/etc/resolv.conf` and rewrites it — without our nameservers — the moment the
+radio goes down. `usb-dhcp.sh` puts them back on a lease event, and without the
+kick that would not happen until the lease next renewed, which on an ICS lease
+is days. The symptom is `ping 8.8.8.8` working and `apt` not.
+
+### Two ways back, when the board is on USB only
+
+Turning wifi off means the gadget is the only way in, so both failure modes have
+an automatic path back to a board you can log into.
+
+| What failed | What catches it | What it does |
+|---|---|---|
+| The bind is killing the board — brownout loop | `bind-guard.sh` | Refuses to bind after 3 unconfirmed boots, **and turns the radio back on** |
+| The bind works and there is still no internet | `unoq-uplink-fallback.service` | Waits 240s after boot, then turns the radio back on |
+
+The second one exists because the guard cannot see it: everything the guard
+checks succeeded. The gadget bound, `br-usb` came up, the address is there — and
+the board still has no way out, because the computer is asleep, or is not
+sharing, or woke up with sharing switched off, or is a different computer.
+
+It is a deadline after boot rather than a watchdog on a timer. A poll that ran
+forever would flip the radio every time the host slept or the cable was jostled,
+and would fight anyone who turned wifi off deliberately. Boot is when the
+question is live and nobody is watching. Falling back then stays fallen back
+until a person unmakes it, which is what you want from something you are relying
+on.
+
+```bash
+UNOQ_UPLINK_FALLBACK=0       # in /etc/default/unoq-usb, to disable it
+UNOQ_UPLINK_DEADLINE=240     # seconds to wait after boot
+```
+
+```bash
+journalctl -b -u unoq-uplink-fallback -t unoq-uplink-fallback
+```
+
+Both are enabled unconditionally by `60-usb-gadget.sh`, including on a board
+whose wifi is on — where the fallback looks, sees a radio already up and exits.
+The moment either is needed is the moment nobody can enable it.
 
 ### The board's own route out
 
@@ -239,8 +381,9 @@ Start here, because it prints everything below in one go:
 ```
 
 Role and power, the UDC, both configurations and their functions, the bridge
-and its ports, the DHCP lease, the default routes in priority order, the bind
-guard's counter, and the recent log. Read-only, no root.
+and its ports, which end is running DHCP and what it leased, the nameservers,
+the wifi radio, the default routes in priority order, the bind guard's counter,
+and the recent log. Read-only, no root.
 
 It matters more than a convenience script normally would. When the board is
 powered over the same cable that carries the gadget, every cable change is also

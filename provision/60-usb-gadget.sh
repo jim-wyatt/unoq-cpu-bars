@@ -63,6 +63,44 @@ else
   skip "no packaged dnsmasq service to disable"
 fi
 
+step "link configuration"
+# Written once and then left alone, unlike everything else here. It is the one
+# file on this board a person is expected to edit, and a provisioning run that
+# reset the mode every time would undo the change on the next bootstrap - most
+# likely while the board is running on the very link the setting controls.
+# REVERT: rm /etc/default/unoq-usb  (the scripts default to server mode anyway)
+if [ -f /etc/default/unoq-usb ]; then
+  skip "/etc/default/unoq-usb exists (mode: $(sed -n 's/^UNOQ_USB_MODE=//p' /etc/default/unoq-usb | tail -1))"
+else
+  write_file 0644 /etc/default/unoq-usb <<'CONF'
+# Which end of the USB link runs DHCP.
+# Read by unoq-usb-gadget.service and unoq-usb-bind.service.
+#
+#   server   the board is 10.55.0.1 and leases the computer an address.
+#            Right when the computer is just something you reach the board from.
+#
+#   client   the board asks the computer for an address instead. Use this when
+#            the computer is SHARING ITS INTERNET: Windows ICS pins its shared
+#            adapter to 192.168.137.1 and runs its own DHCP server, and will
+#            never take a lease from us. Also right for macOS Internet Sharing.
+#            10.55.0.1 stays on the bridge either way.
+#
+# After changing:  sudo systemctl restart unoq-usb-gadget
+UNOQ_USB_MODE=server
+
+# Uncomment to stop the gadget ever touching the board's default route. It is
+# installed at metric 700, so it already loses to wifi (600) and ethernet (100).
+#UNOQ_USB_DEFAULT_ROUTE=0
+
+# If wifi has been turned off (usb/wifi.sh off) and the USB link has produced no
+# route to the internet this many seconds after boot, turn the radio back on and
+# leave it on. Set UNOQ_UPLINK_FALLBACK=0 to let the board sit there with no
+# uplink instead.
+#UNOQ_UPLINK_FALLBACK=1
+#UNOQ_UPLINK_DEADLINE=240
+CONF
+fi
+
 step "fileshare image"
 if [ -f "$IMG" ]; then
   skip "$IMG present ($(du -h "$IMG" | cut -f1) on disk)"
@@ -100,6 +138,9 @@ install_unit "$PROJECT/usb/unoq-usb-bind.service"
 # "boots survived" rather than just "boots attempted". Without this enabled the
 # guard would trip after three normal boots and refuse to bind ever again.
 install_unit "$PROJECT/usb/unoq-usb-confirm.service"
+# The other half of turning wifi off: the guard covers a bind that kills the
+# board, this covers a bind that works and still leaves it with no way out.
+install_unit "$PROJECT/usb/unoq-uplink-fallback.service"
 # enable, but do not --now start it blindly: starting is harmless (no UDC
 # means it builds the definition and exits) and proves the scripts run.
 if systemctl is-enabled --quiet unoq-usb-gadget.service 2>/dev/null; then
@@ -118,6 +159,16 @@ else
   systemctl enable unoq-usb-confirm.service >/dev/null 2>&1 ||
     fail "could not enable unoq-usb-confirm.service"
   did "bind guard confirm enabled at boot"
+fi
+# Harmless on a board whose wifi is on - it looks, sees a radio already up, and
+# exits - so it is enabled unconditionally rather than only when someone has
+# turned wifi off. The moment it is needed is the moment nobody can enable it.
+if systemctl is-enabled --quiet unoq-uplink-fallback.service 2>/dev/null; then
+  skip "wifi fallback already enabled"
+else
+  systemctl enable unoq-uplink-fallback.service >/dev/null 2>&1 ||
+    fail "could not enable unoq-uplink-fallback.service"
+  did "wifi fallback enabled at boot"
 fi
 
 step "build the gadget now (no bind without a host)"

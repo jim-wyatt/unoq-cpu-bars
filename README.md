@@ -111,7 +111,12 @@ FOTA tasks.
 │   └── tests/              pytest suite, all against fakes — no hardware
 ├── usb/                    the composite USB gadget: network + fileshare
 │   ├── gadget-up.sh        build the configfs gadget, bind when a UDC appears
-│   ├── usb-net-up.sh       br-usb, 10.55.0.1, DHCP for the host
+│   ├── usb-net-up.sh       br-usb, 10.55.0.1, and DHCP in either direction
+│   ├── usb-dhcp.sh         client mode: take an address from a sharing host
+│   ├── bind-guard.sh       stop a brownout loop becoming permanent
+│   ├── uplink-fallback.sh  wifi back on if USB gives no internet after boot
+│   ├── wifi.sh             radio off, once the USB link can carry the traffic
+│   ├── status.sh           the whole USB picture in one read-only command
 │   └── *.rules, *.service  udev-driven, because there is no UDC until you
 │                           plug into a computer — see usb.md
 ├── share/                  what the board hands out

@@ -18,6 +18,12 @@ Wants=sys-kernel-config.mount
 Type=oneshot
 RemainAfterExit=yes
 
+# Which end of the link runs DHCP, and whether the gadget may touch the default
+# route. The leading - means a board without the file still works: the scripts
+# default to server mode on their own. Created by provision/60-usb-gadget.sh,
+# and never rewritten by it, so an edit here survives re-provisioning.
+EnvironmentFile=-/etc/default/unoq-usb
+
 # This unit only ever PREPARES: it builds the gadget definition in configfs and
 # brings up br-usb + DHCP. It deliberately does not bind, and --build makes
 # that explicit rather than incidental.

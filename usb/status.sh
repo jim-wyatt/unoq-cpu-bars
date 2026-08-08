@@ -76,8 +76,37 @@ for i in /sys/class/net/*/master; do
     ports="$ports $(basename "$(dirname "$i")")"
 done
 val "bridge ports" "${ports# }"
-val "dnsmasq" "$(pgrep -f "interface=$BRIDGE" >/dev/null 2>&1 && echo running || echo "not running")"
-val "host lease" "$(awk '{print $3, $4}' /run/unoq-usb-dnsmasq.leases 2>/dev/null | tr '\n' ' ')"
+# Which end runs DHCP is the first thing to establish when the two sides cannot
+# see each other: a board in server mode in front of a host that pins its own
+# address (Windows ICS, macOS Internet Sharing) is two /24s on one wire, which
+# looks exactly like a dead cable. See usb-net-up.sh.
+# Liveness from /proc, not `kill -0`: this script is meant to run without root,
+# and kill -0 against a root-owned daemon fails with EPERM for a normal user -
+# it would report every one of these as stopped. The comm check also stops a
+# stale pidfile with a recycled number reading as a running daemon.
+pid_is() {
+  local pid comm want
+  pid="$(cat "$1" 2>/dev/null)"
+  shift
+  case "$pid" in '' | *[!0-9]*) return 1 ;; esac
+  comm="$(cat "/proc/$pid/comm" 2>/dev/null)" || return 1
+  for want in "$@"; do
+    [ "$comm" = "$want" ] && return 0
+  done
+  return 1
+}
+if pid_is /run/unoq-usb-udhcpc.pid busybox udhcpc; then
+  val "dhcp mode" "client - udhcpc is asking the host for an address"
+  val "leased address" "$(awk '{print $1}' /run/unoq-usb-dhcp.state 2>/dev/null)"
+  val "gateway" "$(awk '{print $2}' /run/unoq-usb-dhcp.state 2>/dev/null)"
+elif pid_is /run/unoq-usb-dnsmasq.pid dnsmasq; then
+  val "dhcp mode" "server - dnsmasq is leasing the host an address"
+  val "host lease" "$(awk '{print $3, $4}' /run/unoq-usb-dnsmasq.leases 2>/dev/null | tr '\n' ' ')"
+else
+  val "dhcp mode" "<neither dnsmasq nor udhcpc is running>"
+fi
+val "nameservers" "$(sed -n 's/^nameserver //p' /etc/resolv.conf 2>/dev/null | tr '\n' ' ')"
+val "wifi radio" "$(nmcli radio wifi 2>/dev/null)"
 
 hdr "default routes (lowest metric wins)"
 # The gadget route must LOSE to any real uplink. If a 10.55.0.x route is top of
@@ -93,7 +122,7 @@ hdr "recent gadget log"
 # -b covers this boot; the interesting one after an unexplained reset is
 # usually `journalctl -b -1`, which the footer points at.
 journalctl -b -u unoq-usb-gadget -u unoq-usb-bind -u unoq-usb-confirm \
-  -t unoq-bind-guard -t unoq-usb-route -n 15 --no-pager -o short 2>/dev/null |
+  -t unoq-bind-guard -t unoq-usb-route -t unoq-usb-dhcp -n 15 --no-pager -o short 2>/dev/null |
   sed 's/^/  /' || echo "  <no journal access>"
 
 cat <<EOF

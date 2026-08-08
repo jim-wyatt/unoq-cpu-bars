@@ -2,8 +2,9 @@
 # Copyright (c) 2026 Jim Wyatt
 # SPDX-License-Identifier: MIT
 # Memory and disk reclaim for a headless Arduino UNO Q used as a Linux+MCU dev
-# board. Both matter: 3.6 GB of RAM, and a 9.8 GB / with ~3 GB free on a stock
-# board, which is the first thing to run out.
+# board, and the one apt upgrade a restored board needs. All three matter:
+# 3.6 GB of RAM, a 9.8 GB / with ~3 GB free on a stock board which is the first
+# thing to run out, and a factory image that is however old the image is.
 #
 #   sudo bash ~/hybrid/provision/10-optimize-board.sh
 #
@@ -53,6 +54,65 @@ mask_unit fwupd.service
 # REVERT: systemctl enable --now apt-daily.timer apt-daily-upgrade.timer
 step "unattended apt"
 disable_unit apt-daily.timer apt-daily-upgrade.timer
+
+# --- Bring the factory image up to date. ------------------------------------
+# A freshly restored board is a snapshot of whenever the image was built, and
+# it is further behind than it looks: this one came up 70 packages short of
+# Debian 13.6, openssl and the security pocket among them. Provisioning is the
+# right moment to close that gap - it is the one point where a long download is
+# expected anyway, and it happens before the Zephyr workspace fills the disk.
+#
+# It runs AFTER the timers above are disabled, deliberately. apt-daily firing
+# mid-run would sit on /var/lib/dpkg/lock and this would fail on a board that
+# is doing nothing wrong.
+#
+# `upgrade`, NOT `full-upgrade`: upgrade will never remove a package to satisfy
+# a dependency. On a board whose Qualcomm platform packages are what make it
+# bootable, "apt removed something to move forward" is not a trade worth taking
+# for a newer library, and anything held back stays held back and visible.
+#
+# --force-confold keeps every config file the board already has. The Qualcomm
+# overlay ships modified configs, and confdef alone would let a maintainer's
+# version win wherever the package has no explicit rule.
+#
+# This is the slowest step here and the only one that needs the internet.
+# Services get restarted as their packages upgrade, so expect a brief blip on
+# whatever link you are connected over.
+# REVERT: none - apt does not roll back. Pin a version if you need an old one.
+step "system packages"
+if [ "${UNOQ_SKIP_APT_UPGRADE:-0}" = "1" ]; then
+  skip "upgrade skipped (UNOQ_SKIP_APT_UPGRADE=1)"
+else
+  apt-get update -qq || warn "apt-get update failed - working from a stale index"
+  # -s is a dry run, so this costs a second and tells us whether to say
+  # "already current" or how much we are about to do.
+  PENDING="$(apt-get -s upgrade 2>/dev/null | grep -c '^Inst')"
+  if [ "${PENDING:-0}" -eq 0 ]; then
+    skip "all packages already current"
+  else
+    echo "  upgrading $PENDING package(s) - several minutes, and it downloads"
+    if DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
+      -o Dpkg::Options::=--force-confold \
+      -o Dpkg::Options::=--force-confdef >/dev/null; then
+      did "upgraded $PENDING package(s)"
+    else
+      fail "apt-get upgrade - fix the cause and re-run this script"
+    fi
+  fi
+  # The .debs are now dead weight on the partition this script exists to keep
+  # free: a 70-package upgrade leaves a few hundred MB in the archive cache.
+  CACHE_KB="$(du -sk /var/cache/apt/archives 2>/dev/null | awk '{print $1}')"
+  if [ "${CACHE_KB:-0}" -gt 10240 ]; then
+    apt-get clean
+    did "apt cache cleared (was $((CACHE_KB / 1024)) MB)"
+  else
+    skip "apt cache already small"
+  fi
+  # Debian only creates this if something that needs a reboot was replaced.
+  # Saying so is the whole job; rebooting a board mid-provision is not ours.
+  [ -f /var/run/reboot-required ] &&
+    warn "a package upgrade wants a reboot - finish provisioning first, then reboot"
+fi
 
 # --- I2C access. Stock: PermissionError on /dev/i2c-{0,1,2} ----------------
 # REVERT: gpasswd -d $TARGET_USER i2c

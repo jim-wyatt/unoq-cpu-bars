@@ -10,6 +10,16 @@
 # below is what tells shellcheck which shell to assume.
 # shellcheck shell=bash
 
+# Where this file lives. The helpers below used to name $HOME/hybrid literally,
+# which is only right if you cloned to exactly that path - and nothing in this
+# repo creates that symlink. A `git clone` with no destination, or VS Code's
+# clone, gives you ~/unoq-cpu-bars, and then zbuild, zflash, hpy and mcucon all
+# point at a directory that does not exist, while everything else keeps working.
+# 50-shell-env.sh already points ~/.bashrc at the real checkout; this makes the
+# rest of the file agree with it.
+UNOQ_PROJECT="$(cd "$(dirname "${BASH_SOURCE[0]:-$HOME/hybrid/env.sh}")" && pwd)"
+export UNOQ_PROJECT
+
 # uv, west, cmake, ninja (installed as uv tools) + on-board OpenOCD
 export PATH="$HOME/.local/bin:/opt/openocd/bin:$PATH"
 
@@ -22,16 +32,26 @@ export BOARD=arduino_uno_q
 # west lives in the workspace venv, not on the global PATH
 west() { "$HOME/zephyrproject/.venv/bin/west" "$@"; }
 
+# The three aliases below are double-quoted on purpose, so $UNOQ_PROJECT is
+# resolved once here rather than left to expand when you run them. That is what
+# SC2139 warns about, and it is the behaviour we want: the alias should keep
+# pointing at the checkout it was sourced from even if $HOME or the working
+# directory changes underneath it. Disabled per line, not per file, so a future
+# alias that genuinely wants late expansion still gets flagged.
+
 # MPU-side Python (gpiod, smbus2, pyserial, spidev)
-alias hpy='$HOME/hybrid/.venv/bin/python'
+# shellcheck disable=SC2139
+alias hpy="$UNOQ_PROJECT/.venv/bin/python"
 
 # MCU helpers
-alias zbuild='$HOME/hybrid/mcu/zbuild.sh'
-alias zflash='$HOME/hybrid/mcu/flash.sh'
+# shellcheck disable=SC2139
+alias zbuild="$UNOQ_PROJECT/mcu/zbuild.sh"
+# shellcheck disable=SC2139
+alias zflash="$UNOQ_PROJECT/mcu/flash.sh"
 
 # Watch the MCU console (lpuart1 -> /dev/ttyHS1). Ctrl-C to stop.
 mcucon() {
-  "$HOME/hybrid/.venv/bin/python" - <<'PY'
+  "$UNOQ_PROJECT/.venv/bin/python" - <<'PY'
 import serial, sys
 s = serial.Serial('/dev/ttyHS1', 115200, timeout=0.5)
 print("--- /dev/ttyHS1 @115200 (Ctrl-C to stop) ---", file=sys.stderr)

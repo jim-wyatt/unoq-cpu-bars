@@ -27,8 +27,35 @@ case "$(uname -m)" in
   *) fail "unsupported architecture: $(uname -m)" ;;
 esac
 
+# WHERE THE COMPILER ACTUALLY IS
+# ------------------------------
+# SDK 1.0.1 nests the toolchains one level down, in gnu/:
+#
+#   ~/zephyr-sdk-1.0.1/gnu/arm-zephyr-eabi/bin/arm-zephyr-eabi-gcc
+#
+# Earlier SDKs put them at the top level, which is the path this script used to
+# name in both places it looks. That was wrong twice over. The verify step at
+# the end failed on a perfectly good install - setup.sh had just reported
+# success - and, worse, the "already installed?" check above the download used
+# the same path, so it never matched and every re-run downloaded and extracted
+# the whole SDK again. A script whose header promises idempotence.
+#
+# So the path is resolved rather than assumed, and both layouts are accepted:
+# the version is overridable with ZEPHYR_SDK_VERSION, and which layout a given
+# version uses is not this script's business to hardcode.
+toolchain_gcc() {
+  local d
+  for d in "$SDK_DIR/gnu/$TOOLCHAIN" "$SDK_DIR/$TOOLCHAIN"; do
+    if [ -x "$d/bin/$TOOLCHAIN-gcc" ]; then
+      echo "$d/bin/$TOOLCHAIN-gcc"
+      return 0
+    fi
+  done
+  return 1
+}
+
 step "Zephyr SDK $SDK_VERSION ($SDK_ARCH)"
-if [ -x "$SDK_DIR/$TOOLCHAIN/bin/$TOOLCHAIN-gcc" ]; then
+if GCC="$(toolchain_gcc)"; then
   skip "$SDK_DIR already has $TOOLCHAIN"
 else
   BASE="https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v$SDK_VERSION"
@@ -55,11 +82,16 @@ else
 fi
 
 step "verify"
-GCC="$SDK_DIR/$TOOLCHAIN/bin/$TOOLCHAIN-gcc"
-if [ -x "$GCC" ]; then
+# Re-resolved rather than reusing the value from above, because the install
+# branch is what created it and the whole point of this step is to check that
+# what setup.sh reported actually landed on disk.
+if GCC="$(toolchain_gcc)"; then
   skip "$("$GCC" --version | head -1)"
+  skip "at $GCC"
 else
-  fail "$GCC missing after install"
+  fail "no $TOOLCHAIN-gcc under $SDK_DIR after install - looked in gnu/$TOOLCHAIN
+        and $TOOLCHAIN. If the SDK has moved things again, find it with:
+          find $SDK_DIR -name '$TOOLCHAIN-gcc'"
 fi
 
 summary

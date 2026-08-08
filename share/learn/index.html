@@ -1,0 +1,306 @@
+<!doctype html>
+<!--
+  Copyright (c) 2026 Jim Wyatt
+  SPDX-License-Identifier: MIT
+
+  The landing page on the board's USB drive and its web server.
+
+  Deliberately one self-contained file: no CDN, no fonts, no scripts fetched
+  from anywhere. This page is read on a laptop that has just plugged into a
+  board precisely because it has no internet, and a page that needs a network
+  to render is blank exactly when it is needed.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Arduino UNO Q — start here</title>
+    <style>
+      :root {
+        --bg: #fbfbfa;
+        --panel: #ffffff;
+        --ink: #1a1a18;
+        --muted: #5f5f5a;
+        --line: #e2e2dd;
+        --accent: #007a8a;
+        --accent-soft: #e6f2f4;
+        --warn-bg: #fdf6e3;
+        --warn-line: #e0c97f;
+        --code-bg: #f3f3f0;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --bg: #16171a;
+          --panel: #1e2024;
+          --ink: #e8e8e4;
+          --muted: #a0a09a;
+          --line: #313338;
+          --accent: #4dd0e1;
+          --accent-soft: #16323a;
+          --warn-bg: #2c2718;
+          --warn-line: #6b5a2a;
+          --code-bg: #262930;
+        }
+      }
+      :root[data-theme="dark"] {
+        --bg: #16171a;
+        --panel: #1e2024;
+        --ink: #e8e8e4;
+        --muted: #a0a09a;
+        --line: #313338;
+        --accent: #4dd0e1;
+        --accent-soft: #16323a;
+        --warn-bg: #2c2718;
+        --warn-line: #6b5a2a;
+        --code-bg: #262930;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+        -webkit-text-size-adjust: 100%;
+      }
+      .wrap { max-width: 60rem; margin: 0 auto; padding: 2rem 1.25rem 5rem; }
+      header { border-bottom: 2px solid var(--line); padding-bottom: 1.25rem; margin-bottom: 2rem; }
+      h1 { font-size: clamp(1.6rem, 4vw, 2.3rem); margin: 0 0 .3rem; letter-spacing: -.02em; }
+      .sub { color: var(--muted); margin: 0; font-size: 1.05rem; }
+      h2 {
+        font-size: 1.3rem; margin: 2.75rem 0 .75rem;
+        padding-bottom: .35rem; border-bottom: 1px solid var(--line);
+      }
+      h3 { font-size: 1.05rem; margin: 1.5rem 0 .4rem; }
+      p, li { color: var(--ink); }
+      a { color: var(--accent); }
+
+      code, pre {
+        font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+        font-size: .9em;
+      }
+      code { background: var(--code-bg); padding: .12em .38em; border-radius: 3px; }
+      pre {
+        background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px;
+        padding: .9rem 1rem; overflow-x: auto; line-height: 1.5;
+      }
+      pre code { background: none; padding: 0; }
+
+      .cards { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
+      .card {
+        background: var(--panel); border: 1px solid var(--line);
+        border-radius: 8px; padding: 1.1rem 1.2rem;
+      }
+      .card h3 { margin-top: 0; }
+      .card p { margin: .3rem 0 0; color: var(--muted); font-size: .93rem; }
+
+      .dl { display: block; text-decoration: none; }
+      .dl:hover { border-color: var(--accent); }
+      .dl .name { font-weight: 600; color: var(--accent); }
+      .dl .meta { color: var(--muted); font-size: .85rem; }
+
+      .note {
+        background: var(--warn-bg); border: 1px solid var(--warn-line);
+        border-left-width: 4px; border-radius: 6px; padding: .85rem 1.1rem; margin: 1.25rem 0;
+      }
+      .note strong { display: block; margin-bottom: .2rem; }
+
+      .tablewrap { overflow-x: auto; margin: 1rem 0; }
+      table { border-collapse: collapse; width: 100%; min-width: 34rem; }
+      th, td { text-align: left; padding: .55rem .7rem; border-bottom: 1px solid var(--line); }
+      th { font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+      td code { white-space: nowrap; }
+
+      .arch {
+        background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+        padding: 1rem; margin: 1rem 0; overflow-x: auto;
+      }
+      .arch pre { background: none; border: none; padding: 0; color: var(--muted); }
+
+      footer {
+        margin-top: 3.5rem; padding-top: 1.25rem; border-top: 1px solid var(--line);
+        color: var(--muted); font-size: .88rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <h1>Arduino UNO Q — start here</h1>
+        <p class="sub">
+          You are reading this off the board itself. Everything below is on it too —
+          no internet required.
+        </p>
+      </header>
+
+      <h2>1. The board is two computers</h2>
+      <p>
+        That is the single most useful thing to know. They sit on one PCB and talk over
+        a serial link, but they run different operating systems and are good at
+        different things.
+      </p>
+      <div class="cards">
+        <div class="card">
+          <h3>MPU — Qualcomm QRB2210</h3>
+          <p>
+            Four ARM cores running Debian Linux. Python, web servers, AI models,
+            networking, storage. This page is being served from it.
+          </p>
+        </div>
+        <div class="card">
+          <h3>MCU — STM32U585</h3>
+          <p>
+            One Cortex-M33 running Zephyr. Real-time GPIO, sensors, actuators and the
+            8&times;13 LED matrix. No operating system getting in the way of a
+            microsecond.
+          </p>
+        </div>
+      </div>
+      <div class="arch">
+        <pre>
+   Linux (MPU)                         Zephyr (MCU)
+   ───────────                         ────────────
+   reads /proc/stat  ──── UART ────►   rasterises bars
+   web server              lpuart1     drives 104 LEDs
+   Python                /dev/ttyHS1   timer ISR, 10µs slots
+        </pre>
+      </div>
+
+      <h2>2. Install VS Code</h2>
+      <p>
+        Pick the one for the machine you are sitting at. These are Microsoft's own
+        installers, downloaded onto the board — verify them against
+        <code>SHA256SUMS.txt</code> if you like.
+      </p>
+      <div class="cards">
+        <a class="dl card" href="vscode/VSCodeUserSetup-x64.exe">
+          <span class="name">Windows &middot; 64-bit</span>
+          <p class="meta">VSCodeUserSetup-x64.exe — per-user, no admin needed</p>
+        </a>
+        <a class="dl card" href="vscode/VSCodeUserSetup-arm64.exe">
+          <span class="name">Windows &middot; ARM</span>
+          <p class="meta">VSCodeUserSetup-arm64.exe — Surface, Snapdragon laptops</p>
+        </a>
+        <a class="dl card" href="vscode/VSCode-darwin-universal.zip">
+          <span class="name">macOS</span>
+          <p class="meta">VSCode-darwin-universal.zip — Intel and Apple Silicon</p>
+        </a>
+        <a class="dl card" href="vscode/code-amd64.deb">
+          <span class="name">Linux &middot; Debian/Ubuntu</span>
+          <p class="meta">code-amd64.deb — <code>sudo apt install ./code-amd64.deb</code></p>
+        </a>
+        <a class="dl card" href="vscode/code-arm64.deb">
+          <span class="name">Linux &middot; ARM64</span>
+          <p class="meta">code-arm64.deb — including this board</p>
+        </a>
+        <a class="dl card" href="vscode/code-x64.tar.gz">
+          <span class="name">Linux &middot; portable</span>
+          <p class="meta">code-x64.tar.gz — unpack and run, no install</p>
+        </a>
+      </div>
+      <p style="margin-top:1rem">
+        <a href="vscode/SHA256SUMS.txt">SHA256SUMS.txt</a> &middot;
+        <a href="vscode/">browse the folder</a>
+      </p>
+
+      <h2>3. The two GPIOs nobody documents</h2>
+      <p>
+        If the board ever looks dead after a reboot, it is almost always one of these.
+        Two lines on the Linux side control the MCU, and they appear in no datasheet
+        and in no Zephyr board definition.
+      </p>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr><th>gpiochip1</th><th>Function</th><th>Symptom when wrong</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>line 37</code></td>
+              <td>MCU BOOT0</td>
+              <td>Firmware flashes and <em>verifies</em> — but never runs. The STM32
+                  boots its ROM bootloader instead.</td>
+            </tr>
+            <tr>
+              <td><code>line 70</code></td>
+              <td>UART link enable</td>
+              <td>The MCU transmits happily and <code>/dev/ttyHS1</code> reads zero
+                  bytes. Looks exactly like broken firmware. It is not.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Set them by hand with:</p>
+      <pre><code>gpioset -c /dev/gpiochip1 -t0 37=0    # BOOT0 low
+gpioset -c /dev/gpiochip1 -t0 70=1    # UART link on</code></pre>
+      <div class="note">
+        <strong>BOOT0 is latched at reset.</strong>
+        Set it <em>before</em> resetting or flashing the MCU, not after — the STM32
+        only samples that pin as it comes out of reset.
+      </div>
+
+      <h2>4. Talk to the MCU</h2>
+      <p>From a shell on the board:</p>
+      <pre><code>tio /dev/ttyHS1 -b 115200     # the Zephyr shell, interactively
+unoq:~$ app status            # uptime, panel orientation, refresh sweeps
+unoq:~$ app bars 30 60 90 20  # draw four bars on the LED matrix</code></pre>
+      <p>Or from Python:</p>
+      <pre><code>from unoq import MCU, CpuSampler
+
+with MCU() as mcu:
+    print(mcu.status())
+    mcu.bars(CpuSampler().sample())   # CPU load, one bar per core</code></pre>
+      <div class="note">
+        <strong>One process at a time owns that port.</strong>
+        If you get "device busy", something else has it — usually the CPU-bars
+        service. <code>sudo systemctl stop unoq-cpu-bars</code> frees it.
+      </div>
+
+      <h2>5. The LED matrix</h2>
+      <p>
+        104 blue LEDs in an 8&times;13 grid, charlieplexed across eleven pins (PF0–PF10).
+        Only <em>one</em> LED is physically lit at any instant — the picture you see is
+        entirely persistence of vision, refreshed from a timer interrupt every 10&nbsp;µs.
+      </p>
+      <p>
+        That gives ~962 sweeps per second. Brightness is duty cycle: a level-3 pixel is
+        driven in 3 of every 7 sweeps. <code>app status</code> reports the sweep count,
+        which is the only way to tell from the far end of a serial cable that the panel
+        is really being driven.
+      </p>
+
+      <h2>6. Where to go next</h2>
+      <div class="cards">
+        <div class="card">
+          <h3>hardware.md</h3>
+          <p>Board anatomy, the two undocumented GPIOs, both UARTs, SWD, flash layout.
+             Read this one first.</p>
+        </div>
+        <div class="card">
+          <h3>mcu.md</h3>
+          <p>Build, flash, debug, firmware-update-over-serial, the Zephyr shell,
+             on-chip debugging.</p>
+        </div>
+        <div class="card">
+          <h3>mpu.md</h3>
+          <p>Linux-side hardware access, the <code>unoq</code> Python API, and the
+             CPU-bars demo end to end.</p>
+        </div>
+        <div class="card">
+          <h3>troubleshooting.md</h3>
+          <p>Symptom &rarr; cause. Start here when something that worked yesterday
+             does not today.</p>
+        </div>
+      </div>
+
+      <footer>
+        Served from the board by <code>unoq-learn</code>. The same files are on the
+        USB drive it presents when plugged into a computer.
+        <br />
+        Project documentation and source:
+        <code>https://github.com/jim-wyatt/unoq-cpu-bars</code>
+      </footer>
+    </div>
+  </body>
+</html>

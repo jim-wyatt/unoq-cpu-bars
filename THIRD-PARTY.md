@@ -35,6 +35,27 @@ completeness because the firmware links against them:
 OpenOCD is GPL. `tools/build-openocd.sh` builds it from upstream source into
 `/opt/openocd`; no OpenOCD code is vendored into this repository.
 
+## Downloaded onto your board, never redistributed
+
+`share/fetch-vscode.sh` downloads Microsoft's official Visual Studio Code
+installers onto the board so it can hand them to a laptop that has no internet
+of its own — over the USB fileshare and over `unoq-learn`.
+
+| | Owner | Terms |
+|---|---|---|
+| VS Code installers (`.exe`, `.zip`, `.deb`, `.tar.gz`) | Microsoft | [Microsoft Software Licence Terms](https://code.visualstudio.com/license) |
+
+They are **not** in this repository and are not published by this project. They
+are fetched from `update.code.visualstudio.com` at the moment you run that
+script, onto your own hardware, and land inside `unoq-share.img` which is
+likewise not tracked here. Handing them on to other people is redistribution
+and is governed by Microsoft's terms, not by this project's MIT licence.
+
+Note that the official builds are not the MIT-licensed `vscode` source — they
+add Microsoft-proprietary components. If you would rather ship something freely
+redistributable, point the script at [VSCodium](https://vscodium.com/) builds
+instead.
+
 ## Not included
 
 Earlier revisions of this project kept a `backup/` directory holding Arduino's

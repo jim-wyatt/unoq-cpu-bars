@@ -18,3 +18,8 @@ compile_commands.json
 .mypy_cache/
 .coverage
 htmlcov/
+
+# The fileshare image and its downloaded contents. Microsoft's installers are
+# not ours to redistribute (THIRD-PARTY.md), and the image is ~2 GB of build
+# artefact. Rebuild both with share/fetch-vscode.sh + share/build-image.sh.
+*.img

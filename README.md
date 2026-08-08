@@ -17,6 +17,31 @@ halves of the board for what each is actually good at.
 
 ---
 
+## From a freshly flashed board
+
+```bash
+git clone https://github.com/jim-wyatt/unoq-cpu-bars.git ~/hybrid
+cd ~/hybrid && ./bootstrap.sh
+```
+
+That is the whole bootstrap. It takes ~40–60 minutes on a cold board, almost
+all of it the Zephyr workspace (~3.3 GB) and SDK (~1 GB), and it is
+**idempotent** — re-running it is the recovery path for a run that died
+halfway, not a fresh start. Run it as yourself; it calls `sudo` where it needs
+to and keeps everything else owned by you.
+
+Optional extras are opt-in, because each one costs you something:
+
+```bash
+./bootstrap.sh --with-cpu-bars     # LED matrix at boot   (holds /dev/ttyHS1)
+./bootstrap.sh --with-usb-gadget   # IP over USB          (drops the USB host port)
+./bootstrap.sh --with-learning     # web server on :8080
+./bootstrap.sh --with-purge        # remove the Arduino debs
+./bootstrap.sh --everything
+```
+
+---
+
 ## Quickstart
 
 ```bash
@@ -57,6 +82,7 @@ FOTA tasks.
 | **[hardware.md](docs/hardware.md)** | Board anatomy, the two undocumented GPIOs, the two UARTs, SWD, flash layout. **Read this first.** |
 | **[mcu.md](docs/mcu.md)** | Build, flash, debug, FOTA, shell, firmware tests |
 | **[mpu.md](docs/mpu.md)** | Linux-side hardware access, the `unoq` API, and the CPU-bars demo end to end |
+| **[usb.md](docs/usb.md)** | IP over USB, the fileshare drive, and why the role cannot be switched from software |
 | **[troubleshooting.md](docs/troubleshooting.md)** | Symptom → cause |
 
 ---
@@ -64,6 +90,7 @@ FOTA tasks.
 ## Layout
 
 ```
+├── bootstrap.sh            stock board -> working board, one command
 ├── env.sh                  shell aliases + Zephyr env   (sourced by ~/.bashrc)
 ├── docs/                   see above
 ├── mcu/                    everything for the STM32U585
@@ -80,17 +107,29 @@ FOTA tasks.
 │   └── restore-arduino-firmware.sh
 ├── python/                 MPU-side package (editable install — do not move)
 │   ├── unoq/               link.py (GPIOs), mcu.py (shell), fota.py,
-│   │                       cpu.py (/proc/stat), cpubars.py (the daemon)
+│   │                       cpu.py (/proc/stat), cpubars.py + learn.py (daemons)
 │   └── tests/              pytest suite, all against fakes — no hardware
-├── provision/              one-time root setup, numbered in order
-│                           (50-cpu-bars.sh is optional — see mpu.md)
+├── usb/                    the composite USB gadget: network + fileshare
+│   ├── gadget-up.sh        build the configfs gadget, bind when a UDC appears
+│   ├── usb-net-up.sh       br-usb, 10.55.0.1, DHCP for the host
+│   └── *.rules, *.service  udev-driven, because there is no UDC until you
+│                           plug into a computer — see usb.md
+├── share/                  what the board hands out
+│   ├── learn/index.html    the landing page (self-contained, no CDN)
+│   ├── fetch-vscode.sh     download the installers (not redistributed)
+│   └── build-image.sh      build the FAT32 image both USB and HTTP serve
+├── provision/              root setup, numbered in order; all idempotent
+│   ├── lib.sh              the primitives that make them so
+│   └── user/               the non-root half: uv, SDK, workspace, venv, env
 └── tools/                  check.sh (all gates), install-dev-tools.sh,
                             build-openocd.sh, check-versions.sh
 ```
 
-Three paths are load-bearing and must not move: `env.sh` (sourced by
-`~/.bashrc`), `mcu/link-up.sh` (referenced by `unoq-link.service`), and
-`python/` (the editable install target).
+Two paths are load-bearing within a checkout and must not move: `python/` (the
+editable install target) and `provision/lib.sh` (every script sources it by
+relative path). `env.sh` and the scripts named by unit files may move *with*
+the checkout — `user/50-shell-env.sh` repoints `~/.bashrc`, and `install_unit`
+rewrites the unit paths — but not independently of it.
 
 ---
 
@@ -110,30 +149,49 @@ Full detail in [hardware.md](docs/hardware.md).
 
 ## Provisioning a board
 
-These have already been run on this board. They are here so the setup is
-reproducible, and so you can see exactly what was changed — every step has its
-revert command in the comment above it.
+`bootstrap.sh` runs all of these in order — you rarely need to invoke them
+individually. They are separate, numbered and individually runnable so you can
+see exactly what changes, and every step has its revert command in the comment
+above it.
 
-Run in order, as root:
+**All of them are idempotent.** That is a stronger claim than "safe to re-run":
+a second run reports `0 changed, 14 already correct` and touches nothing — it
+does not reinstall, does not rewrite files whose content already matches, and
+does not restart services that are already correct.
 
 ```bash
 sudo bash ~/hybrid/provision/10-optimize-board.sh
 sudo bash ~/hybrid/provision/20-dev-tools.sh
-sudo bash ~/hybrid/provision/30-mcu-link.sh
-sudo bash ~/hybrid/provision/40-purge-arduino.sh    # optional, last
-sudo bash ~/hybrid/provision/50-cpu-bars.sh         # optional - holds /dev/ttyHS1
+bash      ~/hybrid/provision/user/10-host-tools.sh      # NOT root
+bash      ~/hybrid/provision/user/20-zephyr-sdk.sh
+bash      ~/hybrid/provision/user/30-zephyr-workspace.sh
+bash      ~/hybrid/provision/user/40-python-venv.sh
+bash      ~/hybrid/provision/user/50-shell-env.sh
+sudo bash ~/hybrid/provision/30-mcu-link.sh             # needs the venv above
+sudo bash ~/hybrid/provision/40-purge-arduino.sh        # optional
+sudo bash ~/hybrid/provision/50-cpu-bars.sh             # optional - holds ttyHS1
+sudo bash ~/hybrid/provision/60-usb-gadget.sh           # optional - see usb.md
+sudo bash ~/hybrid/provision/70-learning-web.sh         # optional
 ```
 
 | Script | Does |
 |---|---|
-| `10-optimize-board.sh` | Drops the X11 desktop stack (~218 MB — `DP-1` is disconnected), ModemManager, fwupd, unattended apt. Adds the `i2c`/`spi` groups and a spidev udev rule. |
-| `20-dev-tools.sh` | Installs `clangd-19`, disables the Arduino services and Docker (~210 MB), releases `/dev/ttyHS1`. |
+| `10-optimize-board.sh` | Drops the X11 desktop stack (~218 MB — `DP-1` is disconnected), ModemManager, fwupd, unattended apt. Adds the `i2c`/`spi`/`gpiod` group memberships and a spidev udev rule. `UNOQ_TIER2=1` also drops Bluetooth and udisks2. |
+| `20-dev-tools.sh` | Installs `clangd` (version discovered, not pinned), disables the Arduino services and Docker (~210 MB), verifies `/dev/ttyHS1` is released. |
+| `user/10-host-tools.sh` | `uv`, then `cmake`, `ninja` and `west` as uv tools. |
+| `user/20-zephyr-sdk.sh` | Zephyr SDK, `arm-zephyr-eabi` only. ~1 GB. |
+| `user/30-zephyr-workspace.sh` | `west init` + `update` with the manifest filter. ~3.3 GB, the slow one. |
+| `user/40-python-venv.sh` | The `.venv`, the hardware libraries, `unoq` editable, and the dev tooling. |
+| `user/50-shell-env.sh` | `env.sh` into `~/.bashrc`, and the git pre-commit hook. |
 | `30-mcu-link.sh` | Installs `tio`, and `unoq-link.service` so BOOT0 + UART-enable are applied at boot. **Without this the board looks dead after a reboot.** |
-| `40-purge-arduino.sh` | Removes the remaining Arduino debs. Verifies `/opt/openocd` survives before and after. |
-| `50-cpu-bars.sh` | Installs `unoq-cpu-bars.service`. Optional, and numbered last because it claims the serial port — see [mpu.md](docs/mpu.md#at-every-boot). |
+| `40-purge-arduino.sh` | Removes the remaining Arduino debs. Backs up the stock MCU firmware first, and verifies `/opt/openocd` survives before and after. |
+| `50-cpu-bars.sh` | Installs `unoq-cpu-bars.service`. Optional, because it claims the serial port — see [mpu.md](docs/mpu.md#at-every-boot). |
+| `60-usb-gadget.sh` | IP over USB + the fileshare drive. Optional, because the USB-C port cannot be a host and a device at once — see [usb.md](docs/usb.md). |
+| `70-learning-web.sh` | Serves `share/learn` and the installers on `:8080`. |
 
-`10-optimize-board.sh` has a Tier 2 section, commented out, for things that
-depend on your usage (Bluetooth, adbd, udisks2).
+Paths and the owning user are **derived**, not hardcoded: `install_unit`
+substitutes `$PROJECT` and `$SUDO_USER` into the unit files at install time, so
+the repo works cloned anywhere and under any account.
 
 > Qualcomm platform services — `rmtfs`, `tqftpserv`, `qbootctl` — are marked
 > do-not-touch. Disabling them can leave the board unbootable. `zramswap` also

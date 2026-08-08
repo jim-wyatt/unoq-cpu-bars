@@ -1,0 +1,86 @@
+#!/bin/bash
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
+# Serve the learning content and the VS Code installers over HTTP.
+#
+#   sudo bash ~/hybrid/provision/70-learning-web.sh
+#
+# Idempotent. Safe to run at any time - it claims a TCP port and nothing else.
+# In particular it does NOT touch the USB port, so it works over the network
+# dongle, over WiFi, or over the USB gadget link once that exists.
+#
+# The content comes from the FAT32 image built by share/build-image.sh, mounted
+# read-only at /srv/unoq-share. The same image is what the USB drive exports,
+# so the web page and the drive can never disagree.
+#
+# REVERT: systemctl disable --now unoq-learn.service &&
+#         rm /etc/systemd/system/unoq-learn.service && systemctl daemon-reload
+set -uo pipefail
+# shellcheck source=provision/lib.sh
+. "$(cd "$(dirname "$0")" && pwd)/lib.sh"
+need_root
+
+MOUNT="${UNOQ_SHARE_MOUNT:-/srv/unoq-share}"
+PORT="${UNOQ_LEARN_PORT:-8080}"
+
+step "prerequisites"
+if [ -x "$PROJECT/.venv/bin/unoq-learn" ]; then
+  skip "unoq-learn entry point present"
+else
+  fail "$PROJECT/.venv/bin/unoq-learn missing.
+  Build the venv first:  bash $PROJECT/provision/user/40-python-venv.sh
+  (it is a new entry point, so an existing venv needs the editable
+   install re-run:  uv pip install --python $PROJECT/.venv/bin/python -e $PROJECT/python)"
+fi
+
+if mountpoint -q "$MOUNT"; then
+  skip "$MOUNT is mounted"
+elif [ -d "$MOUNT" ] && compgen -G "$MOUNT/*" >/dev/null; then
+  warn "$MOUNT is a plain directory, not the image mount - serving it anyway"
+else
+  fail "$MOUNT has no content.
+  Build the share first:  sudo bash $PROJECT/share/fetch-vscode.sh
+                          sudo bash $PROJECT/share/build-image.sh"
+fi
+
+step "persistent mount"
+# The unit has RequiresMountsFor=/srv/unoq-share, which only orders against a
+# mount systemd knows about - so the loop mount has to be in fstab, not just
+# mounted by hand once.
+IMG="${UNOQ_SHARE_IMG:-$TARGET_HOME/unoq-share.img}"
+FSTAB_LINE="$IMG $MOUNT vfat loop,ro,nofail,umask=0022,utf8 0 0"
+if grep -qF "$MOUNT" /etc/fstab 2>/dev/null; then
+  skip "$MOUNT already in /etc/fstab"
+else
+  # nofail: a board whose image is missing must still boot to a login prompt.
+  printf '\n# Arduino UNO Q learning content + installers (share/build-image.sh)\n%s\n' \
+    "$FSTAB_LINE" >>/etc/fstab
+  systemctl daemon-reload
+  did "added $MOUNT to /etc/fstab (ro, nofail)"
+fi
+
+step "unoq-learn.service"
+install_unit "$PROJECT/python/unoq-learn.service"
+enable_unit unoq-learn.service
+
+step "verify"
+# Retry rather than sleep-and-hope: the server binds about two seconds after
+# systemd reports the unit started, and a single immediate probe fails on a
+# service that is in fact perfectly healthy.
+code=""
+for _ in $(seq 1 10); do
+  code=$(curl -fsS -o /dev/null -w '%{http_code}' --max-time 5 "http://127.0.0.1:$PORT/" 2>/dev/null) && break
+  sleep 1
+done
+if [ -n "$code" ]; then
+  skip "HTTP $code from http://127.0.0.1:$PORT/"
+else
+  warn "no response on port $PORT - check: journalctl -u unoq-learn -n 30"
+fi
+
+summary
+echo
+echo "Reachable at:"
+ip -4 -br addr show scope global 2>/dev/null |
+  awk -v p="$PORT" '{gsub(/\/.*/, "", $3); if ($3) print "  http://" $3 ":" p "/"}'
+echo "Logs:  journalctl -u unoq-learn -f"

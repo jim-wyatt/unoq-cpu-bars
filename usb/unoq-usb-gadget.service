@@ -1,0 +1,32 @@
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
+[Unit]
+Description=Arduino UNO Q composite USB gadget (network + fileshare)
+Documentation=file:/home/arduino/hybrid/usb/gadget-up.sh
+
+# The fileshare image lives on /home/arduino, a separate partition that mounts
+# around 13s. Binding the gadget before it is there gives the host an empty
+# drive it will happily cache as empty.
+RequiresMountsFor=/home/arduino
+
+# configfs is where the gadget is defined; without it gadget-up.sh has nowhere
+# to write.
+After=sys-kernel-config.mount
+Wants=sys-kernel-config.mount
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+
+# gadget-up.sh is safe to run with no USB Device Controller present: this board
+# only has one while it is plugged into a computer, so at boot this usually
+# just builds the definition and exits. The udev rule
+# (usb/99-unoq-usb-gadget.rules) starts this unit again the moment a UDC
+# appears, which is when the bind actually happens.
+ExecStart=/home/arduino/hybrid/usb/gadget-up.sh
+ExecStart=/home/arduino/hybrid/usb/usb-net-up.sh
+
+ExecStop=/home/arduino/hybrid/usb/gadget-down.sh
+
+[Install]
+WantedBy=multi-user.target

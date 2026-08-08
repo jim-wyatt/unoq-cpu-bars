@@ -1,0 +1,42 @@
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
+[Unit]
+Description=Arduino UNO Q learning content and installers over HTTP
+Documentation=file:/home/arduino/hybrid/share/learn/index.html
+
+# The content lives inside the FAT32 image mounted at /srv/unoq-share, which is
+# a loop mount of a file on /home/arduino - itself a separate partition that
+# mounts around 13s. Without this the server starts first, finds an empty
+# directory, and serves 404s for as long as it stays up.
+RequiresMountsFor=/srv/unoq-share
+
+[Service]
+Type=simple
+User=arduino
+Group=arduino
+ExecStart=/home/arduino/hybrid/.venv/bin/unoq-learn --root /srv/unoq-share --port 8080
+
+# It serves a read-only mount and needs nothing else on the box. These cost
+# nothing and mean a bug in a stdlib HTTP handler reachable over a USB cable
+# cannot reach the rest of the board.
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+PrivateDevices=yes
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallFilter=@system-service
+MemoryMax=128M
+
+# The mount may still be coming up, and a bare port bind can lose a race with
+# another restart. Retrying is the whole recovery.
+Restart=on-failure
+RestartSec=5
+
+# SIGINT takes the same path as Ctrl-C, which main() already handles by
+# closing the socket rather than leaving it in TIME_WAIT.
+KillSignal=SIGINT
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target

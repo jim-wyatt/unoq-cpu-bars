@@ -1,0 +1,19 @@
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
+#
+# Bind the USB gadget when a USB Device Controller appears.
+#
+# This board's dwc3 is dr_mode="otg" with no writable role switch: the Type-C
+# controller decides host vs device from the CC lines when a cable is plugged
+# in. So there is no UDC at all until the board is connected to a computer,
+# and no fixed point in boot at which the gadget could be bound.
+#
+# udev is the only thing that knows when that changes. The unit is started
+# rather than the script run directly so that systemd owns the process, keeps
+# RemainAfterExit state, and runs ExecStop on the way back down.
+ACTION=="add", SUBSYSTEM=="udc", TAG+="systemd", ENV{SYSTEMD_WANTS}+="unoq-usb-gadget.service"
+
+# The gadget netdevs must stay out of NetworkManager's hands: they are bridge
+# ports, and NM would otherwise try to DHCP on them, hand them addresses of
+# its own, and fight usb-net-up.sh for the interface.
+SUBSYSTEM=="net", ACTION=="add", KERNEL=="usb[0-9]*", ENV{NM_UNMANAGED}="1"

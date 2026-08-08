@@ -116,6 +116,18 @@ curl -fsS --max-time 20 -o /dev/null https://github.com 2>/dev/null ||
   fail "no network access - the SDK, Zephyr and PyPI all need to be reachable"
 skip "network reachable"
 
+# Take the stock MCU image now, while it is certainly still there.
+#
+# It ships in the arduino-* debs, so a factory-fresh board has one and a board
+# that has been purged or reflashed does not. 40-purge-arduino.sh also saves it,
+# but that step is optional and most people never run it - so on most boards the
+# only copy sits in ~/.arduino15 until the day it is wanted, which is usually
+# the day after something removed it. It is 634 KB and it is not redistributable,
+# so a lost copy means a factory restore to get it back.
+backup_stock_firmware ||
+  warn "no stock MCU firmware found to back up - fine on a board that has already
+        been purged, but restore-arduino-firmware.sh will have nothing to flash"
+
 # --- run the steps ---------------------------------------------------------
 
 # run_step <label> <sudo|user> <script> [args...]

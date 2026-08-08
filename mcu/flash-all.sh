@@ -26,10 +26,24 @@ APP_HEX="${1:-$WS/build/zephyr/zephyr.signed.hex}"
 
 if [ ! -f "$MCUBOOT_BUILD/zephyr/zephyr.hex" ]; then
   echo "MCUboot not built. Building it now..."
-  ZEPHYR_TOOLCHAIN_VARIANT=zephyr \
-    ZEPHYR_SDK_INSTALL_DIR="${ZEPHYR_SDK:-$HOME/zephyr-sdk-1.0.1}" \
-    "$WS/.venv/bin/west" build -b "${BOARD:-arduino_uno_q}" \
-    "$WS/bootloader/mcuboot/boot/zephyr" -p always -d "$MCUBOOT_BUILD"
+  # The cd is load-bearing, and naming the workspace's own west is not enough
+  # on its own. `build` is an extension command: west discovers it by walking
+  # UP FROM THE CURRENT DIRECTORY looking for a workspace, so run from anywhere
+  # outside ~/zephyrproject the same binary reports
+  #
+  #   west: unknown command "build"; do you need to run this inside a workspace?
+  #
+  # This script used to inherit whatever directory the caller happened to be in,
+  # which works perfectly by hand - you are usually sitting in the workspace -
+  # and fails from bootstrap.sh, from a systemd unit, or from the repo checkout.
+  # A subshell, so the flash steps below keep the caller's directory.
+  (
+    cd "$WS" || exit 1
+    ZEPHYR_TOOLCHAIN_VARIANT=zephyr \
+      ZEPHYR_SDK_INSTALL_DIR="${ZEPHYR_SDK:-$HOME/zephyr-sdk-1.0.1}" \
+      "$WS/.venv/bin/west" build -b "${BOARD:-arduino_uno_q}" \
+      "$WS/bootloader/mcuboot/boot/zephyr" -p always -d "$MCUBOOT_BUILD"
+  )
 fi
 
 [ -f "$APP_HEX" ] || {

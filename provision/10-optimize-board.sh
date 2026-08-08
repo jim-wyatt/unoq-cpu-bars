@@ -1,7 +1,9 @@
 #!/bin/bash
 # Copyright (c) 2026 Jim Wyatt
 # SPDX-License-Identifier: MIT
-# Memory optimization for a headless Arduino UNO Q used as a Linux+MCU dev board.
+# Memory and disk reclaim for a headless Arduino UNO Q used as a Linux+MCU dev
+# board. Both matter: 3.6 GB of RAM, and a 9.8 GB / with ~3 GB free on a stock
+# board, which is the first thing to run out.
 #
 #   sudo bash ~/hybrid/provision/10-optimize-board.sh
 #
@@ -18,6 +20,7 @@ need_root
 
 echo "== Before =="
 free -h | sed -n 2p
+df -h / | sed -n 2p
 
 # ===================== TIER 1 - safe when headless ==========================
 
@@ -85,6 +88,57 @@ step "python headers"
 PYVER="$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
 apt_install "python${PYVER}-dev"
 
+# --- Docker images: the Arduino App framework's container runtime. ~2 GB. ---
+# These are pulled by the stock image and nothing here uses them: the Arduino
+# app stack is what runs containers, and 20-dev-tools.sh disables it. On a
+# stock board they are three images totalling ~2 GB with no containers, so all
+# of it is reclaimable - and it comes off /, which starts with about 3 GB free
+# and is the partition that runs out first.
+#
+# THIS HAS TO HAPPEN HERE, not in 40-purge-arduino.sh where it would sit more
+# naturally next to the rest of the Arduino teardown. `docker image rm` needs
+# the daemon, and the very next script - 20-dev-tools.sh - does
+# `systemctl disable --now docker.service`. By the time 40 runs there is no
+# daemon to talk to and the images would be stranded on disk, still costing
+# 2 GB, with no obvious sign of why.
+#
+# The list is written out before anything is removed, because the revert needs
+# the internet and you will not remember the tags.
+# REVERT: docker pull <each line of $BACKUP_DIR/docker-images.txt>
+step "docker images"
+DOCKER_LIST="${UNOQ_BACKUP:-$TARGET_HOME/uno-q-backup}/docker-images.txt"
+if [ "${UNOQ_KEEP_DOCKER_IMAGES:-0}" = "1" ]; then
+  skip "kept (UNOQ_KEEP_DOCKER_IMAGES=1)"
+elif ! command -v docker >/dev/null 2>&1; then
+  skip "docker not installed"
+elif ! docker info >/dev/null 2>&1; then
+  # Already disabled by a previous run of 20-dev-tools.sh. Say so rather than
+  # printing docker's connection error, which reads like a fault.
+  skip "docker daemon not running - nothing to reclaim from here"
+elif [ -z "$(docker images -q 2>/dev/null)" ]; then
+  skip "no images"
+else
+  before="$(docker system df --format '{{.Size}}' 2>/dev/null | head -1)"
+  as_user mkdir -p "$(dirname "$DOCKER_LIST")"
+  docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null |
+    grep -v '^<none>' >"$DOCKER_LIST.tmp" 2>/dev/null
+  if [ -s "$DOCKER_LIST.tmp" ]; then
+    mv "$DOCKER_LIST.tmp" "$DOCKER_LIST"
+    chown "$TARGET_USER:$TARGET_USER" "$DOCKER_LIST" 2>/dev/null
+    did "recorded $(wc -l <"$DOCKER_LIST") image(s) -> $DOCKER_LIST"
+  else
+    rm -f "$DOCKER_LIST.tmp"
+  fi
+  # -a: every image not used by a container, which on this board is all of
+  # them. Running containers are never touched, so this stays safe if you have
+  # started using docker for something of your own.
+  if docker image prune -af >/dev/null 2>&1; then
+    did "images pruned (was ${before:-~2 GB})"
+  else
+    warn "docker image prune failed - check: docker system df"
+  fi
+fi
+
 # ===================== TIER 2 - opt in with UNOQ_TIER2=1 ====================
 
 if [ "${UNOQ_TIER2:-0}" = "1" ]; then
@@ -110,5 +164,6 @@ fi
 echo
 echo "== After =="
 free -h | sed -n 2p
+df -h / | sed -n 2p
 summary
 echo "Group changes need a re-login (or 'newgrp') to take effect."

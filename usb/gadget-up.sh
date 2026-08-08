@@ -193,7 +193,7 @@ if [ -z "$UDC_NAME" ]; then
   exit 0
 fi
 
-CURRENT="$(cat "$G/UDC" 2>/dev/null | tr -d ' \n')"
+CURRENT="$(tr -d ' \n' <"$G/UDC" 2>/dev/null)"
 if [ "$CURRENT" = "$UDC_NAME" ]; then
   log "already bound to $UDC_NAME"
 else

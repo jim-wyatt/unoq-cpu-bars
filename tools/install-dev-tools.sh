@@ -21,9 +21,26 @@ PROJECT="$(cd "$(dirname "$0")/.." && pwd)"
 VENV="${UNOQ_VENV:-$PROJECT/.venv}"
 BIN="${UNOQ_BIN:-$HOME/.local/bin}"
 
-# Used only when the release lookup below cannot reach the GitHub API. Bump it
-# when you bump the toolchain; it is a floor, not a pin.
-SHFMT_FALLBACK=v3.13.1
+# Ahead of the system paths, and for the same reason check.sh does it: the
+# copies we pin here must be the ones the version checks below see, and the
+# ones the gates actually run, rather than a distro or runner-image build that
+# happens to be earlier on PATH.
+export PATH="$BIN:$PATH"
+
+# PINNED, not "whatever happens to be on PATH", and not "latest".
+#
+# Both of those were wrong, and the way they were wrong was invisible. A GitHub
+# Actions runner ships shellcheck preinstalled, so `command -v shellcheck &&
+# skip` meant CI silently linted with the runner's 0.9.0 while the board used
+# 0.11.0 - and 0.9.0 enables SC2002 by default where 0.11.0 makes it optional.
+# The result was a gate that passed locally and failed in CI with nothing to
+# point at, which is exactly the thing check.sh's header promises does not
+# happen. Chasing `latest` has the same problem in slow motion: the board
+# installs once and CI re-resolves every run, so they drift apart on their own.
+#
+# Bump these deliberately, and both ends move together.
+SHELLCHECK_VERSION="${SHELLCHECK_VERSION:-0.11.0}"
+SHFMT_VERSION="${SHFMT_VERSION:-3.13.1}"
 
 case "$(uname -m)" in
   aarch64 | arm64)
@@ -48,39 +65,41 @@ echo "=== Python tooling -> $VENV ==="
 uv pip install --python "$VENV/bin/python" -q -e "$PROJECT/python[dev]"
 echo "  ruff $("$VENV"/bin/ruff --version | awk '{print $2}'), mypy $("$VENV"/bin/mypy --version | awk '{print $2}')"
 
-echo "=== shellcheck -> $BIN ==="
-if command -v shellcheck >/dev/null 2>&1; then
-  echo "  already present: $(shellcheck --version | awk '/version:/ {print $2}')"
+echo "=== shellcheck $SHELLCHECK_VERSION -> $BIN ==="
+have=""
+command -v shellcheck >/dev/null 2>&1 &&
+  have="$(shellcheck --version | awk '/^version:/ {print $2}')"
+if [ "$have" = "$SHELLCHECK_VERSION" ]; then
+  echo "  already $SHELLCHECK_VERSION"
 else
+  [ -n "$have" ] &&
+    echo "  found $have on PATH, installing $SHELLCHECK_VERSION over it (CI and local must match)"
   tmp=$(mktemp -d)
   # -f so an HTTP error is an error, rather than an HTML page piped into tar.
-  curl -fsSL "https://github.com/koalaman/shellcheck/releases/download/stable/shellcheck-stable.linux.${SC_ARCH}.tar.xz" |
-    tar -xJ -C "$tmp"
-  install -m 0755 "$tmp"/shellcheck-stable/shellcheck "$BIN/shellcheck"
+  curl -fsSL "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.${SC_ARCH}.tar.xz" |
+    tar -xJ -C "$tmp" || {
+    rm -rf "$tmp"
+    echo "  could not download shellcheck v$SHELLCHECK_VERSION" >&2
+    exit 1
+  }
+  install -m 0755 "$tmp/shellcheck-v${SHELLCHECK_VERSION}/shellcheck" "$BIN/shellcheck"
   rm -rf "$tmp"
-  echo "  installed $("$BIN/shellcheck" --version | awk '/version:/ {print $2}')"
+  echo "  installed $("$BIN/shellcheck" --version | awk '/^version:/ {print $2}')"
 fi
 
-echo "=== shfmt -> $BIN ==="
-if command -v shfmt >/dev/null 2>&1; then
-  echo "  already present: $(shfmt --version)"
+echo "=== shfmt $SHFMT_VERSION -> $BIN ==="
+have=""
+command -v shfmt >/dev/null 2>&1 && have="$(shfmt --version | tr -d v)"
+if [ "$have" = "$SHFMT_VERSION" ]; then
+  echo "  already $SHFMT_VERSION"
 else
-  # `\s*` rather than a literal space: the API returns compact JSON
-  # ("tag_name":"v3.13.1"), and a pattern that insisted on the space matched
-  # nothing, which under `pipefail` killed the whole install with no message.
-  #
-  # `|| true` then a pinned fallback, because this is an unauthenticated API
-  # call: CI runners share IPs and get rate-limited, and losing the lookup
-  # should cost you the newest release, not the toolchain. SHFMT_VERSION
-  # overrides both.
-  ver="${SHFMT_VERSION:-$(curl -sSL https://api.github.com/repos/mvdan/sh/releases/latest |
-    grep -oP '"tag_name":\s*"\K[^"]+' || true)}"
-  if [ -z "$ver" ]; then
-    ver="$SHFMT_FALLBACK"
-    echo "  release lookup failed - falling back to $ver"
-  fi
-  curl -fsSL "https://github.com/mvdan/sh/releases/download/${ver}/shfmt_${ver}_linux_${SHFMT_ARCH}" \
-    -o "$BIN/shfmt"
+  [ -n "$have" ] &&
+    echo "  found $have on PATH, installing $SHFMT_VERSION over it (CI and local must match)"
+  curl -fsSL "https://github.com/mvdan/sh/releases/download/v${SHFMT_VERSION}/shfmt_v${SHFMT_VERSION}_linux_${SHFMT_ARCH}" \
+    -o "$BIN/shfmt" || {
+    echo "  could not download shfmt v$SHFMT_VERSION" >&2
+    exit 1
+  }
   chmod +x "$BIN/shfmt"
   echo "  installed $("$BIN/shfmt" --version)"
 fi

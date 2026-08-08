@@ -1,0 +1,29 @@
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
+[Unit]
+Description=Fall back to wifi if the USB link gives this board no internet
+Documentation=file:/home/arduino/hybrid/usb/uplink-fallback.sh
+
+# Nothing to test until the gadget has had its chance. This is ordering only,
+# not a dependency: the bind unit is started by udev when a controller appears,
+# so requiring it would mean waiting forever on a board with no cable in it -
+# which is exactly a board that needs its wifi left alone.
+After=unoq-usb-bind.service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+
+# UNOQ_UPLINK_FALLBACK=0 disables it, UNOQ_UPLINK_DEADLINE changes the wait.
+EnvironmentFile=-/etc/default/unoq-usb
+
+# The script does its own waiting - it polls until it succeeds or the deadline
+# passes - so the unit needs a timeout comfortably beyond the default deadline
+# rather than systemd's 90s, which would kill it mid-wait and leave the radio
+# off with nobody left to turn it on.
+TimeoutStartSec=600
+ExecStart=/home/arduino/hybrid/usb/uplink-fallback.sh
+
+[Install]
+WantedBy=multi-user.target

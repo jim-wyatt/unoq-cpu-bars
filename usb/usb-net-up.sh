@@ -17,6 +17,31 @@
 # handing out 192.168.0.x or 10.0.0.x on a cable would collide with the
 # network the laptop is already on and break its real connection.
 #
+# WHICH END RUNS DHCP
+# -------------------
+# The above is UNOQ_USB_MODE=server, the default, and it is right whenever the
+# computer is simply something you want to reach the board from.
+#
+# UNOQ_USB_MODE=client turns it around: no dnsmasq, and the board asks the
+# computer for an address instead. That is the mode for a host that is sharing
+# its internet, which is what you want once the board's wifi is off to save the
+# power budget. Windows ICS and macOS Internet Sharing both pin their shared
+# adapter to a fixed address and run their own DHCP server on it; they will
+# never take a lease from us, so a board sitting at 10.55.0.1 in front of a host
+# at 192.168.137.1 is two addresses on one wire with no route between them.
+#
+#   UNOQ_USB_MODE=server   board 10.55.0.1 -> leases the host an address
+#   UNOQ_USB_MODE=client   board asks the host -> takes address, gateway, DNS
+#
+# 10.55.0.1 stays on the bridge in BOTH modes. In client mode it is the address
+# the board still answers on when the host's DHCP server is not running, which
+# with wifi off is the difference between a fixable board and a serial console.
+# See usb-dhcp.sh.
+#
+# Set it in the unit's environment (see 60-usb-gadget.sh) or for one run:
+#
+#   sudo UNOQ_USB_MODE=client ~/hybrid/usb/usb-net-up.sh
+#
 # WHY A BRIDGE
 # ------------
 # The gadget offers two configurations, RNDIS and NCM, and the host picks one.
@@ -36,8 +61,10 @@ PREFIX="${UNOQ_USB_PREFIX:-24}"
 RANGE_LO="${UNOQ_USB_RANGE_LO:-10.55.0.10}"
 RANGE_HI="${UNOQ_USB_RANGE_HI:-10.55.0.100}"
 LEASE="${UNOQ_USB_LEASE:-12h}"
+MODE="${UNOQ_USB_MODE:-server}"
 PIDFILE=/run/unoq-usb-dnsmasq.pid
 LEASEFILE=/run/unoq-usb-dnsmasq.leases
+UDHCPC_PID=/run/unoq-usb-udhcpc.pid
 
 log() { echo "unoq-usb-net: $*"; }
 die() {
@@ -46,6 +73,44 @@ die() {
 }
 
 [ "$(id -u)" = 0 ] || die "must run as root"
+
+case "$MODE" in
+  server | client) ;;
+  *) die "UNOQ_USB_MODE must be 'server' or 'client', not '$MODE'" ;;
+esac
+
+# --- one DHCP daemon at a time ---------------------------------------------
+#
+# Switching modes has to stop the other one, and not merely decline to start
+# it. Both would otherwise sit on the same bridge: our dnsmasq answering the
+# board's own udhcpc with a 10.55.0.x lease while the host's server offers a
+# real one, and the board taking whichever reply arrives first. That failure
+# comes and goes with timing, which is the worst kind to be left with.
+pid_alive() { [ -f "$1" ] && kill -0 "$(cat "$1")" 2>/dev/null; }
+
+stop_dnsmasq() {
+  pid_alive "$PIDFILE" || {
+    rm -f "$PIDFILE"
+    return 0
+  }
+  kill "$(cat "$PIDFILE")" 2>/dev/null
+  rm -f "$PIDFILE"
+  log "stopped dnsmasq (mode is $MODE)"
+}
+
+stop_udhcpc() {
+  pid_alive "$UDHCPC_PID" || {
+    rm -f "$UDHCPC_PID"
+    return 0
+  }
+  kill "$(cat "$UDHCPC_PID")" 2>/dev/null
+  rm -f "$UDHCPC_PID"
+  # udhcpc does not run its script on SIGTERM, so the leased address and the
+  # route it installed would outlive it. Run the teardown by hand, which also
+  # hands /etc/resolv.conf back to NetworkManager.
+  interface="$BRIDGE" "$HERE/usb-dhcp.sh" deconfig >/dev/null 2>&1
+  log "stopped udhcpc (mode is $MODE)"
+}
 
 # --- bridge ----------------------------------------------------------------
 
@@ -93,7 +158,65 @@ if [ "$enslaved" = 0 ]; then
   log "no gadget interfaces yet - the bridge is up and waiting"
 fi
 
-# --- DHCP for the host -----------------------------------------------------
+# --- DHCP, in whichever direction this board is configured for -------------
+
+if [ "$MODE" = client ]; then
+  stop_dnsmasq
+
+  # busybox rather than a package: this image ships no dhclient, dhcpcd or
+  # standalone udhcpc, and busybox is already here. It is also about the right
+  # size of tool for the job - one interface, one lease, a handler script.
+  command -v busybox >/dev/null 2>&1 || die "busybox not installed (needed for udhcpc)"
+
+  if pid_alive "$UDHCPC_PID"; then
+    log "udhcpc already running (pid $(cat "$UDHCPC_PID"))"
+  else
+    rm -f "$UDHCPC_PID"
+    # Ask for the address we had last time. A DHCP server is free to refuse,
+    # and this changes nothing if it does - but Windows ICS and macOS both
+    # honour it in practice, which turns "ssh to whatever it got this time"
+    # into an address you can write down. It matters more here than it would
+    # elsewhere: with wifi off there is no second way in to go and look.
+    REQUEST=()
+    LAST="${UNOQ_STATE_DIR:-/var/lib/unoq}/usb-dhcp-last"
+    if [ -r "$LAST" ]; then
+      read -r last_ip <"$LAST"
+      case "$last_ip" in
+        '' | *[!0-9.]*) ;;
+        *.*.*.*)
+          REQUEST=(--request="$last_ip")
+          log "asking for $last_ip again (last address on this link)"
+          ;;
+      esac
+    fi
+    # -b: go to the background and keep trying rather than exiting, because at
+    #     boot the host's shared adapter is usually not up yet. There is no
+    #     failure here worth giving up on - the cable is either plugged in now
+    #     or it will be.
+    # -R: release the lease on a clean exit, so the host does not hold an
+    #     address for a board that has gone away.
+    # -t/-T: five tries three seconds apart before backing off, which keeps a
+    #     normal plug-in feeling immediate without hammering a host that is
+    #     not sharing anything.
+    if busybox udhcpc \
+      --interface="$BRIDGE" \
+      --script="$HERE/usb-dhcp.sh" \
+      --pidfile="$UDHCPC_PID" \
+      -x "hostname:$(hostname)" \
+      "${REQUEST[@]+"${REQUEST[@]}"}" \
+      --background --release \
+      --retries=5 --timeout=3 >/dev/null 2>&1; then
+      log "udhcpc asking for an address on $BRIDGE (host is the DHCP server)"
+    else
+      die "udhcpc failed to start on $BRIDGE"
+    fi
+  fi
+
+  log "board reachable at $ADDR, and at whatever the host leases it"
+  exit 0
+fi
+
+stop_udhcpc
 
 command -v dnsmasq >/dev/null 2>&1 || die "dnsmasq not installed"
 

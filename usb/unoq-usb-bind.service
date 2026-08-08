@@ -27,6 +27,10 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 
+# Same file the prepare unit reads - both run usb-net-up.sh, so both have to
+# agree about which end runs DHCP.
+EnvironmentFile=-/etc/default/unoq-usb
+
 # Deliberately NOT RemainAfterExit. This unit has to be able to run again on
 # every plug-in, and systemd will not re-run ExecStart for a oneshot it still
 # considers active - which is exactly the trap unoq-usb-gadget.service falls

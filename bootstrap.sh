@@ -84,7 +84,13 @@ done
 
 step "preflight"
 
-BOARD="$(tr -d '\0' </sys/firmware/devicetree/base/compatible 2>/dev/null | head -1)"
+# `compatible` is a list of NUL-separated strings, most-specific first. It has
+# to be split ON the NULs, not stripped OF them: `tr -d` concatenated the three
+# tokens into "arduino,imolaqcom,qrb2210qcom,qcm2290", which matches neither
+# board, so this check warned "unrecognised board" on every UNO Q and every
+# VENTUNO Q it ever ran on - an identity check that had never once identified
+# anything.
+BOARD="$(tr '\0' '\n' </sys/firmware/devicetree/base/compatible 2>/dev/null | head -1)"
 case "$BOARD" in
   arduino,imola) skip "board: Arduino UNO Q ($BOARD)" ;;
   arduino,monza) skip "board: Arduino VENTUNO Q ($BOARD)" ;;

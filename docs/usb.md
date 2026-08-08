@@ -83,12 +83,28 @@ exits. That is not a failure — there is simply nothing to bind to yet.
 
 ## What the computer sees
 
-The gadget offers two configurations, and the host picks the one it supports:
+The gadget offers two configurations. A host enumerates configuration 1 and
+stops, so `c.1` is what almost every computer actually uses:
 
-| Config | Functions | Chosen by |
+| Config | Functions | Used by |
 |---|---|---|
-| `c.1` | RNDIS + mass storage | Windows (via the MS OS descriptors) |
-| `c.2` | NCM + mass storage | Linux, macOS |
+| `c.1` | **NCM** + mass storage | Windows 10 ≥1903, Windows 11, macOS ≥Catalina, Linux |
+| `c.2` | RNDIS + mass storage | fallback, selected by hand, for genuinely old Windows |
+
+**NCM first, not RNDIS** — the opposite of most USB-gadget recipes, which
+predate two changes at Microsoft's end:
+
+- Windows has shipped a native NCM class driver (`UsbNcm.sys`) since Windows 10
+  version 1903, so NCM needs no driver and no INF.
+- RNDIS is deprecated and its driver has been **removed from recent Windows 11
+  builds**. A Windows 11 host offered RNDIS in `c.1` binds nothing for
+  networking: you get the drive, no IP, and no obvious error anywhere.
+
+Override for a pre-1903 Windows host:
+
+```bash
+sudo UNOQ_GADGET_PRIMARY=rndis ~/hybrid/usb/gadget-up.sh
+```
 
 Two configurations rather than two network functions in one: a host must not
 bind two network interfaces to the same device. The drive is in both, so it is

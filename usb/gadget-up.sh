@@ -18,8 +18,8 @@
 #
 # WHAT THE HOST SEES
 # ------------------
-#   config 1  RNDIS  + UNO-Q drive   <- Windows picks this (MS OS descriptors)
-#   config 2  NCM    + UNO-Q drive   <- Linux and macOS pick this
+#   config 1  NCM    + UNO-Q drive   <- Windows 11, macOS, Linux all bind this
+#   config 2  RNDIS  + UNO-Q drive   <- fallback for pre-1903 Windows
 #
 # Two configurations rather than two functions in one: a host must not bind two
 # network interfaces to the same device, and each OS picks the config whose
@@ -113,26 +113,62 @@ else
   fi
 
   # --- configurations ---
-  # c.1 first, because Windows enumerates configuration 1 and stops.
+  #
+  # A host enumerates configuration 1 and stops, so whatever goes in c.1 is
+  # what almost every computer will actually use. c.2 exists as a fallback you
+  # can select by hand.
+  #
+  # NCM is the default primary, and RNDIS is NOT, which is the opposite of most
+  # gadget recipes. Those recipes predate two changes at Microsoft's end:
+  #
+  #   - Windows ships a native NCM class driver (UsbNcm.sys) from Windows 10
+  #     version 1903 onwards, so NCM needs no driver and no INF.
+  #   - RNDIS is deprecated, and the driver has been removed from recent
+  #     Windows 11 builds. A Windows 11 host offered RNDIS in c.1 binds nothing
+  #     for networking - you get the drive and no IP, with no obvious error.
+  #
+  # macOS (NCM since Catalina) and Linux both prefer NCM too, so NCM-first is
+  # the right default for every host that is not genuinely old.
+  #
+  # Set UNOQ_GADGET_PRIMARY=rndis for a pre-1903 Windows host.
+  PRIMARY="${UNOQ_GADGET_PRIMARY:-ncm}"
+  case "$PRIMARY" in
+    ncm)
+      C1_FN=ncm.usb0 C1_NAME="NCM + fileshare"
+      C2_FN=rndis.usb0 C2_NAME="RNDIS + fileshare"
+      ;;
+    rndis)
+      C1_FN=rndis.usb0 C1_NAME="RNDIS + fileshare"
+      C2_FN=ncm.usb0 C2_NAME="NCM + fileshare"
+      ;;
+    *) die "UNOQ_GADGET_PRIMARY must be ncm or rndis, not '$PRIMARY'" ;;
+  esac
+
   mkdir -p "$G/configs/c.1/strings/0x409"
-  echo "RNDIS + fileshare" >"$G/configs/c.1/strings/0x409/configuration"
+  echo "$C1_NAME" >"$G/configs/c.1/strings/0x409/configuration"
   echo 250 >"$G/configs/c.1/MaxPower" # mA, i.e. 500mA
-  ln -sf "$G/functions/rndis.usb0" "$G/configs/c.1/"
+  ln -sf "$G/functions/$C1_FN" "$G/configs/c.1/"
   ln -sf "$G/functions/mass_storage.0" "$G/configs/c.1/"
 
   mkdir -p "$G/configs/c.2/strings/0x409"
-  echo "NCM + fileshare" >"$G/configs/c.2/strings/0x409/configuration"
+  echo "$C2_NAME" >"$G/configs/c.2/strings/0x409/configuration"
   echo 250 >"$G/configs/c.2/MaxPower"
-  ln -sf "$G/functions/ncm.usb0" "$G/configs/c.2/"
+  ln -sf "$G/functions/$C2_FN" "$G/configs/c.2/"
   ln -sf "$G/functions/mass_storage.0" "$G/configs/c.2/"
 
-  # Point the Microsoft OS descriptors at the RNDIS config.
+  # The Microsoft OS descriptors carry the RNDIS compatible ID, so they belong
+  # on whichever configuration actually holds rndis. They are harmless when
+  # that is the fallback config - Windows simply never asks.
   echo 1 >"$G/os_desc/use"
   echo 0xcd >"$G/os_desc/b_vendor_code"
   echo MSFT100 >"$G/os_desc/qw_sign"
-  ln -sf "$G/configs/c.1" "$G/os_desc/" 2>/dev/null
+  if [ "$PRIMARY" = rndis ]; then
+    ln -sf "$G/configs/c.1" "$G/os_desc/" 2>/dev/null
+  else
+    ln -sf "$G/configs/c.2" "$G/os_desc/" 2>/dev/null
+  fi
 
-  log "gadget built (rndis+ms in c.1, ncm+ms in c.2)"
+  log "gadget built (c.1=$C1_FN, c.2=$C2_FN, both + mass_storage)"
 fi
 
 [ "$BUILD_ONLY" = 1 ] && {

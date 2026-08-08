@@ -59,47 +59,79 @@ log() {
   echo "unoq-bind-guard: $*"
 }
 
-read_count() {
-  local n
-  n="$(cat "$COUNTER" 2>/dev/null)"
-  # Anything that is not a plain number is treated as zero rather than as an
-  # error: a truncated file from a reset mid-write must not be able to wedge
-  # the guard permanently in either direction.
-  case "$n" in
-    '' | *[!0-9]*) echo 0 ;;
-    *) echo "$n" ;;
+# State is "<boot_id> <count>", not a bare number, and the boot id is the part
+# that makes the count mean BOOTS rather than invocations.
+#
+# The bind unit deliberately runs more than once per plug-in. udev triggers it
+# when the UDC appears, and again for each gadget netdev - usb0 for ncm, usb1
+# for rndis - because those only exist a moment after the bind. That is three
+# runs on a perfectly healthy plug-in. Counting invocations would therefore
+# have reached a limit of 3 during the first SUCCESSFUL plug-in and refused to
+# bind ever again: a guard that causes exactly the outage it exists to prevent,
+# and one that would have looked like the gadget being broken rather than the
+# guard being wrong.
+#
+# So only the first check of any given boot counts. Later ones in the same boot
+# are waved through, and the counter only advances when the board has come up
+# again without ever having confirmed.
+CURRENT_BOOT="$(cat /proc/sys/kernel/random/boot_id 2>/dev/null)"
+
+read_state() {
+  local raw
+  raw="$(cat "$COUNTER" 2>/dev/null)"
+  STATE_BOOT="${raw%% *}"
+  STATE_COUNT="${raw##* }"
+  # Anything unparseable is a clean slate rather than an error: a file
+  # truncated by a reset mid-write must not be able to wedge the guard
+  # permanently in either direction. This also migrates the older bare-number
+  # format, which carries no boot id, by treating it as some previous boot.
+  case "$STATE_COUNT" in
+    '' | *[!0-9]*) STATE_COUNT=0 ;;
+  esac
+  case "$raw" in
+    *' '*) ;;
+    *) STATE_BOOT="" ;;
   esac
 }
 
 case "${1:-}" in
   check)
     mkdir -p "$STATE_DIR" 2>/dev/null
-    count="$(read_count)"
-    if [ "$count" -ge "$MAX" ]; then
-      log "REFUSING to bind: $count consecutive unconfirmed attempts (max $MAX)."
+    read_state
+    if [ "$STATE_COUNT" -ge "$MAX" ]; then
+      log "REFUSING to bind: $STATE_COUNT consecutive boots never confirmed (max $MAX)."
       log "  The board has been rebooting without ever staying up long enough"
       log "  to confirm a bind. Suspect USB power - check the cable is on a"
       log "  powered hub or PD supply, not a 0.5 A port."
       log "  Clear with: sudo rm -f $COUNTER"
       exit 1
     fi
+    if [ "$STATE_BOOT" = "$CURRENT_BOOT" ]; then
+      # Same boot, so this is udev's second or third trigger for one plug-in.
+      log "bind attempt $STATE_COUNT/$MAX (already counted this boot)"
+      exit 0
+    fi
     # Written BEFORE the bind, not after. If the bind is what kills the board
     # there is no "after" in which to record that it was tried.
-    echo "$((count + 1))" >"$COUNTER" 2>/dev/null
+    echo "$CURRENT_BOOT $((STATE_COUNT + 1))" >"$COUNTER" 2>/dev/null
     sync -f "$COUNTER" 2>/dev/null || sync
-    log "bind attempt $((count + 1))/$MAX"
+    log "bind attempt $((STATE_COUNT + 1))/$MAX"
     ;;
   confirm)
-    count="$(read_count)"
-    if [ "$count" = "0" ]; then
+    read_state
+    if [ "$STATE_COUNT" = "0" ]; then
       log "already confirmed"
     else
       rm -f "$COUNTER" 2>/dev/null
-      log "boot confirmed healthy - bind attempt counter cleared (was $count)"
+      log "boot confirmed healthy - bind attempt counter cleared (was $STATE_COUNT)"
     fi
     ;;
   status)
-    echo "attempts: $(read_count)/$MAX  ($COUNTER)"
+    read_state
+    echo "attempts: $STATE_COUNT/$MAX  ($COUNTER)"
+    if [ -n "$STATE_BOOT" ] && [ "$STATE_BOOT" = "$CURRENT_BOOT" ]; then
+      echo "  (already counted in the current boot)"
+    fi
     ;;
   *)
     echo "usage: $(basename "$0") {check|confirm|status}" >&2

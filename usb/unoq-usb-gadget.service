@@ -18,12 +18,15 @@ Wants=sys-kernel-config.mount
 Type=oneshot
 RemainAfterExit=yes
 
-# gadget-up.sh is safe to run with no USB Device Controller present: this board
-# only has one while it is plugged into a computer, so at boot this usually
-# just builds the definition and exits. The udev rule
-# (usb/99-unoq-usb-gadget.rules) starts this unit again the moment a UDC
-# appears, which is when the bind actually happens.
-ExecStart=/home/arduino/hybrid/usb/gadget-up.sh
+# This unit only ever PREPARES: it builds the gadget definition in configfs and
+# brings up br-usb + DHCP. It deliberately does not bind, and --build makes
+# that explicit rather than incidental.
+#
+# Binding lives in unoq-usb-bind.service, which udev starts when a controller
+# actually appears. It has to be a separate unit because this one is
+# RemainAfterExit=yes: systemd will not re-run a oneshot it still considers
+# active, so a udev trigger aimed here would do nothing at all.
+ExecStart=/home/arduino/hybrid/usb/gadget-up.sh --build
 ExecStart=/home/arduino/hybrid/usb/usb-net-up.sh
 
 ExecStop=/home/arduino/hybrid/usb/gadget-down.sh

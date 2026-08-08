@@ -58,15 +58,27 @@ host or device from the CC lines when a cable is plugged in.
 So the design here is event-driven, not boot-time:
 
 ```
+boot, nothing plugged in
+   → unoq-usb-gadget.service builds the definition, br-usb and DHCP, exits
+     (RemainAfterExit=yes — it stays "active" having bound nothing)
+
 plug into a computer
    → Type-C negotiates: computer = host, board = device
    → a UDC appears in /sys/class/udc
-   → udev rule 99-unoq-usb-gadget.rules fires
-   → unoq-usb-gadget.service binds the gadget
-   → usb0 appears, joins br-usb, dnsmasq answers the computer's DHCP
+   → udev fires SYSTEMD_WANTS=unoq-usb-bind.service
+   → that binds the gadget to the UDC
+   → usb0/usb1 appear → udev fires the bind unit again
+   → they join br-usb; dnsmasq answers the computer's DHCP
 ```
 
-At boot with nothing plugged in, the service builds the gadget definition and
+**Why two units.** The obvious design is one unit that udev restarts. It does
+not work: the boot-time unit is `RemainAfterExit=yes`, and systemd will not
+re-run `ExecStart` for a oneshot it still considers active — so a udev trigger
+aimed at it is silently a no-op and the gadget never binds. `unoq-usb-bind.service`
+exists solely to be re-runnable: `Type=oneshot`, no `RemainAfterExit`, back to
+`inactive` the moment it finishes, ready for the next plug-in.
+
+At boot with nothing plugged in, the prepare unit builds the definition and
 exits. That is not a failure — there is simply nothing to bind to yet.
 
 ## What the computer sees

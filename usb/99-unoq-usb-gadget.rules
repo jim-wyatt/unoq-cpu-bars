@@ -1,19 +1,28 @@
 # Copyright (c) 2026 Jim Wyatt
 # SPDX-License-Identifier: MIT
 #
-# Bind the USB gadget when a USB Device Controller appears.
+# Bind the USB gadget when the board is plugged into a computer.
 #
 # This board's dwc3 is dr_mode="otg" with no writable role switch: the Type-C
 # controller decides host vs device from the CC lines when a cable is plugged
 # in. So there is no UDC at all until the board is connected to a computer,
 # and no fixed point in boot at which the gadget could be bound.
 #
-# udev is the only thing that knows when that changes. The unit is started
-# rather than the script run directly so that systemd owns the process, keeps
-# RemainAfterExit state, and runs ExecStop on the way back down.
-ACTION=="add", SUBSYSTEM=="udc", TAG+="systemd", ENV{SYSTEMD_WANTS}+="unoq-usb-gadget.service"
+# NOTE the target is unoq-usb-bind.service, NOT unoq-usb-gadget.service.
+# The latter is RemainAfterExit=yes and is already active from boot, and
+# systemd will not re-run a oneshot it still considers active - so triggering
+# it here would silently do nothing at all. The bind unit exists precisely so
+# there is something re-runnable to point at.
 
-# The gadget netdevs must stay out of NetworkManager's hands: they are bridge
-# ports, and NM would otherwise try to DHCP on them, hand them addresses of
-# its own, and fight usb-net-up.sh for the interface.
+# 1. The controller appears: build (if needed) and bind the gadget.
+ACTION=="add", SUBSYSTEM=="udc", TAG+="systemd", ENV{SYSTEMD_WANTS}+="unoq-usb-bind.service"
+
+# 2. The gadget netdevs appear a moment after the bind, so enslaving them to
+#    br-usb cannot be done in the same breath as step 1 - run the bind unit
+#    again once they exist and usb-net-up.sh will pick them up.
+SUBSYSTEM=="net", ACTION=="add", KERNEL=="usb[0-9]*", TAG+="systemd", ENV{SYSTEMD_WANTS}+="unoq-usb-bind.service"
+
+# 3. Keep NetworkManager off them. They are bridge ports; NM would otherwise
+#    try to DHCP on them, give them addresses of its own, and fight
+#    usb-net-up.sh for the interface.
 SUBSYSTEM=="net", ACTION=="add", KERNEL=="usb[0-9]*", ENV{NM_UNMANAGED}="1"

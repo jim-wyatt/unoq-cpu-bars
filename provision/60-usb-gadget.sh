@@ -92,8 +92,10 @@ if write_file 0644 /etc/udev/rules.d/99-unoq-usb-gadget.rules \
   did "udev rules reloaded"
 fi
 
-step "unoq-usb-gadget.service"
+step "systemd units"
 install_unit "$PROJECT/usb/unoq-usb-gadget.service"
+# The bind half is a separate unit on purpose - see the comment in it.
+install_unit "$PROJECT/usb/unoq-usb-bind.service"
 # enable, but do not --now start it blindly: starting is harmless (no UDC
 # means it builds the definition and exits) and proves the scripts run.
 if systemctl is-enabled --quiet unoq-usb-gadget.service 2>/dev/null; then

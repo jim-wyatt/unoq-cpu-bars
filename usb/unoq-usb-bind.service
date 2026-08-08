@@ -1,0 +1,24 @@
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
+[Unit]
+Description=Bind the Arduino UNO Q USB gadget to the controller that just appeared
+Documentation=file:/home/arduino/hybrid/docs/usb.md
+
+# Started by udev (99-unoq-usb-gadget.rules) when a UDC or a gadget netdev
+# appears - that is, when someone plugs the board into a computer.
+Requires=unoq-usb-gadget.service
+After=unoq-usb-gadget.service
+
+[Service]
+Type=oneshot
+
+# Deliberately NOT RemainAfterExit. This unit has to be able to run again on
+# every plug-in, and systemd will not re-run ExecStart for a oneshot it still
+# considers active - which is exactly the trap unoq-usb-gadget.service falls
+# into, and why the binding lives here rather than there.
+ExecStart=/home/arduino/hybrid/usb/gadget-up.sh
+ExecStart=/home/arduino/hybrid/usb/usb-net-up.sh
+
+# No ExecStop: unbinding is unoq-usb-gadget.service's job, so that pulling the
+# cable (which removes the UDC and stops this unit) does not tear down the
+# gadget definition we want to keep for the next plug-in.

@@ -96,6 +96,10 @@ step "systemd units"
 install_unit "$PROJECT/usb/unoq-usb-gadget.service"
 # The bind half is a separate unit on purpose - see the comment in it.
 install_unit "$PROJECT/usb/unoq-usb-bind.service"
+# And the confirm half, which is what makes the bind guard's counter mean
+# "boots survived" rather than just "boots attempted". Without this enabled the
+# guard would trip after three normal boots and refuse to bind ever again.
+install_unit "$PROJECT/usb/unoq-usb-confirm.service"
 # enable, but do not --now start it blindly: starting is harmless (no UDC
 # means it builds the definition and exits) and proves the scripts run.
 if systemctl is-enabled --quiet unoq-usb-gadget.service 2>/dev/null; then
@@ -104,6 +108,16 @@ else
   systemctl enable unoq-usb-gadget.service >/dev/null 2>&1 ||
     fail "could not enable unoq-usb-gadget.service"
   did "enabled at boot"
+fi
+# Enabled separately and unconditionally: a board that already had the gadget
+# enabled from before the guard existed still needs the confirm unit turning
+# on, or its counter would climb every boot until the guard refused to bind.
+if systemctl is-enabled --quiet unoq-usb-confirm.service 2>/dev/null; then
+  skip "bind guard confirm already enabled"
+else
+  systemctl enable unoq-usb-confirm.service >/dev/null 2>&1 ||
+    fail "could not enable unoq-usb-confirm.service"
+  did "bind guard confirm enabled at boot"
 fi
 
 step "build the gadget now (no bind without a host)"

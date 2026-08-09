@@ -88,19 +88,28 @@ jobs:
         working-directory: app
         run: west build -b arduino_uno_q -d /tmp/build mcu/app
 
-      - name: Check the image is signed and fits
-        # The build step already prints the number that matters - Zephyr's own
-        # "Memory region / Used Size / Region Size / %age Used" table, against
-        # the real 416K slot from docs/reference/hardware.md. There is no point
-        # re-deriving it with size(1), whose binary is not on PATH outside the
-        # setup action's own steps anyway.
+      - name: Sign for MCUboot, and check it still fits
+        # Signing is a SEPARATE step from the build, here and in mcu/zbuild.sh:
+        # `west build` does not do it. An unsigned image compiles perfectly and
+        # MCUboot then refuses to boot it, so a job that only built would miss
+        # that completely - the first version of this one did, and the assertion
+        # below is what caught it.
         #
-        # What is worth asserting is that signing happened. An unsigned image
-        # builds perfectly and MCUboot refuses to boot it, which is a failure
-        # that only shows up on hardware.
+        # This is also the real size check. The build prints Zephyr's own memory
+        # table against the 416K slot; imgtool is what fails when the image plus
+        # its header and trailer no longer fit, which is the case that bricks a
+        # board on the next update.
+        #
+        # Deliberately identical to what mcu/zbuild.sh does. The two being
+        # separate copies is a known wart - see the issue on unifying them.
+        working-directory: app
         run: |
+          pip3 install --quiet imgtool
+          west sign -t imgtool -d /tmp/build -- \
+            --key "$(west topdir)/bootloader/mcuboot/root-rsa-2048.pem" \
+            --version 0.0.0+ci
           hex=/tmp/build/zephyr/zephyr.signed.hex
-          [ -s "$hex" ] || { echo "no signed image at $hex - did imgtool run?" >&2; exit 1; }
+          [ -s "$hex" ] || { echo "west sign produced no $hex" >&2; exit 1; }
           echo "signed image: $(stat -c %s "$hex") bytes"
 
       - name: Run the MCU test suites

@@ -15,7 +15,11 @@ through cmd() or by typing it at `tio /dev/ttyHS1`, and needs no wrapper here.
 from __future__ import annotations
 
 import contextlib
+import errno
+import fcntl
+import os
 import re
+import termios
 import time
 from collections.abc import Sequence
 
@@ -24,6 +28,14 @@ import serial
 from .link import link_up
 
 PORT = "/dev/ttyHS1"
+
+# Kernel-enforced exclusive access to a tty. Set it on our fd and any later
+# open() by a process without CAP_SYS_ADMIN fails with EBUSY.
+#
+# Python's termios does not export these on every platform, hence the fallback
+# to the numeric values from <asm-generic/ioctls.h>. They are stable ABI.
+TIOCEXCL = getattr(termios, "TIOCEXCL", 0x540C)
+TIOCNXCL = getattr(termios, "TIOCNXCL", 0x540D)
 
 # The panel's limits, mirroring APP_BARS_* / APP_MATRIX_* in
 # mcu/app/include/app_proto.h. They cannot be imported from C, so
@@ -40,6 +52,113 @@ _PROMPT = re.compile(r"^\s*\S*:~\$\s*$")
 
 class MCUError(RuntimeError):
     """The MCU reported an error, or returned something unparseable."""
+
+
+class PortBusy(MCUError):
+    """Someone else has the port - or a process that exited left it flagged.
+
+    Separate from MCUError because it is the one failure here that is about
+    this machine rather than about the MCU, and the fix is a different shape:
+    stop something, or restart something.
+    """
+
+
+def port_holders(port: str = PORT) -> list[tuple[int, str]]:
+    """Which processes have `port` open, as (pid, command).
+
+    Reads /proc rather than shelling out to lsof, which is not installed
+    everywhere and needs root here to see other users' processes.
+
+    INCOMPLETE BY CONSTRUCTION, and callers must treat it that way: without
+    root this can only see processes owned by the same user. An empty list
+    means "nothing I am allowed to see", never "nothing".
+    """
+    found: list[tuple[int, str]] = []
+    for entry in os.listdir("/proc"):
+        if not entry.isdigit():
+            continue
+        pid = int(entry)
+        try:
+            fds = os.listdir(f"/proc/{pid}/fd")
+        except OSError:
+            continue  # exited, or not ours to look at
+        for fd in fds:
+            try:
+                if os.readlink(f"/proc/{pid}/fd/{fd}") != port:
+                    continue
+            except OSError:
+                continue
+            try:
+                with open(f"/proc/{pid}/comm") as fh:
+                    comm = fh.read().strip()
+            except OSError:
+                comm = "?"
+            found.append((pid, comm))
+            break
+    return found
+
+
+def _busy_message(port: str, holders: list[tuple[int, str]]) -> str:
+    """Explain an EBUSY in terms of what to actually do about it."""
+    if holders:
+        who = ", ".join(f"{comm} (pid {pid})" for pid, comm in holders)
+        return (
+            f"{port} is flagged exclusive. Open right now: {who}.\n"
+            f"  Stop it first - for the demo that is:  systemctl stop unoq-cpu-bars\n"
+            f"  (Deliberately not claiming that process SET the flag. It may be an\n"
+            f"  innocent bystander that merely keeps the tty open while a TIOCEXCL\n"
+            f"  set by something already gone outlives it. The remedy is the same\n"
+            f"  either way: get every opener to close.)"
+        )
+    # Nothing visible has it open, yet the kernel says busy. Two ways that
+    # happens, and the second one is the trap this whole function exists for.
+    return (
+        f"{port} is flagged exclusive, but no process this user can see has it open.\n"
+        f"  Either another user holds it (try: sudo lsof {port}), or - much more\n"
+        f"  likely - a program that sets TIOCEXCL (tio, screen) exited while a\n"
+        f"  long-lived reader still had the port open. The flag is per-tty and is\n"
+        f"  only cleared on the LAST close, so it outlives the process that set it\n"
+        f"  and lsof shows nothing to explain it.\n"
+        f"  Fix:  systemctl restart unoq-cpu-bars"
+    )
+
+
+def open_port(port: str = PORT, baud: int = BAUD, timeout: float = 0.3) -> serial.Serial:
+    """Open the port so that nothing else can, and fail legibly when it cannot.
+
+    TWO LOCKS, because they catch different intruders and neither is enough:
+
+      flock (pyserial's exclusive=True) is ADVISORY. It stops another pyserial
+      caller that also asks for it, and nothing else - tio, screen, cat and
+      arduino-app-cli all walk straight through it.
+
+      TIOCEXCL is enforced by the kernel at open(). It stops all of those.
+
+    The comment that used to be here claimed TIOCEXCL was what exclusive=True
+    did. It is not - pyserial 3.5 never mentions TIOCEXCL, it calls
+    flock(LOCK_EX|LOCK_NB) - so the guarantee documented for this port had
+    never actually been in force. Measured on this board: with the service
+    running, two further plain serial.Serial() opens both succeeded.
+    """
+    try:
+        s = serial.Serial(port, baud, timeout=timeout, exclusive=True)
+    except serial.SerialException as exc:
+        if exc.errno == errno.EBUSY:
+            raise PortBusy(_busy_message(port, port_holders(port))) from exc
+        if exc.errno in (errno.EAGAIN, errno.EWOULDBLOCK):
+            # flock refused: another pyserial caller that also asked for it.
+            raise PortBusy(_busy_message(port, port_holders(port))) from exc
+        raise
+    # Now make it stick for everyone else. There is a small race between the
+    # open above and this - another process could get in during it - which is
+    # unavoidable without opening the fd ourselves and handing it to pyserial.
+    # It is microseconds, against a failure mode that lasts until reboot.
+    #
+    # Not fatal if it fails: a tty that will not take TIOCEXCL still works, we
+    # just do not get to exclude tio. Better a working link than a refusal.
+    with contextlib.suppress(OSError):
+        fcntl.ioctl(s.fileno(), TIOCEXCL)
+    return s
 
 
 class ShellTimeout(MCUError):
@@ -72,12 +191,12 @@ class MCU:
             # Not fatal - the link may already be up, or permissions may differ.
             with contextlib.suppress(Exception):
                 link_up()
-        # exclusive=True, because the alternative is not "the second opener
-        # fails" - it is "both succeed and interleave".
+        # Exclusive, because the alternative is not "the second opener fails" -
+        # it is "both succeed and interleave".
         #
-        # Nothing in the kernel stops two processes opening a tty. Measured on
-        # this board with unoq-cpu-bars.service running and eight status reads
-        # attempted alongside it: six returned correctly and two failed with
+        # Measured on this board with unoq-cpu-bars.service running and eight
+        # status reads attempted alongside it: six returned correctly and two
+        # failed with
         #
         #   device reports readiness to read but returned no data
         #   (device disconnected or multiple access on port?)
@@ -87,12 +206,11 @@ class MCU:
         # corruption is worse than a clean refusal, because it survives
         # testing.
         #
-        # TIOCEXCL makes any later open fail immediately for a non-root
-        # process, so whoever gets there first keeps the port and the second
-        # one is told plainly. The documentation has always said to stop the
-        # service before using the shell; this is what makes that true rather
-        # than merely advisable.
-        self._s = serial.Serial(port, baud, timeout=timeout, exclusive=True)
+        # See open_port for which lock does what, and why one is not
+        # enough. The documentation has always said to stop the service before
+        # using the shell; this is what finally makes that true rather than
+        # merely advisable.
+        self._s = open_port(port, baud, timeout)
         self._port = port
         time.sleep(0.15)
         self._s.reset_input_buffer()

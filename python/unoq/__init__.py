@@ -21,13 +21,16 @@ the same UART are in `fota`. See ~/hybrid/README.md for the hardware notes.
 from . import fota
 from .cpu import CpuSampler, read_cpu_times
 from .link import BOOT0_LINE, LINK_ENABLE_LINE, link_state, link_up
-from .mcu import MCU, MCUError, ShellTimeout
+from .mcu import MCU, MCUError, PortBusy, ShellTimeout, open_port, port_holders
 
 __all__ = [
     "fota",
     "MCU",
     "MCUError",
+    "PortBusy",
     "ShellTimeout",
+    "open_port",
+    "port_holders",
     "link_up",
     "link_state",
     "BOOT0_LINE",

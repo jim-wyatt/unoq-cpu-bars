@@ -50,11 +50,24 @@ alias zbuild="$UNOQ_PROJECT/mcu/zbuild.sh"
 alias zflash="$UNOQ_PROJECT/mcu/flash.sh"
 
 # Watch the MCU console (lpuart1 -> /dev/ttyHS1). Ctrl-C to stop.
+#
+# Goes through unoq.mcu's opener rather than calling serial.Serial() directly.
+# It used to do the latter, WITHOUT exclusive=True - so this helper quietly
+# bypassed the project's own locking and interleaved with whatever else had the
+# port. It also meant that when the port was busy you got a raw errno instead of
+# being told who had it.
 mcucon() {
   "$UNOQ_PROJECT/.venv/bin/python" - <<'PY'
-import serial, sys
-s = serial.Serial('/dev/ttyHS1', 115200, timeout=0.5)
-print("--- /dev/ttyHS1 @115200 (Ctrl-C to stop) ---", file=sys.stderr)
+import sys
+
+from unoq.mcu import BAUD, PORT, PortBusy, open_port
+
+try:
+    s = open_port(PORT, BAUD, 0.5)
+except PortBusy as exc:
+    print(exc, file=sys.stderr)
+    raise SystemExit(1) from None
+print(f"--- {PORT} @{BAUD} (Ctrl-C to stop) ---", file=sys.stderr)
 try:
     while True:
         d = s.read(256)

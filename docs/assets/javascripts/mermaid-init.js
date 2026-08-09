@@ -2,8 +2,10 @@
  * Copyright (c) 2026 Jim Wyatt
  * SPDX-License-Identifier: MIT
  *
- * Render the ```mermaid fences, from a copy of mermaid that is loaded beside
- * this file.
+ * Render the ```mermaid fences. The library itself is NOT loaded by this file
+ * and is not next to it: Material vendors mermaid (the `privacy` plugin turns
+ * its CDN reference into a local copy under assets/external/) and emits its own
+ * script tag for it. All this file supplies is the call that draws them.
  *
  * WHY NOT MATERIAL'S BUILT-IN INTEGRATION
  * ---------------------------------------

@@ -50,7 +50,7 @@ for candidate in chromium chromium-browser google-chrome google-chrome-stable; d
 done
 if [ -z "$BROWSER" ]; then
   echo "no chromium/chrome on PATH - cannot check whether the diagrams render" >&2
-  echo "  install one, or skip this gate with: tools/check.sh python shell c" >&2
+  echo "  install one, or skip this gate with: tools/check.sh python shell c docs" >&2
   exit 1
 fi
 

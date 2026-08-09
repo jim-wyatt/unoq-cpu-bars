@@ -1,0 +1,193 @@
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
+#
+# The documentation site. One build, three places it has to work:
+#
+#   1. GitHub Pages          the version a stranger finds first
+#   2. http://<board>:8080/  served off the board by unoq-learn
+#   3. the "UNO-Q" USB drive opened as file:// on a laptop with no internet
+#
+# (3) is the constraint that shapes everything below. A site that needs a CDN,
+# a font server or a running web server is blank exactly when someone is
+# sitting next to the board wondering why it will not enumerate.
+#
+#   build:  tools/build-docs.sh
+#   watch:  .venv/bin/mkdocs serve -f mkdocs.yml -a 0.0.0.0:8000
+
+site_name: Learn the Arduino UNO Q
+site_description: >-
+  A course in hybrid MPU + MCU development, taught on one board: Linux and a
+  microcontroller sharing a circuit, and how to make them cooperate.
+site_author: Jim Wyatt
+site_url: https://jim-wyatt.github.io/unoq-cpu-bars/
+copyright: Copyright &copy; 2026 Jim Wyatt &middot; MIT licensed
+
+repo_url: https://github.com/jim-wyatt/unoq-cpu-bars
+repo_name: jim-wyatt/unoq-cpu-bars
+edit_uri: edit/main/docs/
+
+docs_dir: docs
+# Where 70-learning-web.sh serves from and share/build-image.sh copies onto the
+# drive. Generated output - it is in .gitignore, not in the repository.
+site_dir: share/learn
+
+# Every page is a real .html file, so the same tree works when opened from a
+# folder with no server behind it. Directory URLs (`/start-here/`) need a
+# server that knows to hand back index.html, which file:// does not.
+use_directory_urls: false
+
+theme:
+  name: material
+  language: en
+  # No web fonts. Material's default pulls Roboto from Google's servers on
+  # every page load; the system stack looks native everywhere and costs nothing.
+  font: false
+  favicon: assets/favicon.svg
+  logo: assets/logo.svg
+  icon:
+    repo: fontawesome/brands/github
+  features:
+    # Top-level sections become tabs in the header, so the sidebar only ever
+    # shows where you are in the current one. Deliberate: a single flat list of
+    # every page in the project reads as a filing cabinet, not a course.
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    # Previous/next at the foot of every page. This is what makes the course
+    # read as a sequence rather than a pile.
+    - navigation.footer
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - content.action.edit
+    # NOT navigation.instant: it fetches pages with XHR, which the browser
+    # refuses over file://. The drive matters more than the transition.
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Follow the system theme
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light
+
+extra_css:
+  - stylesheets/extra.css
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/jim-wyatt/unoq-cpu-bars
+      name: The project on GitHub
+  # Material's "Made with Material for MkDocs" line stays; it is the licence
+  # condition for the free edition and it is fair credit.
+
+plugins:
+  - search
+  # Downloads anything the theme would otherwise fetch at page load (the
+  # search worker shim, most notably) and rewrites the reference to a local
+  # copy. This is what makes requirement (3) at the top of this file true.
+  # It needs network access at BUILD time, once; the result never does.
+  - privacy
+  # Must come after search: it turns the search index into a plain script the
+  # page can load without XHR, which is the only way search works off a drive.
+  - offline
+
+hooks:
+  - tools/mkdocs_hooks.py
+
+# Broken links are a build failure, not a log line. `tools/build-docs.sh` runs
+# with --strict, and CI runs the same script - the flat one-directory output of
+# the previous generator hid nineteen links that were dead on GitHub.
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      permalink_title: Link to this section
+  - pymdownx.details
+  # Icons and emoji rendered as INLINE SVG, not as a font and not as an image
+  # fetched from a CDN. Same reason as `font: false` above.
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  # Lets a page pull a real file out of the repository instead of quoting it:
+  #     --8<-- "mcu/app/src/bars.c:draw"
+  # A sample that is a copy goes stale silently. A sample that is an include
+  # cannot - check_paths turns a moved file into a build failure.
+  - pymdownx.snippets:
+      base_path: [.]
+      check_paths: true
+  # Diagrams as ```mermaid fences. Chosen over hand-drawn SVG for one reason:
+  # GitHub renders mermaid natively, so the same fence is a picture in the
+  # repository AND on the site. The library itself is vendored by the `privacy`
+  # plugin above, so no page ever fetches it.
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+# Deliberately NOT enabled: pymdownx.smartsymbols and pymdownx.tilde. Both
+# rewrite characters this project uses literally - (c) in licence headers, and
+# `~/hybrid` in nearly every command.
+
+nav:
+  - Home: index.md
+  - Course:
+      - learn/start-here.md
+      - learn/two-computers.md
+      - learn/the-linux-side.md
+      - learn/the-microcontroller-side.md
+      - learn/how-they-talk.md
+      - learn/from-source-to-chip.md
+      - learn/the-led-matrix.md
+      - learn/updating-safely.md
+      - learn/one-cable-many-devices.md
+      - learn/debugging-without-a-screen.md
+      - learn/make-it-yours.md
+  - Reference:
+      - reference/hardware.md
+      - reference/mpu.md
+      - reference/mcu.md
+      - reference/usb.md
+      - reference/troubleshooting.md
+      - reference/clean-board-findings.md
+  - Further reading: further-reading.md
+  - Credits: third-party.md

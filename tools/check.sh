@@ -6,7 +6,7 @@
 #   ~/hybrid/tools/check.sh              # everything
 #   ~/hybrid/tools/check.sh --fix        # reformat in place, then check
 #   ~/hybrid/tools/check.sh --fast       # skip the MCU suite (~70s of build)
-#   ~/hybrid/tools/check.sh python       # one area: python | shell | c | mcu
+#   ~/hybrid/tools/check.sh python       # one area: python | shell | c | docs | mcu
 #
 # Every gate runs even if an earlier one fails, so one pass shows you all the
 # work rather than the first thing to break. Exit status is non-zero if any
@@ -31,14 +31,14 @@ for arg in "$@"; do
       sed -n '2,14p' "$0"
       exit 0
       ;;
-    python | shell | c | mcu) AREAS+=("$arg") ;;
+    python | shell | c | mcu | docs) AREAS+=("$arg") ;;
     *)
       echo "unknown argument: $arg (try --help)" >&2
       exit 2
       ;;
   esac
 done
-[ ${#AREAS[@]} -eq 0 ] && AREAS=(python shell c mcu)
+[ ${#AREAS[@]} -eq 0 ] && AREAS=(python shell c docs mcu)
 
 if [ -t 1 ]; then
   RED=$'\033[31m' GREEN=$'\033[32m' DIM=$'\033[2m' BOLD=$'\033[1m' OFF=$'\033[0m'
@@ -140,6 +140,16 @@ if wanted c; then
       run "clang-format" "$CF" --dry-run --Werror "${CFILES[@]}"
     fi
   fi
+fi
+
+# --- docs ------------------------------------------------------------------
+
+if wanted docs; then
+  cd "$PROJECT" || exit 1
+  # --strict, so a link to a page that moved fails here instead of 404ing for
+  # a reader. This gate is the reason the docs tree can be reorganised at all.
+  have mkdocs "docs (mkdocs --strict)" &&
+    run "docs (mkdocs --strict)" "$PROJECT/tools/build-docs.sh"
 fi
 
 # --- mcu -------------------------------------------------------------------

@@ -1,0 +1,32 @@
+<!--
+Copyright (c) 2026 Jim Wyatt
+SPDX-License-Identifier: MIT
+
+The project in one mark: four CPU cores drawn as four columns of LEDs on the
+board's matrix. White, because it sits on the teal header in both schemes.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Four bars of LEDs">
+  <g fill="#fff">
+    <circle cx="4" cy="28" r="2.3"/>
+    <circle cx="4" cy="21" r="2.3"/>
+
+    <circle cx="12" cy="28" r="2.3"/>
+    <circle cx="12" cy="21" r="2.3"/>
+    <circle cx="12" cy="14" r="2.3"/>
+    <circle cx="12" cy="7" r="2.3"/>
+
+    <circle cx="20" cy="28" r="2.3"/>
+    <circle cx="20" cy="21" r="2.3"/>
+    <circle cx="20" cy="14" r="2.3"/>
+
+    <circle cx="28" cy="28" r="2.3"/>
+    <circle cx="28" cy="21" r="2.3"/>
+    <circle cx="28" cy="14" r="2.3"/>
+    <circle cx="28" cy="7" r="2.3"/>
+  </g>
+  <g fill="#fff" opacity="0.28">
+    <circle cx="4" cy="14" r="2.3"/>
+    <circle cx="4" cy="7" r="2.3"/>
+    <circle cx="20" cy="7" r="2.3"/>
+  </g>
+</svg>

@@ -209,17 +209,17 @@ step "content"
 # here rather than trusting whatever happens to be checked in is what stops the
 # three copies drifting - which is the same reason the image itself is the only
 # store rather than a staging directory.
-if [ -x "$PROJECT/.venv/bin/unoq-build-docs" ]; then
-  if as_user "$PROJECT/.venv/bin/unoq-build-docs" >/dev/null 2>&1; then
-    did "documentation rendered from docs/ into share/learn/"
-  else
-    warn "unoq-build-docs failed - the drive will carry whatever was last built"
-  fi
+#
+# share/learn/ is NOT in the repository any more, so a failure here is a drive
+# with no content rather than a drive with stale content. That is the right way
+# round: an empty drive is obviously broken, a stale one is quietly wrong.
+if as_user "$PROJECT/tools/build-docs.sh" >/dev/null 2>&1; then
+  did "documentation rendered from docs/ into share/learn/"
 else
-  skip "unoq-build-docs not installed - using share/learn/ as checked in"
+  warn "tools/build-docs.sh failed - run it directly to see why:"
+  warn "  $PROJECT/tools/build-docs.sh"
 fi
 
-# Learning content ships in the repo, so it is versioned with everything else.
 if [ -d "$PROJECT/share/learn" ]; then
   rsync -a "$PROJECT/share/learn/" "$MOUNT/" 2>/dev/null ||
     cp -r "$PROJECT/share/learn/." "$MOUNT/"

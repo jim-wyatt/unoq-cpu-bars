@@ -81,12 +81,16 @@ else
 fi
 
 step "unoq package (editable)"
-if "$VENV/bin/python" -c 'import unoq' 2>/dev/null && [ -x "$VENV/bin/unoq-cpu-bars" ]; then
-  skip "unoq importable and unoq-cpu-bars on PATH"
+# The [docs] extra comes along at provisioning time, not just for developers:
+# share/build-image.sh renders the learning site during the same bootstrap, and
+# a board without mkdocs produces a USB drive and a web server with no content.
+if "$VENV/bin/python" -c 'import unoq' 2>/dev/null && [ -x "$VENV/bin/unoq-cpu-bars" ] &&
+  [ -x "$VENV/bin/mkdocs" ]; then
+  skip "unoq importable, unoq-cpu-bars and mkdocs on PATH"
 else
-  uv pip install --python "$VENV/bin/python" -q -e "$PROJECT/python" ||
+  uv pip install --python "$VENV/bin/python" -q -e "$PROJECT/python[docs]" ||
     fail "could not install the unoq package"
-  did "unoq installed editable from $PROJECT/python"
+  did "unoq installed editable from $PROJECT/python (with the docs extra)"
 fi
 
 step "dev tooling"

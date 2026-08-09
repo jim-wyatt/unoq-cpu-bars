@@ -484,3 +484,34 @@ MIT — see [LICENSE](LICENSE). Every first-party file carries an
 A few files belong to other projects and keep their own terms — ST's SVD,
 Zephyr's `.clang-format`, and the panel wiring `matrix.c` reads out of
 ArduinoCore-zephyr. They are listed in [THIRD-PARTY.md](docs/third-party.md).
+
+## Trademarks and affiliation
+
+**This is an independent project. It is not affiliated with, authorised by,
+sponsored by, or endorsed by any of the companies or projects named in it.**
+
+Product, company and project names used here — Arduino® and UNO®, Qualcomm® and
+Snapdragon®, STMicroelectronics® and STM32®, Arm® and Cortex®, Zephyr®, Linux®,
+Debian®, Python®, Microsoft®, Windows®, Visual Studio Code, GitHub®, macOS®,
+Qwiic® — are the property of their respective owners and may be registered
+trademarks in some jurisdictions.
+
+They appear here for one reason: **to say accurately what this software runs
+on, builds with, and talks to.** You cannot describe a Zephyr application that
+flashes an STM32 over SWD without naming Zephyr and STM32. That is descriptive
+use, not a claim on the names, and nothing here should be read as suggesting
+that any of these organisations produced, reviewed or endorsed this project.
+
+Specifically:
+
+- No vendor logos, icons or brand artwork are used or redistributed. The mark
+  on this site is [`docs/assets/logo.svg`](docs/assets/logo.svg) — four LED bars,
+  drawn for this project and MIT-licensed like the rest of it.
+- No vendor binaries or firmware images are redistributed. See
+  [Not included](docs/third-party.md#not-included) for what was deliberately
+  removed and why.
+- Where third-party *files* are included, they keep their own licence headers
+  and are listed in [THIRD-PARTY.md](docs/third-party.md).
+
+If you own one of these marks and object to how it is used here, open an issue
+and it will be changed.

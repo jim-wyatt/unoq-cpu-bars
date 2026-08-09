@@ -5,6 +5,32 @@ the files listed here, which belong to other projects and keep their own terms.
 Each one carries its original licence header — do not replace those with this
 project's.
 
+!!! warning "Independent project — no affiliation, no endorsement"
+
+    This project is **not affiliated with, authorised by, sponsored by, or
+    endorsed by** any of the companies or projects named in it.
+
+    Arduino® and UNO®, Qualcomm® and Snapdragon®, STMicroelectronics® and
+    STM32®, Arm® and Cortex®, Zephyr®, Linux®, Debian®, Python®, Microsoft®,
+    Windows®, Visual Studio Code, GitHub®, macOS® and Qwiic® are the property
+    of their respective owners, and may be registered trademarks in some
+    jurisdictions.
+
+    They are used here **descriptively** — to say accurately what this software
+    runs on, builds with and talks to. You cannot explain a Zephyr application
+    that flashes an STM32 over SWD without naming Zephyr and STM32.
+
+    No vendor logos or brand artwork appear anywhere in this project, and no
+    vendor binaries are redistributed. If you own one of these marks and object
+    to how it is used, open an issue and it will be changed.
+
+## Licences, not trademarks
+
+The rest of this page is about **copyright and licensing** — which files belong
+to whom, and under what terms. That is a separate question from the trademark
+notice above, and the two are easy to conflate: a permissive licence on a
+project's *code* grants nothing at all in respect of its *name*.
+
 | File | Owner | Licence |
 |---|---|---|
 | `.vscode/STM32U585.svd` | STMicroelectronics | Apache-2.0 |

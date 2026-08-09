@@ -49,6 +49,12 @@ site_dir: share/learn
 # server that knows to hand back index.html, which file:// does not.
 use_directory_urls: false
 
+# docs/includes/ is raw material for pymdownx.snippets, not pages. Without this
+# MkDocs renders abbreviations.md as its own (empty) page and then complains it
+# is not in the nav - which --strict turns into a build failure.
+exclude_docs: |
+  includes/
+
 theme:
   name: material
   language: en
@@ -163,6 +169,12 @@ markdown_extensions:
   - pymdownx.snippets:
       base_path: [.]
       check_paths: true
+      # Appended to EVERY page, which is what turns docs/includes/abbreviations.md
+      # into site-wide hover definitions for the acronyms. The audience is
+      # someone meeting most of these for the first time, and a tooltip is a
+      # much smaller interruption than a trip to the glossary.
+      auto_append:
+        - docs/includes/abbreviations.md
   # Diagrams as ```mermaid fences. Chosen over hand-drawn SVG for one reason:
   # GitHub renders mermaid natively, so the same fence is a picture in the
   # repository AND on the site. The library itself is vendored by the `privacy`
@@ -181,25 +193,32 @@ markdown_extensions:
 # rewrite characters this project uses literally - (c) in licence headers, and
 # `~/hybrid` in nearly every command.
 
+# Grouped into four acts rather than listed as sixteen. A flat sidebar of
+# sixteen chapter titles reads as a filing cabinet; the groups are the argument
+# the course is making, and they are the same four the home page uses.
 nav:
   - Home: index.md
   - Course:
       - learn/start-here.md
-      - learn/two-computers.md
-      - learn/the-linux-side.md
-      - learn/the-microcontroller-side.md
-      - learn/from-power-to-prompt.md
-      - learn/how-they-talk.md
-      - learn/from-source-to-chip.md
-      - learn/how-the-build-knows-your-hardware.md
-      - learn/the-led-matrix.md
-      - learn/updating-safely.md
-      - learn/one-cable-many-devices.md
-      - learn/four-lights.md
-      - learn/debugging-without-a-screen.md
-      - learn/knowing-it-works.md
-      - learn/from-factory-to-this.md
-      - learn/make-it-yours.md
+      - What is actually here:
+          - learn/two-computers.md
+          - learn/the-linux-side.md
+          - learn/the-microcontroller-side.md
+          - learn/from-power-to-prompt.md
+      - Making them cooperate:
+          - learn/how-they-talk.md
+          - learn/from-source-to-chip.md
+          - learn/how-the-build-knows-your-hardware.md
+          - learn/the-led-matrix.md
+      - Living with real hardware:
+          - learn/updating-safely.md
+          - learn/one-cable-many-devices.md
+          - learn/four-lights.md
+          - learn/debugging-without-a-screen.md
+      - Making it yours:
+          - learn/knowing-it-works.md
+          - learn/from-factory-to-this.md
+          - learn/make-it-yours.md
   - Reference:
       - reference/hardware.md
       - reference/mpu.md
@@ -207,5 +226,6 @@ nav:
       - reference/usb.md
       - reference/troubleshooting.md
       - reference/clean-board-findings.md
+      - Glossary: glossary.md
   - Further reading: further-reading.md
   - Credits: third-party.md

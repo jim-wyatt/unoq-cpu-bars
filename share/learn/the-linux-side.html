@@ -132,9 +132,11 @@ hr { border: 0; border-top: 1px solid var(--rule); margin: 2.2em 0; }
 cat /sys/class/thermal/thermal_zone3/temp   # CPU temperature, in millidegrees
 ls /dev/ttyHS1                         # the wire to the microcontroller
 ls /sys/class/leds/                    # LEDs you can turn on by writing a 1</code></pre>
-<p>That last one is worth pausing on. Turning on an LED is:</p>
-<pre><code class="lang-bash">cat /sys/class/leds/unoq:user-blue1/brightness</code></pre>
-<p>No library. No driver code. It is a file.</p>
+<p>That last one is worth pausing on. Reading whether an LED is lit is a <code>cat</code>, and turning one on is an <code>echo</code>:</p>
+<pre><code class="lang-bash">cat /sys/class/leds/unoq:user-blue1/brightness      # 0 = off
+echo 1 | sudo tee /sys/class/leds/unoq:user-blue1/brightness
+echo 0 | sudo tee /sys/class/leds/unoq:user-blue1/brightness</code></pre>
+<p>No library. No driver code. No API to look up. It is a file, and writing to it changes the physical world.</p>
 <h2 id="procstat-which-is-what-this-project-actually-reads"><code>/proc/stat</code>, which is what this project actually reads</h2>
 <p>Our worked example needs to know how busy each CPU core is. Linux already counts this, in <code>/proc/stat</code>:</p>
 <pre><code class="lang-bash">head -5 /proc/stat</code></pre>

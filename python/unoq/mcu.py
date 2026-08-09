@@ -72,7 +72,27 @@ class MCU:
             # Not fatal - the link may already be up, or permissions may differ.
             with contextlib.suppress(Exception):
                 link_up()
-        self._s = serial.Serial(port, baud, timeout=timeout)
+        # exclusive=True, because the alternative is not "the second opener
+        # fails" - it is "both succeed and interleave".
+        #
+        # Nothing in the kernel stops two processes opening a tty. Measured on
+        # this board with unoq-cpu-bars.service running and eight status reads
+        # attempted alongside it: six returned correctly and two failed with
+        #
+        #   device reports readiness to read but returned no data
+        #   (device disconnected or multiple access on port?)
+        #
+        # which is a confusing way to be told you are sharing a serial port -
+        # it reads like the cable fell out. Mostly-working with occasional
+        # corruption is worse than a clean refusal, because it survives
+        # testing.
+        #
+        # TIOCEXCL makes any later open fail immediately for a non-root
+        # process, so whoever gets there first keeps the port and the second
+        # one is told plainly. The documentation has always said to stop the
+        # service before using the shell; this is what makes that true rather
+        # than merely advisable.
+        self._s = serial.Serial(port, baud, timeout=timeout, exclusive=True)
         self._port = port
         time.sleep(0.15)
         self._s.reset_input_buffer()

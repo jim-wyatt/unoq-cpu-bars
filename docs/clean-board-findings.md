@@ -10,7 +10,7 @@ board that is already provisioned** — which is every board the scripts had bee
 tested on until then.
 
 The common shape is worth stating up front, because it is what to look for
-next: of the twelve findings below, **five reported success** and four more
+next: of the fourteen findings below, **five reported success** and four more
 printed a warning that read as noise. Only two announced themselves as errors.
 A check that cannot pass is indistinguishable from a check that always passes,
 unless you run it somewhere it matters.
@@ -31,6 +31,8 @@ Status as of the runs on 2026-08-08/09. Fixed items link to the commit.
 | 10 | VS Code machine settings lived only in `~/.vscode-server` | restore wiped them; nothing said so, the board just swapped sooner | fixed |
 | 11 | `70-learning-web.sh` printed only the first address per interface, and ignored link state | advertised `10.55.0.1` and a **down** `docker0`, hid the one address the host can reach | fixed |
 | 12 | `40-purge-arduino.sh` claimed the purge deletes `~/.arduino15` | it does not — apt removes packages, not `$HOME`. 621 MB still there after a real run | fixed |
+| 13 | Attaching the fileshare after the gadget was built left the drive exported **read-write** | the read-only protection `usb.md` insists on was absent on every board following the documented order | fixed |
+| 14 | Nothing locked `/dev/ttyHS1`, so two openers interleaved | 6 of 8 reads correct, 2 failing with an error that blames a disconnected cable | fixed |
 
 ---
 
@@ -112,6 +114,32 @@ gone forever": the purge is the point after which nobody thinks to look for the
 image again, and a restore months later will not feel connected to it.
 
 ---
+
+### 14 — mostly working, which is worse than broken
+
+Found while checking that a sentence in the course was true. It said that
+opening the serial port while `unoq-cpu-bars.service` holds it fails. It did
+not: Linux happily lets two processes open the same tty, and their conversations
+interleave.
+
+Measured, eight status reads alongside the running demo: **six correct, two
+failed**, with
+
+```
+device reports readiness to read but returned no data
+(device disconnected or multiple access on port?)
+```
+
+which reads like the cable fell out.
+
+A clean failure is found in the first five minutes. Something that works 75% of
+the time survives testing, ships, and then fails in front of somebody else while
+pointing at the wrong cause. The documentation had always said to stop the
+service first — `exclusive=True` on the port is what turned that from advice
+into something the kernel enforces.
+
+The general form, worth keeping: **when a README says "remember to X first", ask
+whether the code can make X unnecessary or impossible to forget.**
 
 ### 12 — a warning that was worse than wrong
 

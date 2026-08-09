@@ -36,13 +36,17 @@ ls /dev/ttyHS1                         # the wire to the microcontroller
 ls /sys/class/leds/                    # LEDs you can turn on by writing a 1
 ```
 
-That last one is worth pausing on. Turning on an LED is:
+That last one is worth pausing on. Reading whether an LED is lit is a `cat`,
+and turning one on is an `echo`:
 
 ```bash
-cat /sys/class/leds/unoq:user-blue1/brightness
+cat /sys/class/leds/unoq:user-blue1/brightness      # 0 = off
+echo 1 | sudo tee /sys/class/leds/unoq:user-blue1/brightness
+echo 0 | sudo tee /sys/class/leds/unoq:user-blue1/brightness
 ```
 
-No library. No driver code. It is a file.
+No library. No driver code. No API to look up. It is a file, and writing to it
+changes the physical world.
 
 ## `/proc/stat`, which is what this project actually reads
 

@@ -145,8 +145,12 @@ with MCU() as mcu: print(mcu.status())
 "
 ```
 
-It fails, because something else holds the port. Now confirm *that* is the
-reason, rather than assuming:
+```
+SerialException: [Errno 11] Could not exclusively lock port /dev/ttyHS1
+```
+
+It fails immediately, and says why. Now confirm *that* is the reason, rather
+than assuming:
 
 ```bash
 sudo fuser -v /dev/ttyHS1
@@ -160,6 +164,37 @@ sudo systemctl start unoq-cpu-bars
 
 You have just practised the whole method: observe the failure, form a specific
 hypothesis, test *it* rather than changing code, confirm.
+
+### Why that error message is worth having
+
+That clean refusal is not how it behaved originally, and the story is a good
+one to carry with you.
+
+Linux does not stop two processes opening the same serial port. Both succeed,
+and their conversations interleave — each one reading fragments of the other's
+replies. Measured on this board while writing this page: **eight attempts
+alongside the running demo produced six correct answers and two failures**,
+reporting
+
+```
+device reports readiness to read but returned no data
+(device disconnected or multiple access on port?)
+```
+
+which reads like the cable fell out.
+
+**Mostly working is worse than not working.** A clean failure is found in the
+first five minutes. Something that works 75% of the time survives your testing,
+ships, and fails in front of someone else — and the error message points at
+hardware rather than at the actual cause.
+
+The fix is one flag: open the port with `exclusive=True`, so the kernel refuses
+the second opener outright. The documentation had always said to stop the
+service first; that flag is what turned it from advice into a rule the machine
+enforces.
+
+When you find yourself writing "remember to X first" in a README, ask whether
+the code could simply make X unnecessary or impossible to forget.
 
 ## Check yourself
 

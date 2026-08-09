@@ -168,7 +168,8 @@ cd ~/hybrid
 from unoq import MCU
 with MCU() as mcu: print(mcu.status())
 &quot;</code></pre>
-<p>It fails, because something else holds the port. Now confirm <em>that</em> is the reason, rather than assuming:</p>
+<pre><code>SerialException: [Errno 11] Could not exclusively lock port /dev/ttyHS1</code></pre>
+<p>It fails immediately, and says why. Now confirm <em>that</em> is the reason, rather than assuming:</p>
 <pre><code class="lang-bash">sudo fuser -v /dev/ttyHS1
 sudo systemctl stop unoq-cpu-bars
 ./.venv/bin/python -c &quot;
@@ -177,6 +178,15 @@ with MCU() as mcu: print(mcu.status())
 &quot;
 sudo systemctl start unoq-cpu-bars</code></pre>
 <p>You have just practised the whole method: observe the failure, form a specific hypothesis, test <em>it</em> rather than changing code, confirm.</p>
+<h3 id="why-that-error-message-is-worth-having">Why that error message is worth having</h3>
+<p>That clean refusal is not how it behaved originally, and the story is a good one to carry with you.</p>
+<p>Linux does not stop two processes opening the same serial port. Both succeed, and their conversations interleave — each one reading fragments of the other&#x27;s replies. Measured on this board while writing this page: <strong>eight attempts alongside the running demo produced six correct answers and two failures</strong>, reporting</p>
+<pre><code>device reports readiness to read but returned no data
+(device disconnected or multiple access on port?)</code></pre>
+<p>which reads like the cable fell out.</p>
+<p><strong>Mostly working is worse than not working.</strong> A clean failure is found in the first five minutes. Something that works 75% of the time survives your testing, ships, and fails in front of someone else — and the error message points at hardware rather than at the actual cause.</p>
+<p>The fix is one flag: open the port with <code>exclusive=True</code>, so the kernel refuses the second opener outright. The documentation had always said to stop the service first; that flag is what turned it from advice into a rule the machine enforces.</p>
+<p>When you find yourself writing &quot;remember to X first&quot; in a README, ask whether the code could simply make X unnecessary or impossible to forget.</p>
 <h2 id="check-yourself">Check yourself</h2>
 <ol><li>Your firmware works until you remove a <code>printk</code>, then fails. What kind of bug is this, and why does the print &quot;fix&quot; it?</li><li>A setup script prints &quot;all packages already current&quot; every time. What would convince you that it is true?</li><li>The board reset five minutes ago and you want to know why. Which command?</li></ol>
 <p>Next: what to build once the tour is over.</p>

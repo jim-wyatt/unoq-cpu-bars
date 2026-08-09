@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: MIT
 # Build and bind the composite USB gadget: network + the fileshare drive.
 #
-#   sudo ~/hybrid/usb/gadget-up.sh          # build, and bind if a UDC exists
-#   sudo ~/hybrid/usb/gadget-up.sh --build  # build only, never bind
+#   sudo ~/two-computers-one-board/usb/gadget-up.sh          # build, and bind if a UDC exists
+#   sudo ~/two-computers-one-board/usb/gadget-up.sh --build  # build only, never bind
 #
 # Idempotent: an existing gadget is left alone and re-bound if it came unbound.
 #

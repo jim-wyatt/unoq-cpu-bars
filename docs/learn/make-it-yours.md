@@ -80,7 +80,7 @@ is 96% empty.
 
 ## Where the open work is
 
-The repository's [issues](https://github.com/jim-wyatt/unoq-cpu-bars/issues) list
+The repository's [issues](https://github.com/jim-wyatt/two-computers-one-board/issues) list
 real gaps, each written up with what was measured and why it matters — the
 watchdog, the LEDs, the CDC-ACM console, the unused I²C and SPI, the thermal
 zones, and the mostly-empty MCU flash.
@@ -96,9 +96,9 @@ imports.
 The project has quality gates, and running them is faster than finding out later:
 
 ```bash
-~/hybrid/tools/check.sh              # everything
-~/hybrid/tools/check.sh --fast       # skip the slow MCU suite
-~/hybrid/tools/check.sh python       # one area
+~/two-computers-one-board/tools/check.sh              # everything
+~/two-computers-one-board/tools/check.sh --fast       # skip the slow MCU suite
+~/two-computers-one-board/tools/check.sh python       # one area
 ```
 
 Lint, formatting, strict type checking, tests at 100% coverage, shell linting, C

@@ -49,7 +49,7 @@ set by us — and when they are wrong, a perfectly good board looks broken.
 | 25 / 26 / 38 | SWD swdio / swclk / srst | — |
 
 ```bash
-~/hybrid/mcu/link-up.sh      # BOOT0=0, link-enable=1
+~/two-computers-one-board/mcu/link-up.sh      # BOOT0=0, link-enable=1
 ```
 
 ### They are documented, in the bootloader
@@ -216,7 +216,7 @@ twice a second forever and mean nothing. The tick stopping is the news, and it
 is news Linux cannot deliver, because a host that has stopped talking cannot
 report that it stopped.
 
-`~/hybrid/status/leds.sh explain` prints the current scheme; `... test` cycles the
+`~/two-computers-one-board/status/leds.sh explain` prints the current scheme; `... test` cycles the
 colours so you can learn which physical LED is which.
 
 ## How the MPU flashes the MCU
@@ -253,7 +253,7 @@ predates the libgpiod v2 support this board needs.
 ```
 
 Two 416K slots out of 2 MB of flash, which is why
-[the MCU is 96% empty](https://github.com/jim-wyatt/unoq-cpu-bars/issues/12) is
+[the MCU is 96% empty](https://github.com/jim-wyatt/two-computers-one-board/issues/12) is
 an open question rather than a boast — the part has two banks and this layout
 uses one.
 

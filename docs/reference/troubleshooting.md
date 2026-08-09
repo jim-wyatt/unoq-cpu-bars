@@ -14,7 +14,7 @@ bootloader instead of your image. Confirm by reading the PC — anything around
   -c init -c "reset run" -c "sleep 1000" -c halt -c "reg pc" -c shutdown
 ```
 
-Fix: `~/hybrid/mcu/link-up.sh`, then re-flash. Check `unoq-link.service` is
+Fix: `~/two-computers-one-board/mcu/link-up.sh`, then re-flash. Check `unoq-link.service` is
 enabled so it survives reboots.
 
 **`/dev/ttyHS1` reads zero bytes, but the MCU seems fine.**
@@ -69,7 +69,7 @@ Zephyr's runner resolves board support in-tree and `uno_q` ships no `support/`
 directory (`runners/openocd.py:92`). Restore it:
 
 ```bash
-cp -r ~/hybrid/mcu/board-support/support ~/zephyrproject/zephyr/boards/arduino/uno_q/
+cp -r ~/two-computers-one-board/mcu/board-support/support ~/zephyrproject/zephyr/boards/arduino/uno_q/
 ```
 
 Needed again after a Zephyr version bump.
@@ -82,7 +82,7 @@ configurable speed. Programming and verify still succeed.
 **Board stops booting after flashing.**
 You probably flashed the unsigned `zephyr.hex` over the MCUboot chain. It links
 into slot0 with no image header, so the bootloader refuses it. Recover with
-`~/hybrid/mcu/flash-all.sh`.
+`~/two-computers-one-board/mcu/flash-all.sh`.
 
 **`native_sim` fails with a `CONFIG_64BIT` error.**
 Use `native_sim/native/64` — the plain target is 32-bit and this is aarch64.
@@ -94,7 +94,7 @@ only in `~/zephyrproject/.venv`, which is the interpreter `west` uses.
 
 Usually the culprit is the **CMake Tools extension**: it prompts on open, writes
 `cmake.sourceDirectory` into `.vscode/settings.json` itself, and then configures
-into a stray `hybrid/build/` on every window open. It is listed under
+into a stray `two-computers-one-board/build/` on every window open. It is listed under
 `unwantedRecommendations` — uninstall it, and delete both the setting and the
 directory. Build with the **MCU: build** task (`zbuild.sh`); `clangd` needs
 nothing from CMake Tools, only the `compile_commands.json` that build symlinks.
@@ -177,7 +177,7 @@ port and the command to stop it, instead of surfacing a bare `errno 16`.
 > `tio` **waits silently** rather than reporting the refusal — it retries by
 > default, so it looks like a hang. That is the port being held, not a fault.
 
-[#55]: https://github.com/jim-wyatt/unoq-cpu-bars/issues/55
+[#55]: https://github.com/jim-wyatt/two-computers-one-board/issues/55
 
 **The panel is stuck showing an old frame.**
 Something killed the daemon with SIGTERM instead of SIGINT, so the cleanup that
@@ -192,7 +192,7 @@ The console script only appears after re-running the editable install.
 
 **`apt install openocd` does not work.**
 Debian ships 0.12.0 (2023), predating libgpiod v2. Rebuild from upstream master:
-`sudo bash ~/hybrid/tools/build-openocd.sh`.
+`sudo bash ~/two-computers-one-board/tools/build-openocd.sh`.
 
 **Packages look outdated but must not be upgraded.**
 `cbor2` (<6 by `smp`), `pydantic-core` (pinned exactly by `pydantic`), and
@@ -208,7 +208,7 @@ exist *below* the version you tried. `check-versions.sh` reports the newest
 arm64-installable version, which is the one to name. To see every build:
 
 ```bash
-~/hybrid/tools/check-versions.sh          # arm64-correct
+~/two-computers-one-board/tools/check-versions.sh          # arm64-correct
 ```
 
 Use `…/server/bin/code-server` to install; the `remote-cli/code` binary needs a
@@ -219,7 +219,7 @@ live VS Code session and is not on `PATH`.
 Back to stock Arduino firmware:
 
 ```bash
-~/hybrid/mcu/restore-arduino-firmware.sh
+~/two-computers-one-board/mcu/restore-arduino-firmware.sh
 ```
 
 Works even though `~/.arduino15` is gone, provided you copied the stock image

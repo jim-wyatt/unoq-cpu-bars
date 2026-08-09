@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 [Unit]
 Description=Confirm the Arduino UNO Q USB gadget bind survived this boot
-Documentation=file:/home/arduino/hybrid/usb/bind-guard.sh
+Documentation=file:/home/arduino/two-computers-one-board/usb/bind-guard.sh
 
 # The whole point is to prove the board reached a state you could have logged
 # into. Waiting for the network is most of that proof: if wifi is up and this
@@ -23,7 +23,7 @@ Type=oneshot
 # mounts around 13s) without being so long that a normal reboot-and-replug
 # cycle leaves the counter climbing for no reason.
 ExecStart=/bin/sleep 120
-ExecStart=/home/arduino/hybrid/usb/bind-guard.sh confirm
+ExecStart=/home/arduino/two-computers-one-board/usb/bind-guard.sh confirm
 
 [Install]
 WantedBy=multi-user.target

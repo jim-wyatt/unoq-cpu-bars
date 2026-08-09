@@ -19,9 +19,9 @@ your computer                          UNO Q
 Set it up once with:
 
 ```bash
-sudo bash ~/hybrid/share/fetch-vscode.sh    # ~1.8 GB, needs internet
-sudo bash ~/hybrid/share/build-image.sh     # FAT32 image
-sudo bash ~/hybrid/provision/60-usb-gadget.sh
+sudo bash ~/two-computers-one-board/share/fetch-vscode.sh    # ~1.8 GB, needs internet
+sudo bash ~/two-computers-one-board/share/build-image.sh     # FAT32 image
+sudo bash ~/two-computers-one-board/provision/60-usb-gadget.sh
 ```
 
 Then plug it in. Nothing to configure on the computer.
@@ -103,7 +103,7 @@ predate two changes at Microsoft's end:
 Override for a pre-1903 Windows host:
 
 ```bash
-sudo UNOQ_GADGET_PRIMARY=rndis ~/hybrid/usb/gadget-up.sh
+sudo UNOQ_GADGET_PRIMARY=rndis ~/two-computers-one-board/usb/gadget-up.sh
 ```
 
 Two configurations rather than two network functions in one: a host must not
@@ -169,7 +169,7 @@ In client mode the board asks instead of answering:
 
 ```bash
 sudo systemctl restart unoq-usb-gadget    # with UNOQ_USB_MODE=client set
-~/hybrid/usb/status.sh
+~/two-computers-one-board/usb/status.sh
 ```
 
 ```
@@ -217,9 +217,9 @@ redundant. As a device the board is a power sink at USB default current with no
 PD contract, so it is worth reclaiming.
 
 ```bash
-~/hybrid/usb/wifi.sh check      # would it be safe right now?
-sudo ~/hybrid/usb/wifi.sh off
-sudo ~/hybrid/usb/wifi.sh on
+~/two-computers-one-board/usb/wifi.sh check      # would it be safe right now?
+sudo ~/two-computers-one-board/usb/wifi.sh off
+sudo ~/two-computers-one-board/usb/wifi.sh on
 ```
 
 `check` and `off` run the same preflight, and `off` refuses if it fails:
@@ -362,8 +362,8 @@ aware of the other, which destroys a FAT filesystem quickly.
 To update the content:
 
 ```bash
-sudo bash ~/hybrid/usb/gadget-down.sh      # unbind first
-sudo bash ~/hybrid/share/build-image.sh    # remounts rw, syncs, remounts ro
+sudo bash ~/two-computers-one-board/usb/gadget-down.sh      # unbind first
+sudo bash ~/two-computers-one-board/share/build-image.sh    # remounts rw, syncs, remounts ro
 sudo systemctl restart unoq-usb-gadget
 ```
 
@@ -387,7 +387,7 @@ sudo systemctl enable --now adbd`.
 Start here, because it prints everything below in one go:
 
 ```bash
-~/hybrid/usb/status.sh
+~/two-computers-one-board/usb/status.sh
 ```
 
 Role and power, the UDC, both configurations and their functions, the bridge

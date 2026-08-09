@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 # Serve the learning content and the VS Code installers over HTTP.
 #
-#   sudo bash ~/hybrid/provision/70-learning-web.sh
+#   sudo bash ~/two-computers-one-board/provision/70-learning-web.sh
 #
 # Idempotent. Safe to run at any time - it claims a TCP port and nothing else.
 # In particular it does NOT touch the USB port, so it works over the network

@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: MIT
 # Take a stock, freshly flashed Arduino UNO Q to a working hybrid dev board.
 #
-#   git clone https://github.com/jim-wyatt/unoq-cpu-bars.git ~/hybrid
-#   cd ~/hybrid && ./bootstrap.sh
+#   git clone https://github.com/jim-wyatt/two-computers-one-board.git ~/two-computers-one-board
+#   cd ~/two-computers-one-board && ./bootstrap.sh
 #
 # Run it as YOURSELF, not as root: it calls sudo for the parts that need it and
 # keeps everything else owned by you. A bootstrap that runs wholly as root

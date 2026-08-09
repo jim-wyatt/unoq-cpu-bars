@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: MIT
 # Build the FAT32 image the board hands out as a USB drive.
 #
-#   sudo bash ~/hybrid/share/build-image.sh            # create/refresh
-#   sudo bash ~/hybrid/share/build-image.sh --rw       # leave it writable
+#   sudo bash ~/two-computers-one-board/share/build-image.sh            # create/refresh
+#   sudo bash ~/two-computers-one-board/share/build-image.sh --rw       # leave it writable
 #
 # Idempotent: an image that is already correct is reused and its content synced.
 #

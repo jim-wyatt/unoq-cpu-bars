@@ -10,7 +10,7 @@
  * their columns, height rises with load, rotation is a true rotation) rather
  * than a handful of remembered frames.
  *
- * Runs on native_sim via ~/hybrid/mcu/ztest.sh - no board, no flash cycle.
+ * Runs on native_sim via ~/two-computers-one-board/mcu/ztest.sh - no board, no flash cycle.
  */
 #include <zephyr/ztest.h>
 #include <string.h>

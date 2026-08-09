@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 # Install everything tools/check.sh needs. Idempotent; safe to re-run.
 #
-#   ~/hybrid/tools/install-dev-tools.sh
+#   ~/two-computers-one-board/tools/install-dev-tools.sh
 #
 # No sudo and no apt. Debian's shellcheck/shfmt would need root, and this board
 # is often used by a non-root user, so those two come from upstream releases

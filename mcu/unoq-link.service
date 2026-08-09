@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 [Unit]
 Description=Arduino UNO Q MPU<->MCU link (BOOT0 + UART enable GPIOs)
-Documentation=file:/home/arduino/hybrid/mcu/link-up.sh
+Documentation=file:/home/arduino/two-computers-one-board/mcu/link-up.sh
 DefaultDependencies=no
 After=systemd-udev-settle.service
 Before=multi-user.target
@@ -18,7 +18,7 @@ RequiresMountsFor=/home/arduino
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/home/arduino/hybrid/mcu/link-up.sh
+ExecStart=/home/arduino/two-computers-one-board/mcu/link-up.sh
 
 [Install]
 WantedBy=multi-user.target

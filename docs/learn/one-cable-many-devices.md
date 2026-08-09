@@ -71,7 +71,7 @@ single cable gives you both.
 **Try it:**
 
 ```bash
-~/hybrid/usb/status.sh
+~/two-computers-one-board/usb/status.sh
 ```
 
 That prints the whole picture: the role, the controller, both configurations and
@@ -136,7 +136,7 @@ new thing, fall back automatically if it does not confirm itself.**
 **Try it — see the guard's state:**
 
 ```bash
-~/hybrid/usb/bind-guard.sh status
+~/two-computers-one-board/usb/bind-guard.sh status
 journalctl -b -u unoq-usb-bind -t unoq-bind-guard
 ```
 

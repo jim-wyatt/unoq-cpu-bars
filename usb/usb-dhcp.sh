@@ -4,7 +4,7 @@
 # Take an address from the computer on the other end of the USB cable. Called
 # by udhcpc, not by you.
 #
-#   busybox udhcpc -i br-usb -s /home/arduino/hybrid/usb/usb-dhcp.sh
+#   busybox udhcpc -i br-usb -s /home/arduino/two-computers-one-board/usb/usb-dhcp.sh
 #   argv: <deconfig|bound|renew|nak|leasefail>
 #   env:  $interface $ip $subnet $router $dns $lease
 #

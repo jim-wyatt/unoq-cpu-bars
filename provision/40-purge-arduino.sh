@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 # Remove the remaining Arduino Debian packages.
 #
-#   sudo bash ~/hybrid/provision/40-purge-arduino.sh
+#   sudo bash ~/two-computers-one-board/provision/40-purge-arduino.sh
 #
 # Their services are already disabled by 20-dev-tools.sh, so this only reclaims
 # disk - it does not change behaviour. Run it when you are confident you will
@@ -16,7 +16,7 @@
 #
 # TO GO BACK: apt-get install -y arduino-app-cli arduino-app-lab \
 #                                arduino-router arduino-cli
-#             ~/hybrid/mcu/restore-arduino-firmware.sh
+#             ~/two-computers-one-board/mcu/restore-arduino-firmware.sh
 set -uo pipefail
 # shellcheck source=provision/lib.sh
 . "$(cd "$(dirname "$0")" && pwd)/lib.sh"

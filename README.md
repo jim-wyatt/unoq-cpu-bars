@@ -1,10 +1,13 @@
-# unoq-cpu-bars
+# Two computers, one board
 
-Host CPU load on the Arduino UNO Q's LED matrix — and the Linux-first
-development environment that builds it, on stock upstream tooling (Zephyr,
-west, OpenOCD, libgpiod) instead of the Arduino App framework.
+There are two computers on the Arduino UNO Q, and they do not get along by
+default. This is a Linux-first development environment that makes them
+cooperate, built on stock upstream tooling (Zephyr, west, OpenOCD, libgpiod)
+rather than the Arduino App framework — plus a
+[16-chapter course](https://jim-wyatt.github.io/two-computers-one-board/) that
+teaches the whole stack from a factory-fresh board.
 
-The board is two computers: a Qualcomm QRB2210 running Debian, and an STM32U585
+The two computers are a Qualcomm QRB2210 running Debian and an STM32U585
 running Zephyr. This project covers the full loop across both:
 
 **host tests → build → sign → flash (SWD) or update (serial) → interactive
@@ -20,8 +23,8 @@ halves of the board for what each is actually good at.
 ## From a freshly flashed board
 
 ```bash
-git clone https://github.com/jim-wyatt/unoq-cpu-bars.git ~/hybrid
-cd ~/hybrid && ./bootstrap.sh
+git clone https://github.com/jim-wyatt/two-computers-one-board.git ~/two-computers-one-board
+cd ~/two-computers-one-board && ./bootstrap.sh
 ```
 
 That is the whole bootstrap. It takes ~40–60 minutes on a cold board, almost
@@ -45,9 +48,9 @@ Optional extras are opt-in, because each one costs you something:
 ## Quickstart
 
 ```bash
-source ~/hybrid/env.sh          # already in ~/.bashrc
+source ~/two-computers-one-board/env.sh          # already in ~/.bashrc
 
-zbuild ~/hybrid/mcu/app         # build firmware (auto-signs for MCUboot)
+zbuild ~/two-computers-one-board/mcu/app         # build firmware (auto-signs for MCUboot)
 zflash ~/zephyrproject/build/zephyr/zephyr.signed.hex
 mcucon                          # watch the MCU console
 ```
@@ -195,18 +198,18 @@ does not reinstall, does not rewrite files whose content already matches, and
 does not restart services that are already correct.
 
 ```bash
-sudo bash ~/hybrid/provision/10-optimize-board.sh
-sudo bash ~/hybrid/provision/20-dev-tools.sh
-bash      ~/hybrid/provision/user/10-host-tools.sh      # NOT root
-bash      ~/hybrid/provision/user/20-zephyr-sdk.sh
-bash      ~/hybrid/provision/user/30-zephyr-workspace.sh
-bash      ~/hybrid/provision/user/40-python-venv.sh
-bash      ~/hybrid/provision/user/50-shell-env.sh
-sudo bash ~/hybrid/provision/30-mcu-link.sh             # needs the venv above
-sudo bash ~/hybrid/provision/40-purge-arduino.sh        # optional
-sudo bash ~/hybrid/provision/50-cpu-bars.sh             # optional - holds ttyHS1
-sudo bash ~/hybrid/provision/60-usb-gadget.sh           # optional - see usb.md
-sudo bash ~/hybrid/provision/70-learning-web.sh         # optional
+sudo bash ~/two-computers-one-board/provision/10-optimize-board.sh
+sudo bash ~/two-computers-one-board/provision/20-dev-tools.sh
+bash      ~/two-computers-one-board/provision/user/10-host-tools.sh      # NOT root
+bash      ~/two-computers-one-board/provision/user/20-zephyr-sdk.sh
+bash      ~/two-computers-one-board/provision/user/30-zephyr-workspace.sh
+bash      ~/two-computers-one-board/provision/user/40-python-venv.sh
+bash      ~/two-computers-one-board/provision/user/50-shell-env.sh
+sudo bash ~/two-computers-one-board/provision/30-mcu-link.sh             # needs the venv above
+sudo bash ~/two-computers-one-board/provision/40-purge-arduino.sh        # optional
+sudo bash ~/two-computers-one-board/provision/50-cpu-bars.sh             # optional - holds ttyHS1
+sudo bash ~/two-computers-one-board/provision/60-usb-gadget.sh           # optional - see usb.md
+sudo bash ~/two-computers-one-board/provision/70-learning-web.sh         # optional
 ```
 
 | Script | Does |
@@ -256,12 +259,12 @@ uv pip install --python .venv/bin/python west imgtool
 uv pip install --python .venv/bin/python -r zephyr/scripts/requirements.txt
 
 # 4. MPU python
-cd ~/hybrid && uv venv .venv
+cd ~/two-computers-one-board && uv venv .venv
 uv pip install --python .venv/bin/python gpiod smbus2 pyserial spidev smpclient
 uv pip install --python .venv/bin/python -e python
 
 # 5. shell env
-echo 'source ~/hybrid/env.sh' >> ~/.bashrc
+echo 'source ~/two-computers-one-board/env.sh' >> ~/.bashrc
 ```
 
 The manifest filter keeps the workspace at ~3.3 GB instead of ~7 GB by skipping
@@ -276,10 +279,10 @@ checkout has vanished. Change the filter, then delete.
 One command runs everything:
 
 ```bash
-~/hybrid/tools/check.sh              # all gates
-~/hybrid/tools/check.sh --fast       # skip the MCU suite (~70s of Zephyr build)
-~/hybrid/tools/check.sh --fix        # reformat in place, then check
-~/hybrid/tools/check.sh python       # one area: python | shell | c | docs | mcu
+~/two-computers-one-board/tools/check.sh              # all gates
+~/two-computers-one-board/tools/check.sh --fast       # skip the MCU suite (~70s of Zephyr build)
+~/two-computers-one-board/tools/check.sh --fix        # reformat in place, then check
+~/two-computers-one-board/tools/check.sh python       # one area: python | shell | c | docs | mcu
 ```
 
 Gates keep running after a failure, so one pass shows you all the work rather
@@ -299,8 +302,8 @@ than the first thing to break. Exit status is non-zero if any failed.
 Install the toolchain and the pre-commit hook with:
 
 ```bash
-~/hybrid/tools/install-dev-tools.sh   # no sudo, no apt
-~/hybrid/tools/install-hooks.sh       # pre-commit -> check.sh --fast
+~/two-computers-one-board/tools/install-dev-tools.sh   # no sudo, no apt
+~/two-computers-one-board/tools/install-hooks.sh       # pre-commit -> check.sh --fast
 ```
 
 `install-dev-tools.sh` puts ruff, mypy, pytest and clang-format in the project
@@ -320,9 +323,9 @@ every commit. Skip it once with `git commit --no-verify`.
 ### Tests
 
 ```bash
-cd ~/hybrid/python && ../.venv/bin/pytest      # 93 tests, 100% coverage
+cd ~/two-computers-one-board/python && ../.venv/bin/pytest      # 93 tests, 100% coverage
 ../.venv/bin/pytest -m hardware                # opt-in: needs a live MCU
-~/hybrid/mcu/ztest.sh                          # MCU suites on native_sim (26 cases)
+~/two-computers-one-board/mcu/ztest.sh                          # MCU suites on native_sim (26 cases)
 ```
 
 **Nothing in the default suite touches hardware.** Every serial port and GPIO
@@ -388,7 +391,7 @@ depends on the architecture.
 ## Maintenance
 
 ```bash
-~/hybrid/tools/check-versions.sh      # audit everything; reports only
+~/two-computers-one-board/tools/check-versions.sh      # audit everything; reports only
 ```
 
 Extension auto-update is deliberately **off** (background churn on a 3.6 GiB
@@ -410,8 +413,8 @@ reports "already installed". Name the version explicitly.
 ### Rebuilding OpenOCD
 
 ```bash
-sudo bash ~/hybrid/tools/build-openocd.sh              # build + self-test only
-sudo bash ~/hybrid/tools/build-openocd.sh --promote    # then replace /opt/openocd
+sudo bash ~/two-computers-one-board/tools/build-openocd.sh              # build + self-test only
+sudo bash ~/two-computers-one-board/tools/build-openocd.sh --promote    # then replace /opt/openocd
 ```
 
 `/opt/openocd` is owned by no Debian package, so apt can never reinstall it —
@@ -436,7 +439,7 @@ alone. `--promote` keeps the old install as `/opt/openocd.<timestamp>`.
 All tooling honours `OCD_ROOT`, so you can trial it first:
 
 ```bash
-OCD_ROOT=/opt/openocd-rebuilt ~/hybrid/mcu/flash.sh \
+OCD_ROOT=/opt/openocd-rebuilt ~/two-computers-one-board/mcu/flash.sh \
     ~/zephyrproject/build/zephyr/zephyr.signed.hex
 ```
 
@@ -467,8 +470,8 @@ Push after meaningful changes — the hardware findings in
 ## Recovery
 
 ```bash
-~/hybrid/mcu/flash-all.sh                  # rebuild the MCUboot chain over SWD
-~/hybrid/mcu/restore-arduino-firmware.sh   # back to stock Arduino firmware
+~/two-computers-one-board/mcu/flash-all.sh                  # rebuild the MCUboot chain over SWD
+~/two-computers-one-board/mcu/restore-arduino-firmware.sh   # back to stock Arduino firmware
 ```
 
 Both work even though `~/.arduino15` is gone — the second needs the stock image

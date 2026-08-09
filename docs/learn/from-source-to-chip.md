@@ -76,7 +76,7 @@ which reads like west is broken but means "I cannot see a workspace from here".
 This project wraps all of it:
 
 ```bash
-zbuild ~/hybrid/mcu/app
+zbuild ~/two-computers-one-board/mcu/app
 ```
 
 That sets the board, points at the right workspace, builds, and signs the result
@@ -141,7 +141,7 @@ bootloader**, which expects to live at the start of flash with the application
 after it. So the very first time, you must write both:
 
 ```bash
-~/hybrid/mcu/flash-all.sh        # bootloader + application, in order
+~/two-computers-one-board/mcu/flash-all.sh        # bootloader + application, in order
 ```
 
 Flash only the signed application onto a blank chip and nothing runs. The
@@ -152,7 +152,7 @@ front of it to do the jumping. The chip is fine; it just has no starting point.
 
 ```bash
 sudo systemctl stop unoq-cpu-bars
-cd ~/hybrid
+cd ~/two-computers-one-board
 zbuild mcu/app                                   # ~1 minute
 zflash ~/zephyrproject/build/zephyr/zephyr.signed.hex
 ./.venv/bin/python -c "

@@ -4,7 +4,7 @@
 # Default route out through whichever computer is on the other end of the USB
 # cable. Called by dnsmasq, not by you.
 #
-#   dnsmasq --dhcp-script=/home/arduino/hybrid/usb/usb-route.sh
+#   dnsmasq --dhcp-script=/home/arduino/two-computers-one-board/usb/usb-route.sh
 #   argv: <add|old|del> <mac> <ip> [hostname]
 #
 # WHY A DHCP HOOK

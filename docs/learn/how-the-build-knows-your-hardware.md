@@ -87,7 +87,7 @@ are, against 27 enabled. A disabled node is not compiled into the image, gets no
 driver instance, and its clock is never switched on.
 
 `status = "okay"` enables port F, which is what makes its clock run. After that
-[`matrix.c`](https://github.com/jim-wyatt/unoq-cpu-bars/blob/main/mcu/app/src/matrix.c)
+[`matrix.c`](https://github.com/jim-wyatt/two-computers-one-board/blob/main/mcu/app/src/matrix.c)
 writes the port's registers directly, because the 104 LEDs need pins that change
 direction every 10 microseconds and the ordinary GPIO API is too slow for that.
 See [The LED matrix](the-led-matrix.md).
@@ -115,7 +115,7 @@ exactly this device and no other.
 
 The overlay declares a counter. That does nothing on its own; the counter
 *driver* still has to be compiled, and that is
-[`prj.conf`](https://github.com/jim-wyatt/unoq-cpu-bars/blob/main/mcu/app/prj.conf)'s
+[`prj.conf`](https://github.com/jim-wyatt/two-computers-one-board/blob/main/mcu/app/prj.conf)'s
 job:
 
 ```kconfig
@@ -146,7 +146,7 @@ Everything above is merged at build time into files you can read. This is the
 single most useful debugging trick in Zephyr and almost nobody is shown it.
 
 ```bash
-zbuild ~/hybrid/mcu/app          # if it is not already built
+zbuild ~/two-computers-one-board/mcu/app          # if it is not already built
 cd ~/zephyrproject/build/zephyr
 ```
 
@@ -158,8 +158,8 @@ grep -A3 "chosen {" zephyr.dts
 
 ```dts
 zephyr,code-partition = &slot0_partition;  /* in zephyr/boards/arduino/uno_q/arduino_uno_q.dts:21 */
-zephyr,console = &lpuart1;                 /* in ../unoq-cpu-bars/mcu/app/boards/arduino_uno_q.overlay:11 */
-zephyr,shell-uart = &lpuart1;              /* in ../unoq-cpu-bars/mcu/app/boards/arduino_uno_q.overlay:12 */
+zephyr,console = &lpuart1;                 /* in ../two-computers-one-board/mcu/app/boards/arduino_uno_q.overlay:11 */
+zephyr,shell-uart = &lpuart1;              /* in ../two-computers-one-board/mcu/app/boards/arduino_uno_q.overlay:12 */
 ```
 
 Look at those comments. Zephyr annotates **every property with the file and line

@@ -16,8 +16,8 @@
 # changes and says so, not that it merely survives.
 #
 # They also have to work from wherever the repo was cloned. The scripts used to
-# name /home/arduino/hybrid and the `arduino` user literally, which is fine on
-# the board they were written on and wrong everywhere else.
+# name the checkout path and the `arduino` user literally, which is fine on the
+# board they were written on and wrong everywhere else.
 
 # --- who and where ---------------------------------------------------------
 
@@ -194,7 +194,7 @@ install_unit() {
   local src="$1" name rendered
   name="$(basename "$src")"
   render_unit() {
-    sed -e "s#/home/arduino/hybrid#$PROJECT#g" \
+    sed -e "s#/home/arduino/two-computers-one-board#$PROJECT#g" \
       -e "s#^User=arduino\$#User=$TARGET_USER#" \
       -e "s#^Group=arduino\$#Group=$TARGET_USER#" \
       "$src"
@@ -224,10 +224,10 @@ install_unit() {
   # it is what showed the check was vacuous.
   #
   # The failure that IS real is a unit written with the path spelled some other
-  # way. `~/hybrid` and `$HOME/hybrid` read as obviously equivalent to a human
-  # and are not substituted, and systemd expands neither: it passes them to
-  # execve() literally, so the unit fails at boot with 203/EXEC naming the unit
-  # but not the path, which reads like a permissions problem.
+  # way. `~/...` and `$HOME/...` read as obviously equivalent to a human, are
+  # not substituted, and systemd expands neither: it passes them to execve()
+  # literally, so the unit fails at boot with 203/EXEC naming the unit but not
+  # the path, which reads like a permissions problem.
   local shellism
   # Single quotes are the point: these are patterns to find literally in the
   # unit, not variables to expand here.
@@ -237,7 +237,7 @@ install_unit() {
     fail "$name uses shell syntax systemd will not expand:
   $shellism
   systemd passes these to execve() literally. Write the path as
-  /home/arduino/hybrid/... and install_unit will substitute the real checkout."
+  /home/arduino/two-computers-one-board/... and install_unit will substitute the real checkout."
   fi
 
   # Every program the unit runs must exist NOW. systemd reports a missing

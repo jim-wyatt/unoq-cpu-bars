@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 [Unit]
 Description=Arduino UNO Q host CPU load on the LED matrix
-Documentation=file:/home/arduino/hybrid/docs/mpu.md
+Documentation=file:/home/arduino/two-computers-one-board/docs/mpu.md
 
 # /dev/ttyHS1 reads nothing until link-up.sh has driven the UART enable GPIO,
 # so this is a hard dependency rather than an ordering hint: without it the
@@ -14,7 +14,7 @@ After=unoq-link.service
 Type=simple
 User=arduino
 Group=arduino
-ExecStart=/home/arduino/hybrid/.venv/bin/unoq-cpu-bars --interval 0.5
+ExecStart=/home/arduino/two-computers-one-board/.venv/bin/unoq-cpu-bars --interval 0.5
 
 # The MCU may still be coming up when the MPU reaches multi-user.target, and
 # the shell handshake times out if it is. Retrying is the whole recovery: the

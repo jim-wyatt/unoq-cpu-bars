@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 # The two board LEDs Linux can drive: connectivity, and whether anything failed.
 #
-#   sudo bash ~/hybrid/provision/35-status-leds.sh
+#   sudo bash ~/two-computers-one-board/provision/35-status-leds.sh
 #
 # Idempotent, and cheap: it installs one unit and starts it. Nothing here
 # touches the network, the USB port or the MCU.

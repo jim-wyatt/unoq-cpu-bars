@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 # Give the USB gadget link an address, and hand one to the host over DHCP.
 #
-#   sudo ~/hybrid/usb/usb-net-up.sh
+#   sudo ~/two-computers-one-board/usb/usb-net-up.sh
 #
 # Idempotent.
 #
@@ -40,7 +40,7 @@
 #
 # Set it in the unit's environment (see 60-usb-gadget.sh) or for one run:
 #
-#   sudo UNOQ_USB_MODE=client ~/hybrid/usb/usb-net-up.sh
+#   sudo UNOQ_USB_MODE=client ~/two-computers-one-board/usb/usb-net-up.sh
 #
 # WHY A BRIDGE
 # ------------

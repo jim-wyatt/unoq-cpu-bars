@@ -6,7 +6,7 @@
 # 3.6 GB of RAM, a 9.8 GB / with ~3 GB free on a stock board which is the first
 # thing to run out, and a factory image that is however old the image is.
 #
-#   sudo bash ~/hybrid/provision/10-optimize-board.sh
+#   sudo bash ~/two-computers-one-board/provision/10-optimize-board.sh
 #
 # Idempotent: a second run reports "already correct" and changes nothing.
 # Every change has its revert command in the comment above it.

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 # Optional: show host CPU load on the LED matrix at every boot.
 #
-#   sudo bash ~/hybrid/provision/50-cpu-bars.sh
+#   sudo bash ~/two-computers-one-board/provision/50-cpu-bars.sh
 #
 # Idempotent. Unlike 10..40 this one is a convenience, not a prerequisite -
 # nothing else in the project needs it, and it is the only unit here that holds

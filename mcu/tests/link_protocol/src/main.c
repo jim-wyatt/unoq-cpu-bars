@@ -11,7 +11,7 @@
  *
  * Runs on native_sim (i.e. natively on the UNO Q's own Linux side), so this
  * costs no flash cycle and no hardware. Run with:
- *   ~/hybrid/mcu/ztest.sh
+ *   ~/two-computers-one-board/mcu/ztest.sh
  */
 #include <zephyr/ztest.h>
 #include <stdio.h>

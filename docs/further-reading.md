@@ -53,7 +53,7 @@ microsecond. Read the "Virtualization" part; skim the rest until you need it.
 page for `/proc`, which is where this project's CPU numbers come from. It is
 long and you should not read it end to end. Search it for `stat` and read that
 paragraph; it explains the jiffies arithmetic in
-[`unoq/cpu.py`](https://github.com/jim-wyatt/unoq-cpu-bars/blob/main/python/unoq/cpu.py)
+[`unoq/cpu.py`](https://github.com/jim-wyatt/two-computers-one-board/blob/main/python/unoq/cpu.py)
 better than any tutorial. The [kernel's own filesystem
 documentation](https://docs.kernel.org/filesystems/proc.html) covers the same
 ground with more detail on why each field exists.
@@ -196,7 +196,7 @@ the course chapter is a simplification of it.
 **[Zephyr's SMP protocol
 documentation](https://docs.zephyrproject.org/latest/services/device_mgmt/smp_protocol.html)**
 — the wire format `mcumgr` speaks, which is what this project's
-[`unoq/fota.py`](https://github.com/jim-wyatt/unoq-cpu-bars/blob/main/python/unoq/fota.py)
+[`unoq/fota.py`](https://github.com/jim-wyatt/two-computers-one-board/blob/main/python/unoq/fota.py)
 drives.
 
 ---
@@ -215,7 +215,7 @@ documentation](https://docs.kernel.org/driver-api/usb/gadget.html)** and
 **[gadget ConfigFS](https://docs.kernel.org/usb/gadget_configfs.html)** — the
 exact mechanism this board uses to *become* a network adapter and a disk. The
 ConfigFS page is short and is essentially the specification for
-[`usb/usb-gadget.sh`](https://github.com/jim-wyatt/unoq-cpu-bars/blob/main/usb/usb-gadget.sh).
+[`usb/usb-gadget.sh`](https://github.com/jim-wyatt/two-computers-one-board/blob/main/usb/usb-gadget.sh).
 
 **[RFC 2131](https://www.rfc-editor.org/rfc/rfc2131)** — DHCP. Worth skimming
 once, so that "the board asks the laptop for an address" stops being magic and

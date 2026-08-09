@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 # Point git's pre-commit hook at tools/pre-commit-hook.sh.
 #
-#   ~/hybrid/tools/install-hooks.sh
+#   ~/two-computers-one-board/tools/install-hooks.sh
 #
 # A symlink, not a copy, so edits to the tracked script take effect without
 # reinstalling. Git hooks are not themselves versioned, which is why this

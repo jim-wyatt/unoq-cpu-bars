@@ -271,7 +271,7 @@ to fail when they disagree.
 Run the whole thing:
 
 ```bash
-cd ~/hybrid
+cd ~/two-computers-one-board
 tools/check.sh --fast
 ```
 

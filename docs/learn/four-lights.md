@@ -168,13 +168,13 @@ correct themselves instead of remembering something that stopped being true.
 What the colours mean, from the board itself:
 
 ```bash
-~/hybrid/status/leds.sh explain
+~/two-computers-one-board/status/leds.sh explain
 ```
 
 Learn them by watching them cycle:
 
 ```bash
-sudo ~/hybrid/status/leds.sh test
+sudo ~/two-computers-one-board/status/leds.sh test
 ```
 
 Now make LED 2 tell the truth about a real failure. Break something on purpose:

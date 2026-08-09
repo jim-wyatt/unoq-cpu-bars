@@ -35,8 +35,8 @@ copyright: Copyright &copy; 2026 Jim Wyatt &middot; MIT licensed
 # It must NOT start with https://. The cost is a sitemap without absolute URLs
 # and no canonical link tag; the offline case is worth more than the SEO.
 
-repo_url: https://github.com/jim-wyatt/unoq-cpu-bars
-repo_name: jim-wyatt/unoq-cpu-bars
+repo_url: https://github.com/jim-wyatt/two-computers-one-board
+repo_name: jim-wyatt/two-computers-one-board
 edit_uri: edit/main/docs/
 
 docs_dir: docs
@@ -131,7 +131,7 @@ extra_javascript:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/jim-wyatt/unoq-cpu-bars
+      link: https://github.com/jim-wyatt/two-computers-one-board
       name: The project on GitHub
   # Material's "Made with Material for MkDocs" line stays; it is the licence
   # condition for the free edition and it is fair credit.
@@ -210,7 +210,7 @@ markdown_extensions:
 
 # Deliberately NOT enabled: pymdownx.smartsymbols and pymdownx.tilde. Both
 # rewrite characters this project uses literally - (c) in licence headers, and
-# `~/hybrid` in nearly every command.
+# `~/two-computers-one-board` in nearly every command.
 
 # Grouped into four acts rather than listed as sixteen. A flat sidebar of
 # sixteen chapter titles reads as a filing cabinet; the groups are the argument

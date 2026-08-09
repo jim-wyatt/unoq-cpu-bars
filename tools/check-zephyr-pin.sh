@@ -77,8 +77,12 @@ if [ -z "$filter" ]; then
 fi
 
 fail=0
-if ! grep -q 'west-project-filter' "$WORKFLOW"; then
-  echo "$WORKFLOW no longer passes west-project-filter to the setup action" >&2
+# The INPUT line specifically, not the string anywhere in the file. A bare
+# `grep -q west-project-filter` also matched the step that reads the file, so
+# deleting the `with:` input entirely would still have reported green - the
+# check would have been measuring its own scaffolding.
+if ! grep -qE '^[[:space:]]*west-project-filter:[[:space:]]*\S' "$WORKFLOW"; then
+  echo "$WORKFLOW no longer passes west-project-filter: to the setup action" >&2
   fail=1
 fi
 for f in "$PROV" "$WORKFLOW"; do

@@ -190,7 +190,11 @@ jobs:
         id: filter
         run: |
           f=app/west-project-filter
-          v="$(grep -vE '^[[:space:]]*(#|$)' "$f" | head -1)"
+          # `|| true`: Actions runs this with `bash -e -o pipefail`, so a file
+          # of nothing but comments would make grep exit 1 and kill the step
+          # here - before the check below could say why. Let it come back empty
+          # and report it properly.
+          v="$(grep -vE '^[[:space:]]*(#|$)' "$f" | head -1 || true)"
           [ -n "$v" ] || { echo "no filter line in $f" >&2; exit 1; }
           echo "value=$v" >>"$GITHUB_OUTPUT"
           echo "module filter: $v"

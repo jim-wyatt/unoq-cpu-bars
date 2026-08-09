@@ -19,7 +19,7 @@
 #
 # THE PROJECT FILTER IS NOT HERE, but it is not absent either: west takes it as
 # config rather than manifest, so the workflow applies it from the shared
-# ../west-project-filter and the board's provisioning script reads the same file.
+# west-project-filter beside this file, which the board's script reads too.
 #
 # This used to say CI deliberately cloned everything, on the grounds that a
 # runner has the disk and an allowlist is one more thing to keep correct. Two

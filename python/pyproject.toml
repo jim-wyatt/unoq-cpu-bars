@@ -11,6 +11,7 @@ dependencies = ["pyserial", "gpiod", "smpclient"]
 # not appear on PATH: `python -m unoq.cpubars` works either way.
 [project.scripts]
 unoq-cpu-bars = "unoq.cpubars:main"
+unoq-build-docs = "unoq.docsite:main"
 unoq-learn = "unoq.learn:main"
 
 # Install with:  uv pip install --python ~/hybrid/.venv/bin/python -e 'python[dev]'

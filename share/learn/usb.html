@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IP over USB, and the fileshare - Arduino UNO Q</title>
+<style>
+:root {
+  --bg: #ffffff; --fg: #1c2024; --muted: #5b6570; --rule: #e3e8ee;
+  --accent: #0b6cbd; --accent-soft: #eaf3fb; --code-bg: #f6f8fa;
+  --side: #fbfcfd; --warn-bg: #fff8e6; --warn-edge: #e0a800;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14181c; --fg: #dde3ea; --muted: #93a1b0; --rule: #262d35;
+    --accent: #5aa9f0; --accent-soft: #17222d; --code-bg: #1b2127;
+    --side: #11151a; --warn-bg: #241f10; --warn-edge: #8a6d1a;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, sans-serif;
+}
+.wrap { display: flex; align-items: flex-start; max-width: 1180px; margin: 0 auto; }
+nav {
+  width: 250px; flex: 0 0 250px; padding: 28px 18px 60px; background: var(--side);
+  border-right: 1px solid var(--rule); position: sticky; top: 0; max-height: 100vh;
+  overflow-y: auto;
+}
+nav .brand { font-weight: 700; font-size: 15px; letter-spacing: .01em; display: block;
+  color: var(--fg); text-decoration: none; margin-bottom: 4px; }
+nav .tag { color: var(--muted); font-size: 12.5px; margin-bottom: 22px; }
+nav h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .09em;
+  color: var(--muted); margin: 22px 0 8px; }
+nav ol { list-style: none; margin: 0; padding: 0; counter-reset: step; }
+nav li { margin: 1px 0; }
+nav a { display: block; padding: 5px 9px; border-radius: 6px; text-decoration: none;
+  color: var(--fg); font-size: 14px; }
+nav a:hover { background: var(--accent-soft); }
+nav a.here { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+nav ol.steps a::before { counter-increment: step; content: counter(step) ". ";
+  color: var(--muted); font-variant-numeric: tabular-nums; }
+main { flex: 1 1 auto; min-width: 0; padding: 40px 44px 96px; }
+h1, h2, h3, h4 { line-height: 1.25; margin: 1.9em 0 .55em; }
+h1 { font-size: 2.05rem; margin-top: 0; letter-spacing: -.015em; }
+h2 { font-size: 1.42rem; padding-bottom: .28em; border-bottom: 1px solid var(--rule); }
+h3 { font-size: 1.13rem; }
+h4 { font-size: 1rem; color: var(--muted); }
+p, ul, ol, table, pre, blockquote { margin: 0 0 1.05em; }
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+ul, ol { padding-left: 1.4em; }
+li { margin: .3em 0; }
+code {
+  font: 13.5px/1.5 ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  background: var(--code-bg); padding: .14em .38em; border-radius: 4px;
+}
+pre {
+  background: var(--code-bg); border: 1px solid var(--rule); border-radius: 8px;
+  padding: 13px 15px; overflow-x: auto;
+}
+pre code { background: none; padding: 0; font-size: 13px; line-height: 1.55; }
+blockquote {
+  margin-left: 0; padding: .7em 1em; background: var(--warn-bg);
+  border-left: 3px solid var(--warn-edge); border-radius: 0 6px 6px 0;
+}
+blockquote p { margin: 0; }
+.tablewrap { overflow-x: auto; margin-bottom: 1.05em; }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; padding: 7px 11px; border-bottom: 1px solid var(--rule);
+  vertical-align: top; }
+th { font-size: 12.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+hr { border: 0; border-top: 1px solid var(--rule); margin: 2.2em 0; }
+.pager { display: flex; justify-content: space-between; gap: 14px; margin-top: 56px;
+  padding-top: 20px; border-top: 1px solid var(--rule); font-size: 14.5px; }
+.pager a { display: block; padding: 11px 15px; border: 1px solid var(--rule);
+  border-radius: 8px; text-decoration: none; max-width: 47%; }
+.pager a:hover { border-color: var(--accent); }
+.pager span { display: block; color: var(--muted); font-size: 11.5px;
+  text-transform: uppercase; letter-spacing: .07em; }
+.menu { display: none; }
+@media (max-width: 860px) {
+  .wrap { display: block; }
+  nav { width: auto; max-height: none; position: static; border-right: 0;
+        border-bottom: 1px solid var(--rule); }
+  main { padding: 26px 20px 70px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav><a class="brand" href="index.html">Arduino UNO Q</a>
+<div class="tag">Hybrid MPU + MCU development, from scratch</div>
+<h3>Learning path</h3>
+<ol class="steps">
+<li><a href="start-here.html">Start here</a></li>
+<li><a href="two-computers.html">Two computers on one board</a></li>
+</ol>
+<h3>Reference</h3>
+<ol>
+<li><a href="clean-board-findings.html">What a clean board revealed</a></li>
+<li><a href="hardware.html">The hardware, honestly</a></li>
+<li><a href="mcu.html">MCU workflow</a></li>
+<li><a href="mpu.html">MPU workflow</a></li>
+<li><a href="troubleshooting.html">Troubleshooting</a></li>
+<li><a href="usb.html" class="here">IP over USB, and the fileshare</a></li>
+</ol></nav>
+<main>
+<h1 id="ip-over-usb-and-the-fileshare">IP over USB, and the fileshare</h1>
+<p>Plug the board&#x27;s USB-C port into a computer and it becomes a USB device: a network adapter, and a read-only drive with the VS Code installers and the learning content on it.</p>
+<pre><code>your computer                          UNO Q
+─────────────                          ─────
+10.55.0.10-.100  ◄── USB-C cable ──►   10.55.0.1
+   (by DHCP)                           http://10.55.0.1:8080/
+                                       &quot;UNO-Q&quot; drive, read-only</code></pre>
+<p>Set it up once with:</p>
+<pre><code class="lang-bash">sudo bash ~/hybrid/share/fetch-vscode.sh    # ~1.8 GB, needs internet
+sudo bash ~/hybrid/share/build-image.sh     # FAT32 image
+sudo bash ~/hybrid/provision/60-usb-gadget.sh</code></pre>
+<p>Then plug it in. Nothing to configure on the computer.</p>
+<hr>
+<h2 id="the-one-thing-that-surprises-people">The one thing that surprises people</h2>
+<p><strong>The USB-C port cannot be a host and a device at the same time.</strong></p>
+<p>There is exactly one USB data controller on this board — <code>4e00000.usb</code>, a dwc3 with <code>dr_mode = &quot;otg&quot;</code>. While the board is a device, it is not a host: a hub, dock, network dongle, keyboard or USB stick plugged into it is <em>gone</em> until you disconnect from the computer.</p>
+<p>That is a hardware fact, not a configuration choice. If you develop with a USB Ethernet dongle, you are choosing between the dongle and the gadget.</p>
+<h2 id="you-cannot-switch-the-role-from-software">You cannot switch the role from software</h2>
+<p>This catches people who have done USB gadgets on a Raspberry Pi, where you write <code>dr_mode</code> or <code>echo device &gt; .../role</code>. Here:</p>
+<div class="tablewrap"><table><thead><tr><th></th><th></th></tr></thead><tbody><tr><td><code>/sys/class/usb_role/4e00000.usb-role-switch/role</code></td><td><strong>does not exist</strong></td></tr><tr><td><code>/sys/class/typec/port0/data_role</code></td><td>read-only</td></tr><tr><td>dwc3 <code>mode</code> attribute</td><td>not exposed</td></tr></tbody></table></div>
+<p>The role switch registers without its <code>role</code> attribute because the driver does not set <code>allow_userspace_control</code>. The <strong>Type-C controller</strong> (<code>anx7625</code>) picks host or device from the CC lines when a cable is plugged in.</p>
+<p>So the design here is event-driven, not boot-time:</p>
+<pre><code>boot, nothing plugged in
+   → unoq-usb-gadget.service builds the definition, br-usb and DHCP, exits
+     (RemainAfterExit=yes — it stays &quot;active&quot; having bound nothing)
+
+plug into a computer
+   → Type-C negotiates: computer = host, board = device
+   → a UDC appears in /sys/class/udc
+   → udev fires SYSTEMD_WANTS=unoq-usb-bind.service
+   → that binds the gadget to the UDC
+   → usb0/usb1 appear → udev fires the bind unit again
+   → they join br-usb; dnsmasq answers the computer&#x27;s DHCP</code></pre>
+<p><strong>Why two units.</strong> The obvious design is one unit that udev restarts. It does not work: the boot-time unit is <code>RemainAfterExit=yes</code>, and systemd will not re-run <code>ExecStart</code> for a oneshot it still considers active — so a udev trigger aimed at it is silently a no-op and the gadget never binds. <code>unoq-usb-bind.service</code> exists solely to be re-runnable: <code>Type=oneshot</code>, no <code>RemainAfterExit</code>, back to <code>inactive</code> the moment it finishes, ready for the next plug-in.</p>
+<p>At boot with nothing plugged in, the prepare unit builds the definition and exits. That is not a failure — there is simply nothing to bind to yet.</p>
+<h2 id="what-the-computer-sees">What the computer sees</h2>
+<p>The gadget offers two configurations. A host enumerates configuration 1 and stops, so <code>c.1</code> is what almost every computer actually uses:</p>
+<div class="tablewrap"><table><thead><tr><th>Config</th><th>Functions</th><th>Used by</th></tr></thead><tbody><tr><td><code>c.1</code></td><td><strong>NCM</strong> + mass storage</td><td>Windows 10 ≥1903, Windows 11, macOS ≥Catalina, Linux</td></tr><tr><td><code>c.2</code></td><td>RNDIS + mass storage</td><td>fallback, selected by hand, for genuinely old Windows</td></tr></tbody></table></div>
+<p><strong>NCM first, not RNDIS</strong> — the opposite of most USB-gadget recipes, which predate two changes at Microsoft&#x27;s end:</p>
+<ul><li>Windows has shipped a native NCM class driver (<code>UsbNcm.sys</code>) since Windows 10 version 1903, so NCM needs no driver and no INF.</li><li>RNDIS is deprecated and its driver has been <strong>removed from recent Windows 11 builds</strong>. A Windows 11 host offered RNDIS in <code>c.1</code> binds nothing for networking: you get the drive, no IP, and no obvious error anywhere.</li></ul>
+<p>Override for a pre-1903 Windows host:</p>
+<pre><code class="lang-bash">sudo UNOQ_GADGET_PRIMARY=rndis ~/hybrid/usb/gadget-up.sh</code></pre>
+<p>Two configurations rather than two network functions in one: a host must not bind two network interfaces to the same device. The drive is in both, so it is there whichever way the negotiation goes.</p>
+<p>On the board, both <code>rndis.usb0</code> and <code>ncm.usb0</code> register a netdev. Rather than racing to work out which one the host chose, both are enslaved to a bridge (<code>br-usb</code>) which carries the address. Only the active one ever passes a frame.</p>
+<h2 id="addressing">Addressing</h2>
+<p>There are two modes, and which one you want depends on whether the computer is sharing its internet. The mode lives in <code>/etc/default/unoq-usb</code>, which <code>60-usb-gadget.sh</code> writes once and never rewrites, so an edit survives re-provisioning:</p>
+<pre><code class="lang-bash">UNOQ_USB_MODE=server     # default
+UNOQ_USB_MODE=client     # for a host that shares its connection
+sudo systemctl restart unoq-usb-gadget</code></pre>
+<div class="tablewrap"><table><thead><tr><th></th><th><code>server</code> (default)</th><th><code>client</code></th></tr></thead><tbody><tr><td>Board</td><td><code>10.55.0.1/24</code> static</td><td><code>10.55.0.1</code> <strong>and</strong> whatever the host leases</td></tr><tr><td>Computer</td><td><code>10.55.0.10</code>–<code>.100</code> by DHCP from us</td><td>its own fixed address, its own DHCP server</td></tr><tr><td>Runs DHCP</td><td><code>dnsmasq</code>, ours</td><td>the host&#x27;s</td></tr><tr><td>Right when</td><td>the computer is something you reach the board <em>from</em></td><td>the computer is sharing its internet <em>with</em> the board</td></tr></tbody></table></div>
+<h3 id="server-mode">Server mode</h3>
+<div class="tablewrap"><table><thead><tr><th></th><th></th></tr></thead><tbody><tr><td>Board</td><td><code>10.55.0.1/24</code>, static, on <code>br-usb</code></td></tr><tr><td>Computer</td><td><code>10.55.0.10</code>–<code>10.55.0.100</code>, by DHCP</td></tr><tr><td>Gateway / DNS</td><td><strong>deliberately not offered</strong></td></tr></tbody></table></div>
+<p><code>10.55.0.0/24</code> is deliberately obscure. A board handing out <code>192.168.0.x</code> or <code>10.0.0.x</code> on a cable would collide with the network the laptop is already on.</p>
+<p>No default route is offered either, for the same class of reason: the board is the thing you are connecting <em>to</em>, and a device that silently becomes a laptop&#x27;s default gateway breaks its internet in a way that takes an afternoon to diagnose.</p>
+<p>To set the computer&#x27;s address by hand instead: <code>10.55.0.2/24</code>, no gateway, no DNS.</p>
+<h3 id="client-mode-and-why-windows-forces-it">Client mode, and why Windows forces it</h3>
+<p>Turn on Internet Connection Sharing in Windows and it stops negotiating: it pins the shared adapter to **<code>192.168.137.1/24</code>** and runs its own DHCP server there. It will never take a lease from us. macOS Internet Sharing does the same thing at <code>192.168.2.1</code>.</p>
+<p>So a board sitting at <code>10.55.0.1</code> in front of a host at <code>192.168.137.1</code> is two <code>/24</code>s on one wire with no route between them. Both ends look configured, the cable looks dead, and nothing logs an error — there is nothing wrong with either end in isolation.</p>
+<p>In client mode the board asks instead of answering:</p>
+<pre><code class="lang-bash">sudo systemctl restart unoq-usb-gadget    # with UNOQ_USB_MODE=client set
+~/hybrid/usb/status.sh</code></pre>
+<pre><code>  dhcp mode              client - udhcpc is asking the host for an address
+  leased address         192.168.137.210/24
+  gateway                192.168.137.1</code></pre>
+<p>Nothing is hardcoded to Microsoft&#x27;s numbering — the same code works for macOS, for a Linux host running its own dnsmasq, and for whatever ICS gets changed to. <code>busybox udhcpc</code> is the client, because this image ships no other one and busybox is already here.</p>
+<p>Three things worth knowing:</p>
+<ul><li>**<code>10.55.0.1</code> stays on the bridge in client mode too.** It is the address the board still answers on when the host&#x27;s DHCP server is not running. With wifi off that is the difference between a fixable board and a serial console — from the host, <code>route add 10.55.0.0 mask 255.255.255.0 192.168.137.1</code> (elevated) gets you back to it.</li><li><strong>The address is sticky.</strong> The last lease is remembered in <code>/var/lib/unoq/usb-dhcp-last</code> and re-requested next time, so &quot;what do I ssh to&quot; has an answer you can write down. ICS honours the request in practice.</li><li>**Use the leased IP, not the <code>.local</code> name.** avahi does publish on <code>br-usb</code>, and Windows 11 and macOS both resolve <code>.local</code> natively — but avahi advertises <em>every</em> address on that bridge, and in client mode there are two:</li></ul>
+<pre><code>  Registering new address record for 10.55.0.1 on br-usb.IPv4
+  Registering new address record for 192.168.137.210 on br-usb.IPv4</code></pre>
+<p>A host querying over the cable gets both A records back and picks one. Half the time that is <code>10.55.0.1</code>, which is the address it has no route to. The name is therefore a coin flip and the address is not, which is the other reason the lease is made sticky rather than left to chance.</p>
+<hr>
+<h2 id="running-on-the-usb-link-alone">Running on the USB link alone</h2>
+<p>The radio is the largest thing on this board that can simply be switched off, and on a board that is plugged into a computer anyway it is also the most redundant. As a device the board is a power sink at USB default current with no PD contract, so it is worth reclaiming.</p>
+<pre><code class="lang-bash">~/hybrid/usb/wifi.sh check      # would it be safe right now?
+sudo ~/hybrid/usb/wifi.sh off
+sudo ~/hybrid/usb/wifi.sh on</code></pre>
+<p><code>check</code> and <code>off</code> run the same preflight, and <code>off</code> refuses if it fails:</p>
+<pre><code>  gadget bound, and 192.168.137.1 answers on br-usb
+  the host is NAT-ing: the board keeps its internet over USB
+
+  RECONNECT ON:  arduino@192.168.137.210   (or quentin.local)</code></pre>
+<p>This is not a wrapper around <code>nmcli radio wifi off</code> for the sake of it. You are almost certainly typing that command over the wifi it is about to turn off, and if the USB link is not actually carrying traffic — gadget did not bind, cable is charge-only, host is not sharing, board is in server mode in front of an ICS host — then the moment the radio drops there is no path to the board at all. Not slow: absent.</p>
+<p>The reachability check is ARP, not ping. <strong>Windows blocks ICMP to its ICS adapter by default</strong>, so the gateway that is routing your traffic perfectly well does not answer a ping, and refusing on that basis would refuse in the normal case. A resolved neighbour proves frames cross the wire and get answered, which is the property &quot;will I still be able to reach this board&quot; actually depends on.</p>
+<p><code>off</code> also kicks the DHCP client into renewing, because NetworkManager owns <code>/etc/resolv.conf</code> and rewrites it — without our nameservers — the moment the radio goes down. <code>usb-dhcp.sh</code> puts them back on a lease event, and without the kick that would not happen until the lease next renewed, which on an ICS lease is days. The symptom is <code>ping 8.8.8.8</code> working and <code>apt</code> not.</p>
+<h3 id="two-ways-back-when-the-board-is-on-usb-only">Two ways back, when the board is on USB only</h3>
+<p>Turning wifi off means the gadget is the only way in, so both failure modes have an automatic path back to a board you can log into.</p>
+<div class="tablewrap"><table><thead><tr><th>What failed</th><th>What catches it</th><th>What it does</th></tr></thead><tbody><tr><td>The bind is killing the board — brownout loop</td><td><code>bind-guard.sh</code></td><td>Refuses to bind after 3 unconfirmed boots, <strong>and turns the radio back on</strong></td></tr><tr><td>The bind works and there is still no internet</td><td><code>unoq-uplink-fallback.service</code></td><td>Waits 240s after boot, then turns the radio back on</td></tr></tbody></table></div>
+<p>The second one exists because the guard cannot see it: everything the guard checks succeeded. The gadget bound, <code>br-usb</code> came up, the address is there — and the board still has no way out, because the computer is asleep, or is not sharing, or woke up with sharing switched off, or is a different computer.</p>
+<p>It is a deadline after boot rather than a watchdog on a timer. A poll that ran forever would flip the radio every time the host slept or the cable was jostled, and would fight anyone who turned wifi off deliberately. Boot is when the question is live and nobody is watching. Falling back then stays fallen back until a person unmakes it, which is what you want from something you are relying on.</p>
+<pre><code class="lang-bash">UNOQ_UPLINK_FALLBACK=0       # in /etc/default/unoq-usb, to disable it
+UNOQ_UPLINK_DEADLINE=240     # seconds to wait after boot</code></pre>
+<pre><code class="lang-bash">journalctl -b -u unoq-uplink-fallback -t unoq-uplink-fallback</code></pre>
+<p>Both are enabled unconditionally by <code>60-usb-gadget.sh</code>, including on a board whose wifi is on — where the fallback looks, sees a radio already up and exits. The moment either is needed is the moment nobody can enable it.</p>
+<h3 id="the-boards-own-route-out">The board&#x27;s own route out</h3>
+<p>The board does not offer the computer a gateway, but it does take one <em>from</em> it. When dnsmasq leases the host an address, <code>usb-route.sh</code> points the board&#x27;s default route at that address, metric <strong>700</strong> — so a board with no other uplink can reach the internet through the computer, provided the computer is NAT-ing (Internet Connection Sharing, or <code>New-NetNat</code>, on Windows).</p>
+<p>The metric is the whole safety story, and it is worth stating plainly because getting it wrong is quiet:</p>
+<div class="tablewrap"><table><thead><tr><th>Link</th><th>Metric</th><th></th></tr></thead><tbody><tr><td>Ethernet (NetworkManager)</td><td>100</td><td>wins</td></tr><tr><td><strong>Wifi</strong> (NetworkManager)</td><td><strong>600</strong></td><td>wins</td></tr><tr><td>USB gadget (this)</td><td><strong>700</strong></td><td>fallback only</td></tr></tbody></table></div>
+<p>Higher metric = lower priority, so the USB route is only ever used when the board has nothing better. <strong>This was 500 and therefore beat wifi</strong>, which is a bad failure to diagnose: SSH keeps working, because that is a connected route on the LAN rather than the default, so the board looks reachable and healthy while every outbound connection is being sent to a computer that probably is not routing. <code>apt</code>, <code>git</code> and anything else wanting the internet just stop.</p>
+<p>If you never want the gadget touching the default route:</p>
+<pre><code class="lang-bash">UNOQ_USB_DEFAULT_ROUTE=0     # in the unit&#x27;s environment</code></pre>
+<p>Check which route actually won, with the cable plugged in:</p>
+<pre><code class="lang-bash">ip route show default        # lowest metric is the one in use</code></pre>
+<h3 id="the-dhcp-server-does-not-leak-onto-your-lan">The DHCP server does not leak onto your LAN</h3>
+<p><code>dnsmasq</code> runs with <code>--interface=br-usb --bind-dynamic</code>, so it answers DHCP only on the gadget bridge. It still <em>binds</em> <code>0.0.0.0:67</code> — that is inherent to DHCP, whose clients broadcast from <code>0.0.0.0</code> — so the socket listing is not the thing that makes it safe; the interface filter is.</p>
+<p>Verify it on a board that is also on a real network:</p>
+<pre><code class="lang-bash">sudo ss -ulnp | grep :67          # will show 0.0.0.0:67 - this is expected</code></pre>
+<p>and confirm no <code>10.55.0.x</code> offer appears when a DHCP request goes out on your LAN interface.</p>
+<h2 id="the-fileshare">The fileshare</h2>
+<p><code>share/build-image.sh</code> builds a FAT32 image — the one filesystem Windows, macOS and Linux all mount with no driver — and it is the <strong>only</strong> copy of the content:</p>
+<pre><code>/home/arduino/unoq-share.img     the image (on the big partition)
+  └─ mounted read-only at /srv/unoq-share
+        ├─ index.html            the learning page
+        └─ vscode/               installers + SHA256SUMS.txt</code></pre>
+<p>The same file is what <code>usb_f_mass_storage</code> exports and what <code>unoq-learn</code> serves, so the drive and the web page cannot disagree about what is on the board. It lives on <code>/home/arduino</code> because <code>/</code> has under 5 GB spare once Zephyr is built.</p>
+<p><strong>It is exported read-only, and mounted read-only.</strong> The host and the board would otherwise both be writing the same blocks with neither one&#x27;s page cache aware of the other, which destroys a FAT filesystem quickly.</p>
+<p>To update the content:</p>
+<pre><code class="lang-bash">sudo bash ~/hybrid/usb/gadget-down.sh      # unbind first
+sudo bash ~/hybrid/share/build-image.sh    # remounts rw, syncs, remounts ro
+sudo systemctl restart unoq-usb-gadget</code></pre>
+<h2 id="adb-is-disabled">adb is disabled</h2>
+<p><code>adbd</code> binds its <em>own</em> gadget to the first free UDC. With this installed there would be two gadgets racing for one controller. <code>provision/60-usb-gadget.sh</code> disables <code>adbd</code> for that reason.</p>
+<p>adb over TCP still works once the link is up:</p>
+<pre><code class="lang-bash">adb connect 10.55.0.1:5555</code></pre>
+<p>To go back to adb over USB: <code>sudo systemctl disable --now unoq-usb-gadget &amp;&amp; sudo systemctl enable --now adbd</code>.</p>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<p>Start here, because it prints everything below in one go:</p>
+<pre><code class="lang-bash">~/hybrid/usb/status.sh</code></pre>
+<p>Role and power, the UDC, both configurations and their functions, the bridge and its ports, which end is running DHCP and what it leased, the nameservers, the wifi radio, the default routes in priority order, the bind guard&#x27;s counter, and the recent log. Read-only, no root.</p>
+<p>It matters more than a convenience script normally would. When the board is powered over the same cable that carries the gadget, every cable change is also a power cut — you cannot watch a plug-in happen and no session survives one, so whatever went wrong has always already finished by the time you can look. After an unexplained reset the evidence is in the <strong>previous</strong> boot:</p>
+<pre><code class="lang-bash">journalctl -b -1 -u unoq-usb-bind -t unoq-bind-guard</code></pre>
+<p><strong>Nothing appears on the computer.</strong> Check a UDC exists — if <code>/sys/class/udc</code> is empty the Type-C negotiation did not make the board a device. Try the other cable orientation, and make sure the cable is a data cable (charge-only USB-C cables are common and look identical).</p>
+<pre><code class="lang-bash">ls /sys/class/udc                 # empty = not a device right now
+cat /sys/kernel/config/usb_gadget/unoq/UDC
+journalctl -u unoq-usb-gadget -n 40</code></pre>
+<p><strong>The drive is there but the network is not</strong> (or the reverse). The host bound a configuration whose network function it does not support, or NetworkManager grabbed the gadget interface. <code>ip -br addr show br-usb</code> should show <code>10.55.0.1/24</code>, and <code>bridge link</code> should list a <code>usb*</code> port.</p>
+<p><strong>Windows shows an unknown device.</strong> It picked <code>c.1</code> but did not apply the RNDIS driver. Check the MS OS descriptors survived:</p>
+<pre><code class="lang-bash">cat /sys/kernel/config/usb_gadget/unoq/os_desc/use          # 1
+cat /sys/kernel/config/usb_gadget/unoq/functions/rndis.usb0/os_desc/interface.rndis/compatible_id</code></pre>
+<p><strong>Powering the board from the computer.</strong> As a device the board is a power sink. A laptop USB-C port that only supplies 0.5 A will brown it out under load — the four cores plus the MCU want considerably more. If the board reboots when you run a build, power it properly.</p>
+
+</main>
+</div>
+</body>
+</html>

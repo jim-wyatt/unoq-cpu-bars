@@ -78,7 +78,27 @@ eject_gadget() {
 }
 insert_gadget() {
   [ -w "$GADGET_LUN" ] || return 0
-  echo "$IMG" >"$GADGET_LUN" 2>/dev/null && did "gadget: medium re-inserted ($IMG)"
+  # The whole attribute set, not just the file.
+  #
+  # gadget-up.sh sets these when it builds the gadget, but ONLY inside
+  # `if [ -f "$IMG" ]` - and on a board provisioned in the documented order the
+  # image does not exist yet at that point, so the block is skipped and the LUN
+  # keeps kernel defaults. Attaching the medium here without them left the drive
+  # exported ro=0: read-WRITE, on a filesystem the board has mounted and cached.
+  # docs/usb.md is emphatic that this is how a FAT filesystem gets destroyed,
+  # and the protection it describes was absent on every board that built its
+  # image after the gadget - which is every board that follows the instructions.
+  #
+  # ro cannot be changed while a medium is attached, which is why this runs
+  # after eject_gadget and not on its own.
+  local lun
+  lun="$(dirname "$GADGET_LUN")"
+  echo 1 >"$lun/removable" 2>/dev/null
+  echo 1 >"$lun/ro" 2>/dev/null
+  echo 0 >"$lun/cdrom" 2>/dev/null
+  echo "UNO-Q Share" >"$lun/inquiry_string" 2>/dev/null
+  echo "$IMG" >"$GADGET_LUN" 2>/dev/null &&
+    did "gadget: medium re-inserted read-only ($IMG)"
 }
 
 # format_and_mount <image> <mountpoint> - partition, mkfs, mount rw.
@@ -182,6 +202,23 @@ fi
 # --- content ---------------------------------------------------------------
 
 step "content"
+# Render the documentation first, so the drive cannot ship a stale copy.
+#
+# The markdown in docs/ is the single source: GitHub reads it directly, and this
+# renders it to share/learn/ for the web server and for the drive. Building it
+# here rather than trusting whatever happens to be checked in is what stops the
+# three copies drifting - which is the same reason the image itself is the only
+# store rather than a staging directory.
+if [ -x "$PROJECT/.venv/bin/unoq-build-docs" ]; then
+  if as_user "$PROJECT/.venv/bin/unoq-build-docs" >/dev/null 2>&1; then
+    did "documentation rendered from docs/ into share/learn/"
+  else
+    warn "unoq-build-docs failed - the drive will carry whatever was last built"
+  fi
+else
+  skip "unoq-build-docs not installed - using share/learn/ as checked in"
+fi
+
 # Learning content ships in the repo, so it is versioned with everything else.
 if [ -d "$PROJECT/share/learn" ]; then
   rsync -a "$PROJECT/share/learn/" "$MOUNT/" 2>/dev/null ||

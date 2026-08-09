@@ -191,12 +191,96 @@ write_file() {
 # readable files. Rewriting them here is what lets the repo be cloned anywhere
 # and still produce units that point at the clone.
 install_unit() {
-  local src="$1" name
+  local src="$1" name rendered
   name="$(basename "$src")"
-  if sed -e "s#/home/arduino/hybrid#$PROJECT#g" \
-    -e "s#^User=arduino\$#User=$TARGET_USER#" \
-    -e "s#^Group=arduino\$#Group=$TARGET_USER#" \
-    "$src" | write_file 0644 "/etc/systemd/system/$name"; then
+  render_unit() {
+    sed -e "s#/home/arduino/hybrid#$PROJECT#g" \
+      -e "s#^User=arduino\$#User=$TARGET_USER#" \
+      -e "s#^Group=arduino\$#Group=$TARGET_USER#" \
+      "$src"
+  }
+  [ -r "$src" ] || fail "install_unit: cannot read $src"
+
+  # Captured for the checks below only. Command substitution strips trailing
+  # newlines, so the WRITE re-runs the renderer and pipes it straight through -
+  # a unit file that did not end in exactly one newline would otherwise be
+  # rewritten on every run, turning the second run's `skip` into a `did` and
+  # quietly destroying the idempotence signal a re-provision depends on.
+  #
+  # EVERY FAILURE MODE OF THE RENDERER HAS TO BE CAUGHT HERE, because empty
+  # output passes all of the checks below vacuously - grep finds no shell
+  # syntax and no Exec lines in nothing - and the write pipeline would then
+  # install an empty unit file. systemd loads that happily and the service
+  # simply never runs.
+  rendered="$(render_unit)" || fail "install_unit: could not render $src"
+  [ -n "$rendered" ] || fail "install_unit: $src rendered to nothing"
+  grep -q '^\[' <<<"$rendered" ||
+    fail "install_unit: $src has no [Section] header - not a unit file"
+
+  # SHELL SYNTAX SYSTEMD DOES NOT EXPAND.
+  #
+  # Not a check that the substitution happened - that one cannot fail, because
+  # sed replaces the placeholder wherever it appears, and writing the test for
+  # it is what showed the check was vacuous.
+  #
+  # The failure that IS real is a unit written with the path spelled some other
+  # way. `~/hybrid` and `$HOME/hybrid` read as obviously equivalent to a human
+  # and are not substituted, and systemd expands neither: it passes them to
+  # execve() literally, so the unit fails at boot with 203/EXEC naming the unit
+  # but not the path, which reads like a permissions problem.
+  local shellism
+  # Single quotes are the point: these are patterns to find literally in the
+  # unit, not variables to expand here.
+  # shellcheck disable=SC2016
+  shellism="$(grep -nE '(^|=|:| )(~/|\$HOME|\$\{HOME)' <<<"$rendered" || true)"
+  if [ -n "$shellism" ]; then
+    fail "$name uses shell syntax systemd will not expand:
+  $shellism
+  systemd passes these to execve() literally. Write the path as
+  /home/arduino/hybrid/... and install_unit will substitute the real checkout."
+  fi
+
+  # Every program the unit runs must exist NOW. systemd reports a missing
+  # ExecStart as status=203/EXEC at boot, which names the unit but not the
+  # path, and looks identical to a permissions problem.
+  local line prog optional
+  while IFS= read -r line; do
+    prog="${line#*=}"
+    prog="${prog#"${prog%%[![:space:]]*}"}"
+    # Strip systemd's prefix characters (-, @, :, +, !) and note whether `-` was
+    # among them, in ONE pass. Testing for `-` first and stripping afterwards
+    # looks equivalent and is not: systemd allows the prefixes in combination
+    # and in any order, so `+-/path` would be seen as non-optional, have its `-`
+    # stripped, and then be required to exist - stricter than systemd, failing
+    # an install that is correct.
+    #
+    # `-` means "a failure of this command is not a failure of the unit", which
+    # includes the program not being there at all.
+    optional=0
+    while :; do
+      case "$prog" in
+        -*)
+          optional=1
+          prog="${prog#?}"
+          ;;
+        [@:+!]*) prog="${prog#?}" ;;
+        *) break ;;
+      esac
+    done
+    prog="${prog%% *}"
+    # Only absolute paths: systemd resolves bare names against its own PATH,
+    # and second-guessing that here would produce false failures.
+    case "$prog" in /*) ;; *) continue ;; esac
+    [ "$optional" = 1 ] && continue
+    [ -x "$prog" ] && continue
+    fail "$name runs a program that is not there:
+  $prog
+  from: $line
+  Provisioning steps have an order - if this is a venv entry point, the venv
+  step has not run yet; if it is a script, check the path in $src."
+  done < <(grep -E '^(ExecStart|ExecStartPre|ExecStartPost|ExecStop|ExecReload)=' <<<"$rendered" || true)
+
+  if render_unit | write_file 0644 "/etc/systemd/system/$name"; then
     systemctl daemon-reload
   fi
 }

@@ -153,3 +153,28 @@ def test_main_serves_then_exits_cleanly_on_interrupt(
     assert learn.main(["--root", str(tmp_path)]) == 0
     assert closed == [True]
     assert "serving" in capsys.readouterr().out
+
+
+def test_default_root_is_the_mount_not_the_staging_directory() -> None:
+    """These are two different things and the names are one character apart.
+
+    /srv/unoq-share is the read-only mount of the FAT32 image - what the drive
+    exports and what the web server must serve. /var/lib/unoq-share is the
+    staging directory share/fetch-vscode.sh writes into, which does not exist
+    on a board that has only been provisioned.
+
+    The default used to be the staging path. Nothing caught it because
+    unoq-learn.service passes --root explicitly, so the wrong default was only
+    ever reachable by running the server by hand.
+    """
+    assert learn.DEFAULT_ROOT == "/srv/unoq-share"
+
+
+def test_the_unit_file_agrees_with_the_default() -> None:
+    """The unit passing --root is what hid the bug. Now the two are held equal,
+    so changing either alone fails here rather than diverging silently."""
+    unit = Path(__file__).resolve().parents[1] / "unoq-learn.service"
+    execstart = next(
+        line for line in unit.read_text().splitlines() if line.startswith("ExecStart=")
+    )
+    assert f"--root {learn.DEFAULT_ROOT}" in execstart

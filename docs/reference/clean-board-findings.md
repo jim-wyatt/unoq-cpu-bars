@@ -260,6 +260,25 @@ grep -o '.\{30\}unpkg.com/mermaid' share/learn/assets/javascripts/bundle.*.js
 
 It must not start with `https://`. The comment in `mkdocs.yml` says so.
 
+### 21. The drive accumulated a second, stale copy of the whole site
+
+`share/build-image.sh` synced the rendered site onto the drive with a plain
+`rsync -a` — no `--delete`. That was harmless while the generator wrote one flat
+directory of pages, because the file set never shrank.
+
+The first build after the site grew subdirectories put **both layouts on the
+drive at once**: twenty pages from the old build sitting beside the new tree,
+every one of them still reachable over HTTP and every one of them out of date.
+Precisely the disagreement between the three copies that rebuilding the image is
+supposed to prevent.
+
+Fixed with `--delete` plus `--exclude '/vscode/'`, since the installers live on
+the drive and are not in `share/learn` — rsync does not delete excluded paths,
+so stale documentation goes and the ~2 GB of downloads stay.
+
+Verified afterwards: 27 HTML files on the drive, matching the build exactly, and
+an old flat URL now returns 404.
+
 ## Decisions taken, for the refactor
 
 - **Keep the `10.55.0.0/24` server mode.** It is not legacy; it is what makes

@@ -88,14 +88,20 @@ jobs:
         working-directory: app
         run: west build -b arduino_uno_q -d /tmp/build mcu/app
 
-      - name: Report the image size against the slot
-        # A build that succeeds and no longer fits is a build that bricks a
-        # board on the next update. 416K is the slot size from the flash layout
-        # in docs/reference/hardware.md.
-        working-directory: app
+      - name: Check the image is signed and fits
+        # The build step already prints the number that matters - Zephyr's own
+        # "Memory region / Used Size / Region Size / %age Used" table, against
+        # the real 416K slot from docs/reference/hardware.md. There is no point
+        # re-deriving it with size(1), whose binary is not on PATH outside the
+        # setup action's own steps anyway.
+        #
+        # What is worth asserting is that signing happened. An unsigned image
+        # builds perfectly and MCUboot refuses to boot it, which is a failure
+        # that only shows up on hardware.
         run: |
-          arm-zephyr-eabi-size /tmp/build/zephyr/zephyr.elf || true
-          ls -l /tmp/build/zephyr/zephyr.signed.hex 2>/dev/null || true
+          hex=/tmp/build/zephyr/zephyr.signed.hex
+          [ -s "$hex" ] || { echo "no signed image at $hex - did imgtool run?" >&2; exit 1; }
+          echo "signed image: $(stat -c %s "$hex") bytes"
 
       - name: Run the MCU test suites
         # The same suites, on the same platform, as mcu/ztest.sh runs on the
@@ -105,7 +111,11 @@ jobs:
         # rather than testing a configuration nobody runs.
         working-directory: app
         run: |
-          python3 "$ZEPHYR_BASE/scripts/twister" \
+          # `west topdir`, not $ZEPHYR_BASE: the setup action exports that only
+          # within its own steps, so it is empty here and twister was looked for
+          # at /scripts/twister. Asking west where the workspace is works from
+          # any directory inside it.
+          python3 "$(west topdir)/zephyr/scripts/twister" \
             -T mcu/tests \
             -p native_sim/native/64 \
             --outdir /tmp/twister-out \

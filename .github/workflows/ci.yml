@@ -36,10 +36,10 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v9
         with:
           enable-cache: true
 
@@ -55,6 +55,46 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH"
           tools/check.sh python shell c docs
 
+  # Does this change touch anything the firmware is built from?
+  #
+  # Seconds, and it decides whether the five-minute job below runs at all. Most
+  # pull requests here are documentation - the course alone is 6,000 lines - and
+  # none of them can affect a Cortex-M33 binary.
+  #
+  # Asking the API for the changed files rather than using a paths-filter action
+  # keeps this dependency-free, and rather than `git diff` because a shallow
+  # clone does not have the base commit to diff against.
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      firmware: ${{ steps.filter.outputs.firmware }}
+    steps:
+      - id: filter
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Anything that is not a pull request - a push to main, a manual run -
+          # builds. The point is to skip work that cannot matter, not to find
+          # excuses; main should always have a proven firmware build.
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "firmware=true" >>"$GITHUB_OUTPUT"
+            echo "not a pull request - building"
+            exit 0
+          fi
+          files=$(gh api --paginate \
+            "repos/${{ github.repository }}/pulls/${{ github.event.number }}/files" \
+            --jq '.[].filename')
+          # west.yml and this workflow are in the list because both change what
+          # gets built, without any C file moving.
+          if grep -qE '^(mcu/|west\.yml|\.github/workflows/ci\.yml)' <<<"$files"; then
+            echo "firmware=true" >>"$GITHUB_OUTPUT"
+            echo "firmware inputs changed - building"
+          else
+            echo "firmware=false" >>"$GITHUB_OUTPUT"
+            echo "nothing under mcu/ changed - skipping the firmware build"
+          fi
+
   # The MCU half. Split into its own job because it needs a Zephyr workspace and
   # the SDK, which the gates above do not - so a formatting mistake still fails
   # in thirty seconds rather than waiting on a toolchain download.
@@ -63,12 +103,27 @@ jobs:
   # firmware build got a green tick, because nothing outside the board ever
   # compiled it. The version it builds is held equal to the board's by
   # tools/check-zephyr-pin.sh.
+  #
+  # GATED TWICE, because it is the expensive one (~5 minutes, most of it
+  # downloading Zephyr and the SDK):
+  #
+  #   needs: checks   do not spend five minutes finding out the code does not
+  #                   lint. The fast gates take thirty seconds; if they fail,
+  #                   this never starts.
+  #   if: changes     skip entirely when nothing it builds from was touched.
+  #
+  # NOTE for branch protection: a skipped job reports as "skipped", not
+  # "success". If this is ever made a required check, a documentation-only pull
+  # request will sit unmergeable - require `checks` instead, or add a stub job
+  # that always succeeds.
   firmware:
+    needs: [checks, changes]
+    if: needs.changes.outputs.firmware == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Checked out under a fixed name rather than the repository's, because
           # west.yml has to name this directory and the repository is going to
@@ -105,9 +160,14 @@ jobs:
         working-directory: app
         run: |
           pip3 install --quiet imgtool
+          # The build part of the version must be a NUMBER. `--version 0.0.0+ci`
+          # was rejected outright: imgtool wants maj.min.rev+build, and west
+          # passes its own `--version 0.0.0+0` first, so a second one that does
+          # not parse loses the whole invocation. zbuild.sh uses an epoch here
+          # for the same reason; the run number is the CI equivalent.
           west sign -t imgtool -d /tmp/build -- \
             --key "$(west topdir)/bootloader/mcuboot/root-rsa-2048.pem" \
-            --version 0.0.0+ci
+            --version "0.0.0+${{ github.run_number }}"
           hex=/tmp/build/zephyr/zephyr.signed.hex
           [ -s "$hex" ] || { echo "west sign produced no $hex" >&2; exit 1; }
           echo "signed image: $(stat -c %s "$hex") bytes"

@@ -53,11 +53,23 @@
   "task.autoDetect": "off",
   "typescript.tsserver.useSyntaxServer": "never",
 
-  // git.autofetch wakes the network every few minutes. On a board whose uplink
-  // may be a USB cable to a laptop that is not always sharing, that is both
-  // pointless and a source of confusing log noise.
-  "git.autofetch": false,
-  "git.autorefresh": false,
+  // Autofetch and autorefresh were BOTH off here, on the reasoning that
+  // "git.autofetch wakes the network every few minutes, and on a board whose
+  // uplink may be a USB cable to a laptop that is not always sharing, that is
+  // pointless and a source of confusing log noise".
+  //
+  // That was right for a board being developed on alone. It is wrong the moment
+  // anyone else - a colleague, or an agent - is pushing branches you are trying
+  // to watch: with these off, the Source Control view shows a stale working
+  // tree and the branch list never learns that a remote branch exists.
+  //
+  // autorefresh is the important one and costs nothing over the network: it is
+  // what makes the SCM view notice files changing on disk. autofetch is one
+  // `git fetch` a minute, which is negligible next to the ~3 GB this board
+  // downloads during provisioning.
+  "git.autofetch": true,
+  "git.autofetchPeriod": 60,
+  "git.autorefresh": true,
 
   "telemetry.telemetryLevel": "off",
   "workbench.enableExperiments": false,

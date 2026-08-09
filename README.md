@@ -500,7 +500,7 @@ They appear here for one reason: **to say accurately what this software runs
 on, builds with, and talks to.** You cannot describe a Zephyr application that
 flashes an STM32 over SWD without naming Zephyr and STM32. That is descriptive
 use, not a claim on the names, and nothing here should be read as suggesting
-any of these organisations produced, reviewed or approves of this project.
+that any of these organisations produced, reviewed or endorsed this project.
 
 Specifically:
 

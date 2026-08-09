@@ -84,6 +84,7 @@ FOTA tasks.
 | **[mpu.md](docs/mpu.md)** | Linux-side hardware access, the `unoq` API, and the CPU-bars demo end to end |
 | **[usb.md](docs/usb.md)** | IP over USB, the fileshare drive, and why the role cannot be switched from software |
 | **[troubleshooting.md](docs/troubleshooting.md)** | Symptom → cause |
+| **[clean-board-findings.md](docs/clean-board-findings.md)** | What taking a factory-restored board through `bootstrap.sh` actually turned up, and what is still unvalidated |
 
 ---
 

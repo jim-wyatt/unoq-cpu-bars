@@ -21,6 +21,7 @@ from time import sleep as _sleep
 from typing import Protocol
 
 from .cpu import PROC_STAT, CpuSampler
+from .diskio import DiskActivity
 from .mcu import BARS_MAX, MCU, PORT
 
 # Fast enough to feel live, slow enough that the shell round-trip is a rounding
@@ -34,10 +35,18 @@ DEFAULT_INTERVAL = 0.5
 # the fact that it neither opens a port nor reads /proc.
 class Panel(Protocol):
     def bars(self, pct: Sequence[float]) -> None: ...
+    def io(self, busy: bool) -> None: ...
 
 
 class Load(Protocol):
     def sample(self) -> list[int]: ...
+
+
+class Io(Protocol):
+    """The disk-activity half of the frame, kept behind a Protocol like Load so
+    the loop can be tested without a /sys to read."""
+
+    def busy(self) -> bool: ...
 
 
 def run(
@@ -46,6 +55,7 @@ def run(
     interval: float = DEFAULT_INTERVAL,
     count: int | None = None,
     sleep: Callable[[float], None] = _sleep,
+    io: Io | None = None,
 ) -> int:
     """Sample and draw `count` frames, or forever if count is None.
 
@@ -54,11 +64,20 @@ def run(
     and report a meaningless number as the opening frame.
     """
     sent = 0
+    last_io: bool | None = None
     while count is None or sent < count:
         sleep(interval)
         values = sampler.sample()
         if values:
             mcu.bars(values[:BARS_MAX])
+        # Sent only on a change. The MCU holds the last value, so repeating it
+        # every frame would be several hundred pointless commands a minute down
+        # a link whose whole design goal is to carry almost nothing.
+        if io is not None:
+            busy = io.busy()
+            if busy != last_io:
+                mcu.io(busy)
+                last_io = busy
         sent += 1
     return sent
 
@@ -90,7 +109,7 @@ def main(argv: list[str] | None = None) -> int:
 
     with MCU(port=args.port) as mcu:
         try:
-            run(mcu, sampler, args.interval, args.count)
+            run(mcu, sampler, args.interval, args.count, io=DiskActivity())
         except KeyboardInterrupt:
             pass  # Ctrl-C is how you stop this, not a failure.
         finally:

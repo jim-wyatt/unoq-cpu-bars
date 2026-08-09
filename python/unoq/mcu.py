@@ -198,6 +198,16 @@ class MCU:
             raise MCUError(f"could not parse matrix flip: {out!r}")
         return m.group(1) != "0"
 
+    def io(self, busy: bool) -> None:
+        """Tell the MCU whether the eMMC is busy, for LED 4.
+
+        Linux cannot show this itself - the kernel's mmc0, disk-activity and
+        disk-write LED triggers are all offered on this board and none of them
+        fire - so the LED that shows it lives on the other chip, and this is how
+        it finds out. See unoq/diskio.py.
+        """
+        self.cmd(f"app io {1 if busy else 0}")
+
     def matrix_off(self) -> None:
         """Blank the panel and stop its refresh timer."""
         self.cmd("app matrix off")

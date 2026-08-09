@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 [Unit]
 Description=Arduino UNO Q host CPU load on the LED matrix
-Documentation=file:/home/arduino/two-computers-one-board/docs/mpu.md
+Documentation=file:/home/arduino/two-computers-one-board/docs/reference/mpu.md
 
 # /dev/ttyHS1 reads nothing until link-up.sh has driven the UART enable GPIO,
 # so this is a hard dependency rather than an ordering hint: without it the

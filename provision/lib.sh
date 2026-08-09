@@ -280,6 +280,27 @@ install_unit() {
   step has not run yet; if it is a script, check the path in $src."
   done < <(grep -E '^(ExecStart|ExecStartPre|ExecStartPost|ExecStop|ExecReload)=' <<<"$rendered" || true)
 
+  # Documentation=file: targets, for the same reason as the Exec paths above -
+  # except these fail SILENTLY. Nothing reads them until a person runs
+  # `systemctl status` and follows the link, so a stale one survives
+  # indefinitely. Two did: the docs restructure moved usb.md and mpu.md under
+  # reference/ and left two units pointing at paths that no longer existed.
+  #
+  # Only file: is checked. https: and man: are not ours to verify, and trying
+  # would make this need the network.
+  local doc
+  while IFS= read -r line; do
+    for doc in ${line#*=}; do
+      case "$doc" in file:*) ;; *) continue ;; esac
+      doc="${doc#file:}"
+      [ -e "$doc" ] && continue
+      fail "$name documents itself with a file that is not there:
+  $doc
+  from: $line
+  A moved or renamed document is the usual cause."
+    done
+  done < <(grep -E '^Documentation=' <<<"$rendered" || true)
+
   if render_unit | write_file 0644 "/etc/systemd/system/$name"; then
     systemctl daemon-reload
   fi

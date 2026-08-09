@@ -16,8 +16,19 @@
 # zbuild, zflash, hpy and mcucon all point at a directory that does not exist,
 # while everything else keeps working. 50-shell-env.sh already points ~/.bashrc
 # at the real checkout; this makes the rest of the file agree with it.
-UNOQ_PROJECT="$(cd "$(dirname "${BASH_SOURCE[0]:-$HOME/two-computers-one-board/env.sh}")" && pwd)"
-export UNOQ_PROJECT
+#
+# NO FALLBACK PATH. There used to be one - `${BASH_SOURCE[0]:-$HOME/<repo>/env.sh}`
+# - and it quietly reintroduced the exact assumption the paragraph above says
+# was removed: sourced from a shell that does not set BASH_SOURCE, it would
+# guess a path, be wrong, and every helper would point somewhere that does not
+# exist with nothing to say why. Refusing is the honest answer, because there
+# is no way to work out where this file is without the shell's help.
+if [ -z "${BASH_SOURCE[0]:-}" ]; then
+  echo "env.sh: source me from bash - I cannot find myself otherwise" >&2
+else
+  UNOQ_PROJECT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  export UNOQ_PROJECT
+fi
 
 # uv, west, cmake, ninja (installed as uv tools) + on-board OpenOCD
 export PATH="$HOME/.local/bin:/opt/openocd/bin:$PATH"

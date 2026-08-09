@@ -324,3 +324,39 @@ unit() {
   [ "$status" -ne 0 ]
   [[ "$output" == *"no [Section] header"* ]]
 }
+
+# --- Documentation= ---------------------------------------------------------
+
+@test "a Documentation=file: target that does not exist is caught" {
+  # These fail SILENTLY in production: nothing reads them until a person runs
+  # `systemctl status` and follows the link. Two units shipped for weeks
+  # pointing at docs/usb.md and docs/mpu.md after the docs moved under
+  # reference/, and nothing anywhere noticed.
+  load_lib "$BATS_TEST_TMPDIR"
+  src="$(unit doc "[Unit]" "Documentation=file:$BATS_TEST_TMPDIR/gone.md" \
+    "[Service]" "ExecStart=$BIN/thing")"
+  run install_unit "$src"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"documents itself with a file that is not there"* ]]
+}
+
+@test "http and man Documentation entries are left alone" {
+  # Not ours to verify, and checking them would make provisioning need the
+  # network - which is the one thing this board's whole design avoids.
+  load_lib "$BATS_TEST_TMPDIR"
+  src="$(unit docurl "[Unit]" \
+    "Documentation=https://example.invalid/x man:systemd(1)" \
+    "[Service]" "ExecStart=$BIN/thing")"
+  run install_unit "$src"
+  [ "$status" -eq 0 ]
+}
+
+@test "several Documentation entries on one line are all checked" {
+  load_lib "$BATS_TEST_TMPDIR"
+  src="$(unit docmulti "[Unit]" \
+    "Documentation=file:$BIN/thing file:$BATS_TEST_TMPDIR/gone.md" \
+    "[Service]" "ExecStart=$BIN/thing")"
+  run install_unit "$src"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"gone.md"* ]]
+}

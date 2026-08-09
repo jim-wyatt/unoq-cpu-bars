@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 [Unit]
 Description=Arduino UNO Q learning content and installers over HTTP
-Documentation=file:/home/arduino/two-computers-one-board/share/learn/index.html
+Documentation=file:/home/arduino/two-computers-one-board/python/unoq/learn.py
 
 # The content lives inside the FAT32 image mounted at /srv/unoq-share, which is
 # a loop mount of a file on /home/arduino - itself a separate partition that

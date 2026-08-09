@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 [Unit]
 Description=Bind the Arduino UNO Q USB gadget to the controller that just appeared
-Documentation=file:/home/arduino/two-computers-one-board/docs/usb.md
+Documentation=file:/home/arduino/two-computers-one-board/docs/reference/usb.md
 
 # Started by udev (99-unoq-usb-gadget.rules) when a UDC or a gadget netdev
 # appears - that is, when someone plugs the board into a computer.

@@ -109,6 +109,23 @@ theme:
 extra_css:
   - stylesheets/extra.css
 
+# Material vendors mermaid itself (the `privacy` plugin turns its CDN reference
+# into a local copy) and emits a script tag for it that resolves correctly from
+# every page - but nothing then RENDERS the diagrams. Measured with a headless
+# Chromium: the library loads, and `data-processed` stays at 0 on every page.
+#
+# So the library comes from Material, and the one missing piece - calling
+# mermaid.run() over the `pre.mermaid` blocks - is supplied here. extra_javascript
+# is emitted per page with the right number of ../ for that page's depth, and it
+# runs on DOMContentLoaded, by which point Material's copy has defined mermaid.
+#
+# Verify after changing anything here, because nothing fails when this breaks -
+# the diagrams simply come out as text:
+#
+#   tools/check-diagrams.sh
+extra_javascript:
+  - assets/javascripts/mermaid-init.js
+
 extra:
   social:
     - icon: fontawesome/brands/github

@@ -47,6 +47,7 @@ and is served over the network, so it is redistribution and belongs here.
 | `assets/stylesheets/`, `assets/javascripts/` | Martin Donath (squidfunk) and contributors | MIT |
 | `assets/javascripts/lunr/` | The lunr.js authors | MIT |
 | `assets/external/unpkg.com/mermaid@11/` | The Mermaid authors | MIT |
+| `assets/javascripts/mermaid-init.js` | This project | MIT |
 | Icons (inlined as SVG) | Material Design Icons / FontAwesome / Octicons | Apache-2.0 / CC-BY-4.0 / MIT |
 
 The `privacy` plugin is what puts the last two there: it downloads at build

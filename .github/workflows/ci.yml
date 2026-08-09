@@ -57,7 +57,7 @@ jobs:
       - name: Run gates
         run: |
           export PATH="$HOME/.local/bin:$PATH"
-          tools/check.sh python shell c docs
+          tools/check.sh python shell c docs diagrams
 
   # Does this change touch anything the firmware is built from?
   #

@@ -5,8 +5,8 @@
 #
 #   ~/hybrid/tools/check.sh              # everything
 #   ~/hybrid/tools/check.sh --fix        # reformat in place, then check
-#   ~/hybrid/tools/check.sh --fast       # skip the MCU suite (~70s of build)
-#   ~/hybrid/tools/check.sh python       # one area: python | shell | c | docs | mcu
+#   ~/hybrid/tools/check.sh --fast       # skip the slow ones (MCU build, diagrams)
+#   ~/hybrid/tools/check.sh python       # one area: python | shell | c | docs | diagrams | mcu
 #
 # Every gate runs even if an earlier one fails, so one pass shows you all the
 # work rather than the first thing to break. Exit status is non-zero if any
@@ -31,14 +31,14 @@ for arg in "$@"; do
       sed -n '2,14p' "$0"
       exit 0
       ;;
-    python | shell | c | mcu | docs) AREAS+=("$arg") ;;
+    python | shell | c | mcu | docs | diagrams) AREAS+=("$arg") ;;
     *)
       echo "unknown argument: $arg (try --help)" >&2
       exit 2
       ;;
   esac
 done
-[ ${#AREAS[@]} -eq 0 ] && AREAS=(python shell c docs mcu)
+[ ${#AREAS[@]} -eq 0 ] && AREAS=(python shell c docs diagrams mcu)
 
 if [ -t 1 ]; then
   RED=$'\033[31m' GREEN=$'\033[32m' DIM=$'\033[2m' BOLD=$'\033[1m' OFF=$'\033[0m'
@@ -171,6 +171,20 @@ if wanted docs; then
   # a reader. This gate is the reason the docs tree can be reorganised at all.
   have mkdocs "docs (mkdocs --strict)" &&
     run "docs (mkdocs --strict)" "$PROJECT/tools/build-docs.sh"
+fi
+
+# --- diagrams ---------------------------------------------------------------
+
+if wanted diagrams; then
+  cd "$PROJECT" || exit 1
+  if [ "$FAST" = 1 ]; then
+    printf '%s>>> diagrams (skipped: --fast)%s\n\n' "$DIM" "$OFF"
+  else
+    # The only gate that opens a browser, and the only one that can catch a
+    # diagram silently coming out as grey text - which is exactly what twelve of
+    # them did, through a clean --strict build, for hours. ~60s.
+    run "diagrams (headless render)" "$PROJECT/tools/check-diagrams.sh"
+  fi
 fi
 
 # --- mcu -------------------------------------------------------------------

@@ -360,3 +360,75 @@ unit() {
   [ "$status" -ne 0 ]
   [[ "$output" == *"gone.md"* ]]
 }
+
+# --- the interpreter, not just the file ------------------------------------
+
+@test "a script whose interpreter is missing is caught" {
+  # The case this whole check was written for, which it originally missed.
+  # Moving the checkout left the venv's console scripts present and executable
+  # with a shebang naming a python that no longer existed - so -x passed,
+  # install_unit was happy, and systemd reported 203/EXEC naming the SCRIPT
+  # rather than the interpreter that was actually gone.
+  load_lib "$BATS_TEST_TMPDIR"
+  printf '#!%s/bin/absent-python\nprint(1)\n' "$BATS_TEST_TMPDIR" >"$BIN/script"
+  chmod +x "$BIN/script"
+  src="$(unit interp "[Service]" "ExecStart=$BIN/script")"
+  run install_unit "$src"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"interpreter is missing"* ]]
+  [[ "$output" == *"absent-python"* ]]
+}
+
+@test "a working interpreter passes" {
+  load_lib "$BATS_TEST_TMPDIR"
+  printf '#!/bin/sh\nexit 0\n' >"$BIN/good"
+  chmod +x "$BIN/good"
+  src="$(unit goodinterp "[Service]" "ExecStart=$BIN/good")"
+  run install_unit "$src"
+  [ "$status" -eq 0 ]
+}
+
+@test "env-style shebangs are accepted without resolving the argument" {
+  # `#!/usr/bin/env python3` runs /usr/bin/env, which resolves python3 from
+  # PATH itself. Checking the argument would mean reimplementing that lookup
+  # and would fail on anything using a PATH systemd sets up later.
+  load_lib "$BATS_TEST_TMPDIR"
+  printf '#!/usr/bin/env definitely-not-installed\n' >"$BIN/envstyle"
+  chmod +x "$BIN/envstyle"
+  src="$(unit envstyle "[Service]" "ExecStart=$BIN/envstyle")"
+  run install_unit "$src"
+  [ "$status" -eq 0 ]
+}
+
+@test "a binary with no shebang is not mistaken for a broken script" {
+  load_lib "$BATS_TEST_TMPDIR"
+  cp /bin/true "$BIN/realbinary"
+  src="$(unit binary "[Service]" "ExecStart=$BIN/realbinary")"
+  run install_unit "$src"
+  [ "$status" -eq 0 ]
+}
+
+@test "a tab-separated shebang splits on the tab, as the kernel does" {
+  # The kernel ends the interpreter name at a space OR a tab, so this shebang
+  # names /usr/bin/env and runs fine. Splitting on a literal space alone would
+  # leave "env<TAB>definitely-not-installed" in the interpreter and fail -x on
+  # a unit that works - a false failure that blocks provisioning outright.
+  load_lib "$BATS_TEST_TMPDIR"
+  printf '#!/usr/bin/env\tdefinitely-not-installed\n' >"$BIN/tabbed"
+  chmod +x "$BIN/tabbed"
+  src="$(unit tabbed "[Service]" "ExecStart=$BIN/tabbed")"
+  run install_unit "$src"
+  [ "$status" -eq 0 ]
+}
+
+@test "a missing interpreter is still caught when separated by a tab" {
+  # The other half: widening the split must not blind the check itself.
+  load_lib "$BATS_TEST_TMPDIR"
+  printf '#!%s/bin/absent\tfoo\n' "$BATS_TEST_TMPDIR" >"$BIN/tabbedbad"
+  chmod +x "$BIN/tabbedbad"
+  src="$(unit tabbedbad "[Service]" "ExecStart=$BIN/tabbedbad")"
+  run install_unit "$src"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"interpreter is missing"* ]]
+  [[ "$output" == *"absent"* ]]
+}

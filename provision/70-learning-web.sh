@@ -78,14 +78,25 @@ step "verify"
 # systemd reports the unit started, and a single immediate probe fails on a
 # service that is in fact perfectly healthy.
 code=""
+reachable=0
 for _ in $(seq 1 10); do
-  code=$(curl -fsS -o /dev/null -w '%{http_code}' --max-time 5 "http://127.0.0.1:$PORT/" 2>/dev/null) && break
+  # The EXIT STATUS is the only honest signal here. On a refused connection
+  # curl still prints "000" to stdout and exits non-zero, so `[ -n "$code" ]`
+  # is true and the probe "passes" - which is exactly what happened during the
+  # checkout relocation that found this: `ok HTTP 000` while nothing at all was
+  # listening. A verify step that passes when the thing it verifies is down is
+  # worse than none, because it is where you look to find out whether it worked.
+  if code=$(curl -fsS -o /dev/null -w '%{http_code}' --max-time 5 \
+    "http://127.0.0.1:$PORT/" 2>/dev/null); then
+    reachable=1
+    break
+  fi
   sleep 1
 done
-if [ -n "$code" ]; then
+if [ "$reachable" = 1 ]; then
   skip "HTTP $code from http://127.0.0.1:$PORT/"
 else
-  warn "no response on port $PORT - check: journalctl -u unoq-learn -n 30"
+  warn "no response on port $PORT (last code: ${code:-none}) - check: journalctl -u unoq-learn -n 30"
 fi
 
 summary

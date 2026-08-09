@@ -17,10 +17,22 @@
 # every pass. A CI job that compiles a different Zephyr from the board is worse
 # than no CI job, because it reports green about something nobody is running.
 #
-# NO PROJECT FILTER HERE, unlike the board. The filter exists because a 10 GB
-# rootfs cannot hold 7 GB of vendor HALs; a runner can, and a shallow clone of
-# everything is far less likely to break than an allowlist that has to be kept
-# correct by hand.
+# THE PROJECT FILTER IS NOT HERE, but it is not absent either: west takes it as
+# config rather than manifest, so the workflow applies it from the shared
+# ../west-project-filter and the board's provisioning script reads the same file.
+#
+# This used to say CI deliberately cloned everything, on the grounds that a
+# runner has the disk and an allowlist is one more thing to keep correct. Two
+# things changed that. The allowlist was never hypothetical - the board has
+# maintained one all along, so "keep it correct by hand" was already the cost of
+# doing business, and sharing it adds no new burden while removing a copy. And
+# the disk was never what it cost: `west update` clones 68 projects one at a
+# time, 159s of it, almost entirely connection overhead for hardware this board
+# does not have.
+#
+# What actually decided it is the rule three lines below. CI was building 68
+# modules against the board's ~20. That is the same class of divergence as the
+# version, and it earns the same treatment.
 manifest:
   self:
     # The workflow checks this repository out at ./app rather than under its own

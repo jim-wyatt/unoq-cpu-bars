@@ -54,3 +54,44 @@ EOF
 fi
 
 echo "Zephyr pinned at $prov in both the provisioning script and the manifest"
+
+# --- the module filter -----------------------------------------------------
+#
+# The version has to be written twice; the FILTER does not, so it is shared
+# outright and this only has to prove nobody has quietly gone back to a copy.
+# A hardcoded filter in either consumer would still work and would still build
+# - it would just be free to drift, which is the failure this whole file exists
+# to prevent.
+FILTER_FILE="$PROJECT/west-project-filter"
+WORKFLOW="$PROJECT/.github/workflows/ci.yml"
+
+if [ ! -r "$FILTER_FILE" ]; then
+  echo "missing $FILTER_FILE - both the board and CI read the filter from it" >&2
+  exit 1
+fi
+
+filter="$(grep -vE '^[[:space:]]*(#|$)' "$FILTER_FILE" | head -1)"
+if [ -z "$filter" ]; then
+  echo "$FILTER_FILE has no filter line (first non-comment, non-blank line)" >&2
+  exit 1
+fi
+
+fail=0
+if ! grep -q 'west-project-filter' "$WORKFLOW"; then
+  echo "$WORKFLOW no longer passes west-project-filter to the setup action" >&2
+  fail=1
+fi
+for f in "$PROV" "$WORKFLOW"; do
+  if grep -qE "^[^#]*['\"= ]-hal_\.\*," "$f"; then
+    cat >&2 <<EOF
+$f hardcodes a module filter instead of reading west-project-filter.
+
+That is the copy this file exists to prevent: it builds fine and is free to
+drift from the other consumer. Read the shared file instead.
+EOF
+    fail=1
+  fi
+done
+[ "$fail" = 0 ] || exit 1
+
+echo "module filter shared from west-project-filter by the board and CI"

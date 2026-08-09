@@ -11,6 +11,7 @@ default - see pyproject.toml.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Sequence
 from typing import Any
 
@@ -21,6 +22,11 @@ import pytest
 # drift - the same trick app_proto.h gets, for the same reason: a fake that
 # imitates a prompt the firmware never sends proves nothing about the parser.
 PROMPT = "unoq:~$ "
+
+# One descriptor for the whole session, deliberately never closed: FakeSerial
+# hands it to open_port's TIOCEXCL ioctl, and a per-instance fd would leak one
+# per test. See FakeSerial.fileno for why it has to be real.
+_DEV_NULL = os.open(os.devnull, os.O_RDWR)
 
 
 class FakeSerial:
@@ -60,6 +66,21 @@ class FakeSerial:
         self._pending = b""
 
     # -- serial.Serial surface ---------------------------------------------
+
+    def fileno(self) -> int:
+        """A real descriptor, pointing at /dev/null.
+
+        open_port() sets TIOCEXCL on the fd it gets back, and under test that
+        ioctl is real. Two tempting answers are both wrong: a plausible number
+        like 42 aims a "make this tty exclusive" ioctl at whatever the test
+        process happens to have open there, and -1 raises ValueError rather
+        than the OSError open_port is written to tolerate.
+
+        /dev/null is a character device that is not a tty, so the ioctl fails
+        with ENOTTY - exactly the path a real tty that will not take TIOCEXCL
+        takes, and one open_port already handles.
+        """
+        return _DEV_NULL
 
     def reset_input_buffer(self) -> None:
         self.reset_count += 1

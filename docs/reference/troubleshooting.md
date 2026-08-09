@@ -43,7 +43,9 @@ See [hardware.md](hardware.md#the-two-gpios-nobody-documents).
 
 **`Device or resource busy` on `/dev/ttyHS1`.**
 Something else holds it — `tio`, `mcucon`, a stale Python handle, or (if it were
-re-enabled) `arduino-router`. Use `unoq.MCU` as a context manager.
+re-enabled) `arduino-router`. Use `unoq.MCU` as a context manager. If nothing
+appears to hold it, see
+[the note on `tio` below](#tio-can-leave-the-port-unusable-after-it-exits).
 
 ## Serial output is wrong or missing
 
@@ -134,9 +136,48 @@ any other user of them will lose. PF11–PF15 are untouched.
 
 **`/dev/ttyHS1` is suddenly "device busy" — `mcucon`, `tio` and `unoq.MCU` all
 fail.**
-The boot service is probably running and holding the port open; pyserial opens
-it exclusively. `sudo systemctl stop unoq-cpu-bars`. Flashing over SWD is
-unaffected.
+The boot service is probably running and holding the port open.
+`sudo systemctl stop unoq-cpu-bars`. Flashing over SWD is unaffected.
+
+Since [#55] `unoq.MCU` reports this properly — it names the process holding the
+port and the command to stop it, instead of surfacing a bare `errno 16`.
+
+> ### `tio` can leave the port unusable after it exits
+>
+> This is the confusing one, and it looks like a hardware fault.
+>
+> There are **two different locks** on a serial port and they do not see each
+> other. `flock` — which is what pyserial's `exclusive=True` takes — is
+> *advisory*: it stops another pyserial caller and nothing else. `TIOCEXCL` —
+> which is what `tio` and `screen` set — is enforced by the kernel, and any
+> later `open()` fails with `EBUSY`.
+>
+> **`TIOCEXCL` is per-tty state, cleared only when the *last* file descriptor
+> closes.** `unoq-cpu-bars.service` holds the port open permanently. So a `tio`
+> that is killed rather than quit cleanly can leave the flag set with nothing
+> to show for it:
+>
+> ```console
+> $ sudo lsof /dev/ttyHS1
+> unoq-cpu- 255481 arduino 3uW CHR 237,1 0t0 149 /dev/ttyHS1
+> $ hpy -c "import os; os.open('/dev/ttyHS1', os.O_RDWR)"
+> OSError: [Errno 16] Device or resource busy
+> ```
+>
+> The only process listed is the one that has always had it open and is not the
+> cause. Nothing in `lsof` explains the `EBUSY`, because the flag outlives the
+> process that set it.
+>
+> ```bash
+> sudo systemctl restart unoq-cpu-bars   # closes every fd, clearing the flag
+> ```
+>
+> `unoq.MCU` now sets `TIOCEXCL` itself, which mostly closes this off: `tio` can
+> no longer open the port while the service is running, so it cannot flag it.
+> `tio` **waits silently** rather than reporting the refusal — it retries by
+> default, so it looks like a hang. That is the port being held, not a fault.
+
+[#55]: https://github.com/jim-wyatt/unoq-cpu-bars/issues/55
 
 **The panel is stuck showing an old frame.**
 Something killed the daemon with SIGTERM instead of SIGINT, so the cleanup that

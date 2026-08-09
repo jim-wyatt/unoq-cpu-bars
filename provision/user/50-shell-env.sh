@@ -91,5 +91,33 @@ else
   warn "  reproduce with: bash --norc --noprofile -c '. $PROJECT/env.sh'"
 fi
 
+step "VS Code machine settings"
+# The board-wide half of the editor configuration - watcher excludes for the
+# ~4 GB of Zephyr checkout and toolchain, and the auto-update switch the README
+# says is deliberately off.
+#
+# It has to be installed rather than merely documented, because it lives under
+# ~/.vscode-server, which a factory restore wipes. Every setting in it is one
+# whose default costs you something rather than breaking anything, so nothing
+# announces its absence: the board just runs hotter, swaps sooner, and updates
+# extensions in the background while you build.
+#
+# Written only if missing, like /etc/default/unoq-usb: it is a file a person is
+# expected to edit, and re-provisioning must not undo that.
+# REVERT: rm ~/.vscode-server/data/Machine/settings.json
+VSCODE_MACHINE="$HOME/.vscode-server/data/Machine/settings.json"
+if [ ! -d "$HOME/.vscode-server" ]; then
+  skip "no ~/.vscode-server (VS Code Remote has not connected to this board yet)"
+elif [ -f "$VSCODE_MACHINE" ]; then
+  skip "$VSCODE_MACHINE exists - leaving it alone"
+else
+  mkdir -p "$(dirname "$VSCODE_MACHINE")"
+  if cp "$PROVISION_DIR/user/vscode-machine-settings.json" "$VSCODE_MACHINE"; then
+    did "wrote $VSCODE_MACHINE (reload the window to apply)"
+  else
+    warn "could not write $VSCODE_MACHINE"
+  fi
+fi
+
 summary
 echo "Open a new shell, or:  source $PROJECT/env.sh"

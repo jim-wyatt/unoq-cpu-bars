@@ -1,0 +1,70 @@
+// Copyright (c) 2026 Jim Wyatt
+// SPDX-License-Identifier: MIT
+//
+// Board-wide VS Code Server settings, installed to
+// ~/.vscode-server/data/Machine/settings.json by 50-shell-env.sh.
+//
+// These are the MACHINE-scoped ones: they are about this board having 3.6 GB of
+// RAM and a slow-ish disk, not about this project. The project's own settings
+// live in .vscode/settings.json and are checked in beside the code they affect.
+//
+// They used to exist only inside ~/.vscode-server, which meant a factory
+// restore silently took them with it - and nothing announced their absence,
+// because every one of them is a setting whose default merely costs you
+// something rather than breaking anything.
+{
+  // The README says extension auto-update is deliberately off, because a
+  // background download-and-reload of a dozen extensions on a 3.6 GB board is
+  // felt. That decision lived nowhere but in this file, so a restore quietly
+  // undid it. Run tools/check-versions.sh occasionally instead.
+  "extensions.autoUpdate": false,
+  "extensions.autoCheckUpdates": false,
+
+  // The file watcher is the one component whose cost scales with what is on
+  // disk rather than what is open. ~/zephyrproject is ~3.3 GB and the SDK
+  // another ~1 GB, and neither is ever edited by hand - they are checkouts west
+  // manages and a toolchain. Watching them buys nothing and costs an inotify
+  // watch per directory.
+  "files.watcherExclude": {
+    "**/zephyrproject/**": true,
+    "**/zephyr-sdk-*/**": true,
+    "**/.venv/**": true,
+    "**/.cache/**": true,
+    "**/twister-out/**": true,
+    "**/build/**": true,
+    "**/__pycache__/**": true,
+    "**/.git/objects/**": true
+  },
+
+  // Same trees, for search. Without this, a project-wide find walks 4+ GB of
+  // Zephyr and toolchain sources and pushes the board into swap.
+  "search.exclude": {
+    "**/zephyrproject/**": true,
+    "**/zephyr-sdk-*/**": true,
+    "**/.venv/**": true,
+    "**/twister-out/**": true,
+    "**/build/**": true
+  },
+  "search.followSymlinks": false,
+
+  // Scanning for npm scripts, gulp files and grunt tasks on a board with no
+  // node project on it is pure cost.
+  "npm.autoDetect": "off",
+  "task.autoDetect": "off",
+  "typescript.tsserver.useSyntaxServer": "never",
+
+  // git.autofetch wakes the network every few minutes. On a board whose uplink
+  // may be a USB cable to a laptop that is not always sharing, that is both
+  // pointless and a source of confusing log noise.
+  "git.autofetch": false,
+  "git.autorefresh": false,
+
+  "telemetry.telemetryLevel": "off",
+  "workbench.enableExperiments": false,
+  "workbench.settings.enableNaturalLanguageSearch": false,
+
+  // Restoring a dozen editors on window reload means a dozen language-server
+  // requests before you have asked for anything.
+  "workbench.editor.restoreViewState": false,
+  "files.hotExit": "off"
+}

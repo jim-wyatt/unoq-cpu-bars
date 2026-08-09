@@ -35,6 +35,7 @@ tools/check.sh docs           # one area
   PASS  pytest + coverage    104 tests, 100% of branches
   PASS  shellcheck           shell mistakes
   PASS  shfmt                shell layout
+  PASS  bats (shell behaviour)  35 tests, no board involved
   PASS  clang-format         C layout
   PASS  docs (mkdocs --strict)  every documentation link resolves
 ```
@@ -120,6 +121,75 @@ The tests that genuinely need a board exist and are marked:
 They are **deselected by default** (`-m "not hardware"`), so the suite is
 runnable on a laptop, in CI, and on a board whose serial port is currently held
 by the demo. Opt in with `pytest -m hardware` when the hardware is there.
+
+## Testing shell, which is where the bugs actually were
+
+Here is an uncomfortable measurement of this project:
+
+| | lines | checked by |
+|---|---:|---|
+| **shell** (40 scripts) | **5,256** | `shellcheck` + `shfmt` |
+| Python | 807 | 104 tests, 100% of branches |
+| C | 965 | ztest on `native_sim` |
+
+The largest component by a factor of five had **no behavioural tests at all**.
+And every one of the twenty-one findings in
+[the log](../reference/clean-board-findings.md) was in shell or in a `systemd`
+unit — not one was in the Python or the C that all the testing effort went into.
+
+That is a very common shape, and it is worth recognising in your own projects:
+**the tested part is usually the part that was easy to test**, not the part most
+likely to hurt you.
+
+### The trick that made it possible
+
+The obvious fix is to split every script into a "decide" half and a "do" half,
+and test the first. That is a large change to scripts that currently work, made
+*before* there are any tests to catch it going wrong — the wrong order.
+
+But these scripts already have a seam, because **everything they actually do is
+another program**: `ip`, `nmcli`, `systemctl`, `logger`. Put a directory of fake
+versions at the front of `PATH` and the real script runs, unmodified, while
+nothing reaches the board. What you assert on is the command line it *would*
+have used.
+
+```bash
+stub_body ip <<'SH'
+case "$1 $2" in "link show") exit 1 ;; esac   # pretend the bridge has gone
+exit 0
+SH
+
+run usb/usb-route.sh add 02:00:00:00:00:01 192.168.137.1
+[ "$status" -eq 0 ]
+! ran_like 'ip route'      # it noticed, and did nothing
+```
+
+The runner is [bats](https://github.com/bats-core/bats-core), which is itself
+shell.
+
+### Write the bug down as a test
+
+Both suites exist because those two scripts had already failed in ways that were
+expensive:
+
+- **The bind guard counted wrong.** `udev` triggers the bind unit three times on
+  a perfectly healthy plug-in, so counting invocations reached its limit of 3
+  during the first *successful* one and refused to bind ever again — a guard
+  causing exactly the outage it exists to prevent.
+- **The USB route metric was 500**, which beat wifi's 600, so plugging the board
+  into a computer silently handed that computer the default route. SSH survived,
+  so nothing looked broken, while `apt` and `git` simply stopped.
+
+Neither is the kind of thing you would think to test in advance. Both are
+obvious once they have happened, and a test is how you make sure they happen
+only once.
+
+> [!TIP]
+> A suite that passes the first time you run it may be asserting nothing. Break
+> the code on purpose and check the *right* test goes red. Both of these were
+> mutation-tested against the two bugs above before being committed — reversing
+> the guard's same-boot check turns exactly one test red, and it is the one
+> named after the bug.
 
 ## The 100% that is not what it looks like
 

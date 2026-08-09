@@ -121,6 +121,13 @@ if wanted shell; then
       fi
     fi
   fi
+  # Behaviour, not style. shellcheck and shfmt are linters: they will tell you
+  # a variable is unquoted and never that the bind guard counts wrong. Shell is
+  # the largest thing in this project by a factor of five and every finding in
+  # docs/reference/clean-board-findings.md was in it or in a unit file, so it
+  # is the last place that should have been checked for syntax only.
+  need bats "bats (shell behaviour)" &&
+    run "bats (shell behaviour)" bats "$PROJECT/tests"
 fi
 
 # --- c ---------------------------------------------------------------------

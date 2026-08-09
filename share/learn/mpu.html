@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MPU workflow - Arduino UNO Q</title>
+<style>
+:root {
+  --bg: #ffffff; --fg: #1c2024; --muted: #5b6570; --rule: #e3e8ee;
+  --accent: #0b6cbd; --accent-soft: #eaf3fb; --code-bg: #f6f8fa;
+  --side: #fbfcfd; --warn-bg: #fff8e6; --warn-edge: #e0a800;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14181c; --fg: #dde3ea; --muted: #93a1b0; --rule: #262d35;
+    --accent: #5aa9f0; --accent-soft: #17222d; --code-bg: #1b2127;
+    --side: #11151a; --warn-bg: #241f10; --warn-edge: #8a6d1a;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, sans-serif;
+}
+.wrap { display: flex; align-items: flex-start; max-width: 1180px; margin: 0 auto; }
+nav {
+  width: 250px; flex: 0 0 250px; padding: 28px 18px 60px; background: var(--side);
+  border-right: 1px solid var(--rule); position: sticky; top: 0; max-height: 100vh;
+  overflow-y: auto;
+}
+nav .brand { font-weight: 700; font-size: 15px; letter-spacing: .01em; display: block;
+  color: var(--fg); text-decoration: none; margin-bottom: 4px; }
+nav .tag { color: var(--muted); font-size: 12.5px; margin-bottom: 22px; }
+nav h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .09em;
+  color: var(--muted); margin: 22px 0 8px; }
+nav ol { list-style: none; margin: 0; padding: 0; counter-reset: step; }
+nav li { margin: 1px 0; }
+nav a { display: block; padding: 5px 9px; border-radius: 6px; text-decoration: none;
+  color: var(--fg); font-size: 14px; }
+nav a:hover { background: var(--accent-soft); }
+nav a.here { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+nav ol.steps a::before { counter-increment: step; content: counter(step) ". ";
+  color: var(--muted); font-variant-numeric: tabular-nums; }
+main { flex: 1 1 auto; min-width: 0; padding: 40px 44px 96px; }
+h1, h2, h3, h4 { line-height: 1.25; margin: 1.9em 0 .55em; }
+h1 { font-size: 2.05rem; margin-top: 0; letter-spacing: -.015em; }
+h2 { font-size: 1.42rem; padding-bottom: .28em; border-bottom: 1px solid var(--rule); }
+h3 { font-size: 1.13rem; }
+h4 { font-size: 1rem; color: var(--muted); }
+p, ul, ol, table, pre, blockquote { margin: 0 0 1.05em; }
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+ul, ol { padding-left: 1.4em; }
+li { margin: .3em 0; }
+code {
+  font: 13.5px/1.5 ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  background: var(--code-bg); padding: .14em .38em; border-radius: 4px;
+}
+pre {
+  background: var(--code-bg); border: 1px solid var(--rule); border-radius: 8px;
+  padding: 13px 15px; overflow-x: auto;
+}
+pre code { background: none; padding: 0; font-size: 13px; line-height: 1.55; }
+blockquote {
+  margin-left: 0; padding: .7em 1em; background: var(--warn-bg);
+  border-left: 3px solid var(--warn-edge); border-radius: 0 6px 6px 0;
+}
+blockquote p { margin: 0; }
+.tablewrap { overflow-x: auto; margin-bottom: 1.05em; }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; padding: 7px 11px; border-bottom: 1px solid var(--rule);
+  vertical-align: top; }
+th { font-size: 12.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+hr { border: 0; border-top: 1px solid var(--rule); margin: 2.2em 0; }
+.pager { display: flex; justify-content: space-between; gap: 14px; margin-top: 56px;
+  padding-top: 20px; border-top: 1px solid var(--rule); font-size: 14.5px; }
+.pager a { display: block; padding: 11px 15px; border: 1px solid var(--rule);
+  border-radius: 8px; text-decoration: none; max-width: 47%; }
+.pager a:hover { border-color: var(--accent); }
+.pager span { display: block; color: var(--muted); font-size: 11.5px;
+  text-transform: uppercase; letter-spacing: .07em; }
+.menu { display: none; }
+@media (max-width: 860px) {
+  .wrap { display: block; }
+  nav { width: auto; max-height: none; position: static; border-right: 0;
+        border-bottom: 1px solid var(--rule); }
+  main { padding: 26px 20px 70px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav><a class="brand" href="index.html">Arduino UNO Q</a>
+<div class="tag">Hybrid MPU + MCU development, from scratch</div>
+<h3>Learning path</h3>
+<ol class="steps">
+<li><a href="start-here.html">Start here</a></li>
+<li><a href="two-computers.html">Two computers on one board</a></li>
+</ol>
+<h3>Reference</h3>
+<ol>
+<li><a href="clean-board-findings.html">What a clean board revealed</a></li>
+<li><a href="hardware.html">The hardware, honestly</a></li>
+<li><a href="mcu.html">MCU workflow</a></li>
+<li><a href="mpu.html" class="here">MPU workflow</a></li>
+<li><a href="troubleshooting.html">Troubleshooting</a></li>
+<li><a href="usb.html">IP over USB, and the fileshare</a></li>
+</ol></nav>
+<main>
+<h1 id="mpu-workflow">MPU workflow</h1>
+<p>The Linux side: direct hardware access, the <code>unoq</code> package for talking to the MCU, and the CPU-bars demo that uses both halves of the board at once.</p>
+<pre><code class="lang-bash">hpy your_script.py          # alias for ~/hybrid/.venv/bin/python</code></pre>
+<h2 id="direct-hardware">Direct hardware</h2>
+<p>The MPU&#x27;s own GPIO / I²C / SPI — separate from the Arduino headers, which are wired to the MCU.</p>
+<pre><code class="lang-python">import gpiod, smbus2, spidev, serial</code></pre>
+<div class="tablewrap"><table><thead><tr><th>Interface</th><th>Device</th><th>Notes</th></tr></thead><tbody><tr><td>GPIO</td><td><code>/dev/gpiochip0..2</code></td><td>chip1 has 127 lines; also carries SWD + BOOT0</td></tr><tr><td>I²C</td><td><code>/dev/i2c-0..2</code></td><td>needs the <code>i2c</code> group</td></tr><tr><td>SPI</td><td><code>/dev/spidev0.0</code></td><td>needs the <code>spi</code> group + udev rule</td></tr><tr><td>Serial</td><td><code>/dev/ttyHS1</code></td><td>the MCU link</td></tr></tbody></table></div>
+<p>Group membership and the udev rule are set up by [<code>provision/20-dev-tools.sh</code>](../provision/20-dev-tools.sh).</p>
+<h2 id="the-unoq-package">The <code>unoq</code> package</h2>
+<p>Installed editable from <code>~/hybrid/python</code> into <code>~/hybrid/.venv</code>.</p>
+<pre><code class="lang-python">from unoq import MCU, fota, link_up, link_state
+
+link_up()                      # BOOT0 low + UART enable (idempotent)
+link_state()                   # {&#x27;boot0&#x27;: &#x27;OUTPUT&#x27;, &#x27;link_enable&#x27;: &#x27;OUTPUT&#x27;}
+
+with MCU() as mcu:
+    mcu.status()               # {&#x27;uptime_ms&#x27;: 12216, &#x27;flip&#x27;: 0, &#x27;sweeps&#x27;: 1043712}
+
+    mcu.bars([12, 3, 0, 47])   # LED matrix: one bar per value, 0..100
+    mcu.matrix_px(7, 0)        # light one LED - finds the panel&#x27;s orientation
+    mcu.matrix_flip()          # rotate 180 degrees, persisted in NVS
+    mcu.matrix_off()
+
+    mcu.cmd(&#x27;kernel threads&#x27;)  # any shell command, parsed into lines</code></pre>
+<p>The class wraps the firmware&#x27;s own <code>app</code> command group and nothing else. The shell&#x27;s built-in groups — <code>gpio</code>, <code>i2c</code>, <code>device</code>, <code>kernel</code>, <code>devmem</code> — are one <code>mcu.cmd()</code> away, or you can type them straight into <code>tio</code>; wrapping each in a Python method bought nothing but more surface to keep in step with Zephyr.</p>
+<p><code>MCU</code> is a context manager <strong>on purpose</strong> — the UART is a single shared resource and a stale handle blocks <code>tio</code>, <code>mcucon</code>, and SMP alike.</p>
+<p><code>mcu.cmd()</code> reads until the shell prompt reappears rather than sleeping a fixed time, so slow commands (<code>device list</code>) and fast ones each cost what they should. It raises <code>MCUError</code> on <code>command not found</code> and on any line the firmware prefixes with <code>Error:</code>, and <code>ShellTimeout</code> if no prompt comes back.</p>
+<h3 id="firmware-update">Firmware update</h3>
+<pre><code class="lang-python">from unoq import fota
+fota.images()    # slot table
+fota.upload(path); fota.test(); fota.reset(); fota.confirm()</code></pre>
+<p>See <a href="mcu.html#update-over-serial-no-swd">mcu.md</a>.</p>
+<hr>
+<h1 id="cpu-bars-on-the-led-matrix">CPU bars on the LED matrix</h1>
+<p>Host CPU load, one bar per core, on the board&#x27;s 8×13 panel. It is the smallest thing that uses both halves of the board for what each is good at: Linux reads <code>/proc/stat</code>, the STM32 holds a 100 kHz refresh loop steady while it does.</p>
+<pre><code class="lang-bash">unoq-cpu-bars                       # until Ctrl-C
+python -m unoq.cpubars --interval 0.25 --count 20</code></pre>
+<pre><code class="lang-python">from unoq import MCU, CpuSampler
+
+sampler = CpuSampler()              # takes the first reading
+with MCU() as mcu:
+    mcu.bars(sampler.sample())      # [12, 3, 0, 47] -&gt; four bars</code></pre>
+<p><code>/proc/stat</code> holds counters since boot, so a single reading is the average since power-on; keep one <code>CpuSampler</code> alive and take differences.</p>
+<h2 id="at-every-boot">At every boot</h2>
+<pre><code class="lang-bash">sudo bash ~/hybrid/provision/50-cpu-bars.sh      # install + enable
+journalctl -u unoq-cpu-bars -f</code></pre>
+<blockquote><p>**It holds <code>/dev/ttyHS1</code> open.** pyserial opens the port exclusively, so while the service runs, <code>mcucon</code>, <code>tio</code>, <code>unoq.MCU</code> and FOTA all fail with <em>device busy</em>. Stop it before working on the MCU:  ``<code>bash sudo systemctl stop unoq-cpu-bars </code>`<code>  Flashing over SWD (</code>flash.sh<code>, </code>zflash`) is unaffected — that is OpenOCD on the GPIO lines, not the UART.</p></blockquote>
+<p>The unit sets <code>KillSignal=SIGINT</code>, which is load-bearing rather than stylistic. systemd&#x27;s default SIGTERM kills Python outright, so the <code>finally:</code> that blanks the panel never runs and the last frame stays lit indefinitely — measured: SIGTERM exits 143 with the refresh still sweeping, SIGINT exits 0 with the panel dark. <code>Restart=on-failure</code> covers the case where the MPU reaches <code>multi-user.target</code> before the MCU&#x27;s shell is answering.</p>
+<p>It also declares <code>Requires=unoq-link.service</code>, because <code>/dev/ttyHS1</code> reads nothing until that unit has driven the UART-enable GPIO. Ordering alone would let this start against a silent port and restart forever.</p>
+<h2 id="which-half-does-what">Which half does what</h2>
+<div class="tablewrap"><table><thead><tr><th></th><th>Runs on</th><th>File</th></tr></thead><tbody><tr><td>Read <code>/proc/stat</code>, turn counters into percentages</td><td>MPU</td><td>[<code>python/unoq/cpu.py</code>](../python/unoq/cpu.py)</td></tr><tr><td>Send <code>app bars 12 3 0 47</code> over <code>/dev/ttyHS1</code></td><td>MPU</td><td>[<code>python/unoq/mcu.py</code>](../python/unoq/mcu.py)</td></tr><tr><td>Percentages → 104 grayscale pixels</td><td>MCU</td><td>[<code>mcu/app/src/bars.c</code>](../mcu/app/src/bars.c)</td></tr><tr><td>Charlieplex those pixels onto PF0–PF10</td><td>MCU</td><td>[<code>mcu/app/src/matrix.c</code>](../mcu/app/src/matrix.c)</td></tr></tbody></table></div>
+<p>The wire format is whole percentages, so <code>app bars 100 50 0 0</code> typed into <code>tio</code> does exactly what the daemon does. Nothing on the MCU knows what a CPU core is, and nothing on the MPU knows how a bar is drawn.</p>
+<h2 id="reading-the-display">Reading the display</h2>
+<p>Bars are 2 columns wide with a 1-column gap, centred, growing from the bottom.</p>
+<p>Eight rows would quantise load into 12.5% steps, so the top pixel of each bar is dimmed in proportion to the remainder — the 3-bit grayscale is used as a vernier, giving 56 distinguishable heights instead of 8.</p>
+<p>The scale is linear, which has one consequence worth knowing before you decide the display is broken: a core needs <strong>13%</strong> before it lights one row at full brightness, and <strong>2%</strong> before it lights anything at all. An idle UNO Q therefore shows a dark panel with at most a faint dot or two along the bottom edge, and looks exactly like a service that failed to start. Put some load on before judging it:</p>
+<pre><code class="lang-bash">for i in 1 2 3 4; do (timeout 10 bash -c &#x27;while :; do :; done&#x27; &amp;) ; done</code></pre>
+<p>The dark idle state is deliberate — a baseline glow would be indistinguishable from a low but real load.</p>
+<h2 id="orientation">Orientation</h2>
+<p><strong>The panel&#x27;s rows run in whichever direction your board is mounted</strong>, and the firmware cannot know which. If the bars hang from the top instead of standing on the bottom, flip them once:</p>
+<pre><code>unoq:~$ app matrix px 7 0 7      # lights the bottom-left LED, as you should see it
+unoq:~$ app matrix flip          # wrong corner? rotate 180 degrees
+ok flip=1</code></pre>
+<p><code>flip</code> is stored in NVS, so it survives reboots and firmware updates. <code>app status</code> reports it. From Python: <code>mcu.matrix_px(7, 0)</code> and <code>mcu.matrix_flip()</code>.</p>
+<h2 id="is-it-actually-running">Is it actually running?</h2>
+<p>A charlieplexed panel is invisible to software — nothing the MCU can read back tells you what is lit. The one observable is the refresh sweep counter:</p>
+<pre><code class="lang-bash">hpy -c &quot;
+from unoq import MCU; import time
+with MCU() as m:
+    t0 = time.monotonic(); a = m.status()[&#x27;sweeps&#x27;]
+    time.sleep(1)
+    t1 = time.monotonic(); b = m.status()[&#x27;sweeps&#x27;]
+    print(round((b - a) / (t1 - t0)), &#x27;sweeps/s&#x27;)&quot;</code></pre>
+<p>Expect <strong>~962/s</strong> while the panel is on (104 LEDs × 10 µs per slot); measured</p>
+<ol><li>A count stuck at zero means the refresh timer never started; a count that</li></ol>
+<p>climbs means the ISR is running whether or not you can see the LEDs from where you are.</p>
+<blockquote><p>Divide by the <em>measured</em> interval, not by the sleep. A <code>status()</code> round trip costs ~0.30 s — <code>cmd()</code> blocks in <code>read()</code> until its timeout even after the prompt has arrived — so the obvious <code>sleep(1); b - a</code> version reports ~1250 and looks like a panel refreshing 30% faster than the hardware allows.</p></blockquote>
+<p>The panel starts lazily on the first <code>app bars</code>, and <code>app matrix off</code> stops the timer and releases the pins.</p>
+<h2 id="shell-commands">Shell commands</h2>
+<pre><code>app status                      uptime_ms, flip, sweeps
+app bars &lt;pct&gt; [pct ...]        1..7 values, 0..100 each
+app matrix px &lt;row&gt; &lt;col&gt; &lt;lvl&gt; light one LED; row 0..7, col 0..12, lvl 0..7
+app matrix flip                 rotate 180 degrees, persisted
+app matrix off                  blank the panel, stop the refresh</code></pre>
+<h2 id="why-seven-bars">Why seven bars</h2>
+<p>Bars are at least one column wide and always separated by one blank column, so <em>n</em> bars need 2<em>n</em>−1 columns. Thirteen columns therefore cap it at seven. The UNO Q&#x27;s MPU has four cores, so this is not a limit you will meet; a bigger host gets <code>cpu0..cpu6</code> and a warning on stderr, never a silent truncation.</p>
+<h2 id="how-the-panel-works">How the panel works</h2>
+<p>104 LEDs on eleven pins (PF0–PF10), charlieplexed: each LED is one <em>ordered</em> pair of pins, lit by driving one high, one low, and leaving the other nine floating as inputs. Eleven pins give 11 × 10 = 110 ordered pairs; the panel uses the first 104.</p>
+<p>Only one LED is ever on. A TIM17 counter callback walks all 104 every 1.04 ms, and brightness comes from lighting a given LED in <em>L</em> of the seven sweeps that make up a grayscale cycle — so the whole panel redraws at ~137 Hz.</p>
+<p>That is why [<code>matrix.c</code>](../mcu/app/src/matrix.c) writes <code>MODER</code> and <code>BSRR</code> directly instead of calling <code>gpio_pin_configure_dt()</code>: pins must change <em>direction</em>, not just level, 100,000 times a second.</p>
+<blockquote><p>Upstream Zephyr&#x27;s <code>arduino_uno_q</code> board does not describe the matrix at all. The pin pairing and the 10 µs slot were taken from Arduino&#x27;s own core (<code>ArduinoCore-zephyr</code>, <code>loader/matrix.inc</code>) — the only description of this wiring that exists. Nothing else from that core is used here, and the devicetree nodes it needs are declared in [<code>mcu/app/boards/arduino_uno_q.overlay</code>](../mcu/app/boards/arduino_uno_q.overlay).</p></blockquote>
+<h2 id="gotchas">Gotchas</h2>
+<ul><li><strong>PF0–PF10 belong to the panel.</strong> Anything else in the build that claims them will fight the refresh ISR. PF11–PF15 are untouched.</li><li>The refresh ISR runs at 100 kHz whenever the panel is on. It is cheap, but it is not free — <code>app matrix off</code> if you are measuring something timing-sensitive.</li><li><code>unoq-cpu-bars</code> only appears on <code>PATH</code> after re-running the editable install; <code>python -m unoq.cpubars</code> always works.</li><li><strong>Close the shell handle before using SMP.</strong> <code>MCU</code> and <code>fota</code> both want the same UART, and reopening it immediately after a close drops the first SMP frame — which looks exactly like a firmware fault but is a host-side race. Leave the <code>with MCU()</code> block first, and give it a moment.</li><li><code>cbor2</code> is capped <code>&lt;6.0.0</code> by <code>smp</code>, and <code>pydantic</code> pins <code>pydantic-core</code> exactly. Both show as &quot;outdated&quot; and <strong>must not</strong> be upgraded — see the maintenance notes in <a href="README.html#things-that-look-out-of-date-but-are-not">the README</a>.</li><li>Reading <code>/dev/ttyHS1</code> returns zero bytes if GPIO line 70 is not driven high. <code>MCU()</code> calls <code>link_up()</code> for you; raw <code>pyserial</code> does not.</li></ul>
+
+</main>
+</div>
+</body>
+</html>

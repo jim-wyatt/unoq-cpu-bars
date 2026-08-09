@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The hardware, honestly - Arduino UNO Q</title>
+<style>
+:root {
+  --bg: #ffffff; --fg: #1c2024; --muted: #5b6570; --rule: #e3e8ee;
+  --accent: #0b6cbd; --accent-soft: #eaf3fb; --code-bg: #f6f8fa;
+  --side: #fbfcfd; --warn-bg: #fff8e6; --warn-edge: #e0a800;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14181c; --fg: #dde3ea; --muted: #93a1b0; --rule: #262d35;
+    --accent: #5aa9f0; --accent-soft: #17222d; --code-bg: #1b2127;
+    --side: #11151a; --warn-bg: #241f10; --warn-edge: #8a6d1a;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, sans-serif;
+}
+.wrap { display: flex; align-items: flex-start; max-width: 1180px; margin: 0 auto; }
+nav {
+  width: 250px; flex: 0 0 250px; padding: 28px 18px 60px; background: var(--side);
+  border-right: 1px solid var(--rule); position: sticky; top: 0; max-height: 100vh;
+  overflow-y: auto;
+}
+nav .brand { font-weight: 700; font-size: 15px; letter-spacing: .01em; display: block;
+  color: var(--fg); text-decoration: none; margin-bottom: 4px; }
+nav .tag { color: var(--muted); font-size: 12.5px; margin-bottom: 22px; }
+nav h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .09em;
+  color: var(--muted); margin: 22px 0 8px; }
+nav ol { list-style: none; margin: 0; padding: 0; counter-reset: step; }
+nav li { margin: 1px 0; }
+nav a { display: block; padding: 5px 9px; border-radius: 6px; text-decoration: none;
+  color: var(--fg); font-size: 14px; }
+nav a:hover { background: var(--accent-soft); }
+nav a.here { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+nav ol.steps a::before { counter-increment: step; content: counter(step) ". ";
+  color: var(--muted); font-variant-numeric: tabular-nums; }
+main { flex: 1 1 auto; min-width: 0; padding: 40px 44px 96px; }
+h1, h2, h3, h4 { line-height: 1.25; margin: 1.9em 0 .55em; }
+h1 { font-size: 2.05rem; margin-top: 0; letter-spacing: -.015em; }
+h2 { font-size: 1.42rem; padding-bottom: .28em; border-bottom: 1px solid var(--rule); }
+h3 { font-size: 1.13rem; }
+h4 { font-size: 1rem; color: var(--muted); }
+p, ul, ol, table, pre, blockquote { margin: 0 0 1.05em; }
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+ul, ol { padding-left: 1.4em; }
+li { margin: .3em 0; }
+code {
+  font: 13.5px/1.5 ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  background: var(--code-bg); padding: .14em .38em; border-radius: 4px;
+}
+pre {
+  background: var(--code-bg); border: 1px solid var(--rule); border-radius: 8px;
+  padding: 13px 15px; overflow-x: auto;
+}
+pre code { background: none; padding: 0; font-size: 13px; line-height: 1.55; }
+blockquote {
+  margin-left: 0; padding: .7em 1em; background: var(--warn-bg);
+  border-left: 3px solid var(--warn-edge); border-radius: 0 6px 6px 0;
+}
+blockquote p { margin: 0; }
+.tablewrap { overflow-x: auto; margin-bottom: 1.05em; }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; padding: 7px 11px; border-bottom: 1px solid var(--rule);
+  vertical-align: top; }
+th { font-size: 12.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+hr { border: 0; border-top: 1px solid var(--rule); margin: 2.2em 0; }
+.pager { display: flex; justify-content: space-between; gap: 14px; margin-top: 56px;
+  padding-top: 20px; border-top: 1px solid var(--rule); font-size: 14.5px; }
+.pager a { display: block; padding: 11px 15px; border: 1px solid var(--rule);
+  border-radius: 8px; text-decoration: none; max-width: 47%; }
+.pager a:hover { border-color: var(--accent); }
+.pager span { display: block; color: var(--muted); font-size: 11.5px;
+  text-transform: uppercase; letter-spacing: .07em; }
+.menu { display: none; }
+@media (max-width: 860px) {
+  .wrap { display: block; }
+  nav { width: auto; max-height: none; position: static; border-right: 0;
+        border-bottom: 1px solid var(--rule); }
+  main { padding: 26px 20px 70px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav><a class="brand" href="index.html">Arduino UNO Q</a>
+<div class="tag">Hybrid MPU + MCU development, from scratch</div>
+<h3>Learning path</h3>
+<ol class="steps">
+<li><a href="start-here.html">Start here</a></li>
+<li><a href="two-computers.html">Two computers on one board</a></li>
+</ol>
+<h3>Reference</h3>
+<ol>
+<li><a href="clean-board-findings.html">What a clean board revealed</a></li>
+<li><a href="hardware.html" class="here">The hardware, honestly</a></li>
+<li><a href="mcu.html">MCU workflow</a></li>
+<li><a href="mpu.html">MPU workflow</a></li>
+<li><a href="troubleshooting.html">Troubleshooting</a></li>
+<li><a href="usb.html">IP over USB, and the fileshare</a></li>
+</ol></nav>
+<main>
+<h1 id="the-hardware-honestly">The hardware, honestly</h1>
+<p>The UNO Q is two computers sharing a board.</p>
+<div class="tablewrap"><table><thead><tr><th></th><th><strong>MPU</strong> (Linux side)</th><th><strong>MCU</strong> (real-time side)</th></tr></thead><tbody><tr><td>Part</td><td>Qualcomm QRB2210 (<code>arduino,imola</code>)</td><td>STM32U585 Cortex-M33</td></tr><tr><td>Runs</td><td>Debian, Python, your services</td><td>Zephyr firmware</td></tr><tr><td>Memory</td><td>3.6 GiB shared</td><td>2 MB flash / 768 KB RAM</td></tr><tr><td>Reached via</td><td>native Linux syscalls</td><td>SWD, or a serial link</td></tr></tbody></table></div>
+<p>Most Arduino-header GPIO is wired to the <strong>MCU</strong>, not the MPU. The MPU has its own separate GPIO / I²C / SPI — that is what [<code>unoq</code>](mpu.md) talks to.</p>
+<hr>
+<h2 id="the-two-gpios-nobody-documents">The two GPIOs nobody documents</h2>
+<p><strong>Read this before debugging anything.</strong> <code>arduino-router</code> used to drive two MPU GPIO lines the MCU depends on. That service is now disabled, so these must be set by us — and when they are wrong, a perfectly good board looks broken.</p>
+<div class="tablewrap"><table><thead><tr><th><code>gpiochip1</code> line</th><th>Function</th><th>Symptom when wrong</th></tr></thead><tbody><tr><td><strong>37</strong></td><td>MCU <strong>BOOT0</strong>, latched at reset</td><td>Firmware flashes <em>and verifies</em>, but never runs. PC sits around <code>0x0bf9xxxx</code> — the STM32 ROM bootloader.</td></tr><tr><td><strong>70</strong></td><td><strong>UART link enable</strong></td><td>MCU transmits fine (<code>LPUART1 CR1=0x2d</code>, TC/TXE set) but <code>/dev/ttyHS1</code> reads zero bytes.</td></tr><tr><td>25 / 26 / 38</td><td>SWD swdio / swclk / srst</td><td>—</td></tr></tbody></table></div>
+<pre><code class="lang-bash">~/hybrid/mcu/link-up.sh      # BOOT0=0, link-enable=1</code></pre>
+<p><code>flash.sh</code> calls this automatically, and <code>unoq.MCU</code> calls it on construction. <code>unoq-link.service</code> applies it at boot.</p>
+<p>Pin state **persists after the <code>gpioset</code> process exits** — the SoC pinctrl keeps driving the last value — which is why a one-shot is enough and no daemon is needed. BOOT0 is only sampled at MCU reset, so set it <em>before</em> resetting.</p>
+<blockquote><p>### Never <code>gpioget</code> these two lines  <code>gpioget</code> <strong>requests the line as an input</strong>, and that drops the drive the same way a reboot without <code>unoq-link.service</code> would. Reading the pins is enough to break the link — you get plausible-looking values back (<code>37=active</code>, <code>70=inactive</code>, i.e. exactly the broken state) and the MCU goes quiet.  Check them without touching them. <code>gpioinfo</code> only reads line <em>info</em>, never requests the line:  ``<code>bash gpioinfo -c gpiochip1 37 70      # both must say </code>output<code> hpy -c &quot;from unoq.link import link_state; print(link_state())&quot; </code>`<code>  </code>output<code> means driven. </code>input<code> means floating — run </code>link-up.sh<code>. This is why </code>unoq.link.link_state()` reports <em>direction</em> rather than value: there is no way to read the value that does not also destroy it.</p></blockquote>
+<blockquote><p><code>mcu/link-up.sh</code> is referenced by <code>/etc/systemd/system/unoq-link.service</code>. <strong>Do not move or rename it</strong> without reinstalling that unit.</p></blockquote>
+<hr>
+<h2 id="the-two-uarts">The two UARTs</h2>
+<p>They are <strong>not</strong> interchangeable.</p>
+<div class="tablewrap"><table><thead><tr><th>Node</th><th>Pins</th><th>Goes to</th></tr></thead><tbody><tr><td><code>lpuart1</code></td><td>PG7/PG8 + RTS/CTS on PG6/PG5</td><td><strong>the Linux MPU</strong> → <code>/dev/ttyHS1</code></td></tr><tr><td><code>usart1</code></td><td>PB6/PB7</td><td>the Arduino header pins (D0/D1)</td></tr></tbody></table></div>
+<p>Upstream Zephyr&#x27;s <code>arduino_uno_q</code> board defaults <code>zephyr,console</code> to **<code>usart1</code>**, so a stock <code>hello_world</code> prints to the <em>header pins</em> and you see nothing from Linux. Override it in a board overlay — see [<code>mcu/app/boards/arduino_uno_q.overlay</code>](../mcu/app/boards/arduino_uno_q.overlay).</p>
+<p>The RTS/CTS pair on <code>lpuart1</code> is the giveaway: hardware flow control means a board-to-board link.</p>
+<hr>
+<h2 id="the-led-matrix">The LED matrix</h2>
+<p>104 blue LEDs in an 8×13 grid, wired to the <strong>MCU</strong> on <strong>PF0–PF10</strong> and charlieplexed: each LED is one <em>ordered</em> pair of those eleven pins, lit by driving one high, one low, and leaving the other nine as inputs. Eleven pins give 110 ordered pairs; the panel uses the first 104, in that order.</p>
+<p>Upstream Zephyr&#x27;s <code>arduino_uno_q</code> board <strong>does not mention the matrix at all</strong>, and neither does the datasheet. The wiring is recorded in exactly one place — Arduino&#x27;s own core (<code>ArduinoCore-zephyr</code>, <code>loader/matrix.inc</code>) — which is where this project&#x27;s pin map and 10 µs refresh slot come from. Nothing else from that core is used; the driver is [<code>mcu/app/src/matrix.c</code>](../mcu/app/src/matrix.c) and the devicetree nodes it needs (<code>gpiof</code>, <code>timers17</code>) are declared in the app&#x27;s board overlay.</p>
+<p>PF11–PF15 are <em>not</em> part of the panel — PF14/PF15 reach the Arduino header — so the driver masks only the low eleven pins when it tri-states the port.</p>
+<p>See <a href="mpu.html#cpu-bars-on-the-led-matrix">mpu.md</a> for the display built on this.</p>
+<h2 id="how-the-mpu-flashes-the-mcu">How the MPU flashes the MCU</h2>
+<p>There is no external debug probe. The MPU bit-bangs SWD on its own GPIO lines using OpenOCD&#x27;s <code>linuxgpiod</code> driver:</p>
+<pre><code>Info : Linux GPIOD JTAG/SWD bitbang driver (libgpiod v2)
+Info : SWD DPIDR 0x0be12477
+Info : [stm32u5.cpu] Cortex-M33 r0p4 processor detected</code></pre>
+<p>No root needed — your user is in the <code>gpiod</code> group.</p>
+<blockquote><p>**<code>/opt/openocd</code> is owned by no Debian package.** <code>dpkg -S /opt/openocd</code> finds nothing; it was placed there by an install script, so apt will never reinstall it. Copy it somewhere safe (<code>cp -a /opt/openocd ~/uno-q-backup/</code>) before you purge anything, and note that it is reproducible from source — see <a href="README.html#rebuilding-openocd">the README</a>.</p></blockquote>
+<p><code>apt install openocd</code> does <strong>not</strong> substitute: Debian ships 0.12.0 (2023), which predates the libgpiod v2 support this board needs.</p>
+<hr>
+<h2 id="flash-layout">Flash layout</h2>
+<pre><code>0x08000000  boot_partition   64K   MCUboot (38K used)
+0x08010000  slot0           416K   running signed app
+0x08078000  slot1           416K   staged update
+0x080e0000  storage         128K   NVS (settings, boot counter)</code></pre>
+<p>Images link at <code>0x08010000</code> and must be <strong>signed</strong> — MCUboot refuses a raw image. See <a href="mcu.html">mcu.md</a>.</p>
+
+</main>
+</div>
+</body>
+</html>

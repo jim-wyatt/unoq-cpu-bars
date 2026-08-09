@@ -77,14 +77,36 @@ FOTA tasks.
 
 ## Documentation
 
+Everything under `docs/` is both a folder you can read here on GitHub and the
+source of a **rendered site** — served off the board at `http://<board>:8080/`,
+and carried on the USB drive so it works with no network at all.
+
+```bash
+tools/build-docs.sh              # render docs/ -> share/learn/
+tools/build-docs.sh --serve      # live preview on :8000 while you write
+```
+
+It is [Material for MkDocs](https://squidfunk.github.io/mkdocs-material/), built
+with `--strict`: a link that does not resolve is a build failure, and
+`tools/check.sh docs` runs it as a gate. `share/learn/` is generated output and
+is not in the repository.
+
+### The course
+
+**[docs/learn/](docs/learn/start-here.md)** is a course in hybrid MPU + MCU
+development for someone who can program and has never done embedded work. Start
+at [Start here](docs/learn/start-here.md).
+
+### Reference
+
 | | |
 |---|---|
-| **[hardware.md](docs/hardware.md)** | Board anatomy, the two undocumented GPIOs, the two UARTs, SWD, flash layout. **Read this first.** |
-| **[mcu.md](docs/mcu.md)** | Build, flash, debug, FOTA, shell, firmware tests |
-| **[mpu.md](docs/mpu.md)** | Linux-side hardware access, the `unoq` API, and the CPU-bars demo end to end |
-| **[usb.md](docs/usb.md)** | IP over USB, the fileshare drive, and why the role cannot be switched from software |
-| **[troubleshooting.md](docs/troubleshooting.md)** | Symptom → cause |
-| **[clean-board-findings.md](docs/clean-board-findings.md)** | What taking a factory-restored board through `bootstrap.sh` actually turned up, and what is still unvalidated |
+| **[hardware.md](docs/reference/hardware.md)** | Board anatomy, the two undocumented GPIOs, the two UARTs, SWD, flash layout. **Read this first.** |
+| **[mcu.md](docs/reference/mcu.md)** | Build, flash, debug, FOTA, shell, firmware tests |
+| **[mpu.md](docs/reference/mpu.md)** | Linux-side hardware access, the `unoq` API, and the CPU-bars demo end to end |
+| **[usb.md](docs/reference/usb.md)** | IP over USB, the fileshare drive, and why the role cannot be switched from software |
+| **[troubleshooting.md](docs/reference/troubleshooting.md)** | Symptom → cause |
+| **[clean-board-findings.md](docs/reference/clean-board-findings.md)** | What taking a factory-restored board through `bootstrap.sh` actually turned up, and what is still unvalidated |
 
 ---
 
@@ -93,7 +115,10 @@ FOTA tasks.
 ```
 ├── bootstrap.sh            stock board -> working board, one command
 ├── env.sh                  shell aliases + Zephyr env   (sourced by ~/.bashrc)
+├── mkdocs.yml              the documentation site: theme, nav, offline rules
 ├── docs/                   see above
+│   ├── learn/              the course, in reading order
+│   └── reference/          the detail, for someone who already knows
 ├── mcu/                    everything for the STM32U585
 │   ├── app/                the firmware: shell + SMP + NVS + LED matrix
 │   │   ├── include/        app_proto.h - the MPU<->MCU contract, shared
@@ -122,13 +147,14 @@ FOTA tasks.
 │   └── *.rules, *.service  udev-driven, because there is no UDC until you
 │                           plug into a computer — see usb.md
 ├── share/                  what the board hands out
-│   ├── learn/index.html    the landing page (self-contained, no CDN)
+│   ├── learn/              the rendered site — GENERATED, gitignored
 │   ├── fetch-vscode.sh     download the installers (not redistributed)
 │   └── build-image.sh      build the FAT32 image both USB and HTTP serve
 ├── provision/              root setup, numbered in order; all idempotent
 │   ├── lib.sh              the primitives that make them so
 │   └── user/               the non-root half: uv, SDK, workspace, venv, env
 └── tools/                  check.sh (all gates), install-dev-tools.sh,
+                            build-docs.sh, mkdocs_hooks.py,
                             build-openocd.sh, check-versions.sh
 ```
 
@@ -150,7 +176,7 @@ Two MPU GPIO lines control the MCU and are documented nowhere:
 | **70** | UART link enable | MCU transmits, `/dev/ttyHS1` reads nothing |
 
 `unoq-link.service` sets them at boot; `flash.sh` and `unoq.MCU` set them too.
-Full detail in [hardware.md](docs/hardware.md).
+Full detail in [hardware.md](docs/reference/hardware.md).
 
 ---
 
@@ -192,8 +218,8 @@ sudo bash ~/hybrid/provision/70-learning-web.sh         # optional
 | `user/50-shell-env.sh` | `env.sh` into `~/.bashrc`, and the git pre-commit hook. |
 | `30-mcu-link.sh` | Installs `tio`, and `unoq-link.service` so BOOT0 + UART-enable are applied at boot. **Without this the board looks dead after a reboot.** |
 | `40-purge-arduino.sh` | Removes the remaining Arduino debs. Backs up the stock MCU firmware first, and verifies `/opt/openocd` survives before and after. |
-| `50-cpu-bars.sh` | Installs `unoq-cpu-bars.service`. Optional, because it claims the serial port — see [mpu.md](docs/mpu.md#at-every-boot). |
-| `60-usb-gadget.sh` | IP over USB + the fileshare drive. Optional, because the USB-C port cannot be a host and a device at once — see [usb.md](docs/usb.md). |
+| `50-cpu-bars.sh` | Installs `unoq-cpu-bars.service`. Optional, because it claims the serial port — see [mpu.md](docs/reference/mpu.md#at-every-boot). |
+| `60-usb-gadget.sh` | IP over USB + the fileshare drive. Optional, because the USB-C port cannot be a host and a device at once — see [usb.md](docs/reference/usb.md). |
 | `70-learning-web.sh` | Serves `share/learn` and the installers on `:8080`. |
 
 Paths and the owning user are **derived**, not hardcoded: `install_unit`
@@ -251,7 +277,7 @@ One command runs everything:
 ~/hybrid/tools/check.sh              # all gates
 ~/hybrid/tools/check.sh --fast       # skip the MCU suite (~70s of Zephyr build)
 ~/hybrid/tools/check.sh --fix        # reformat in place, then check
-~/hybrid/tools/check.sh python       # one area: python | shell | c | mcu
+~/hybrid/tools/check.sh python       # one area: python | shell | c | docs | mcu
 ```
 
 Gates keep running after a failure, so one pass shows you all the work rather
@@ -322,7 +348,7 @@ want it lower.
 
 ### CI
 
-`.github/workflows/ci.yml` runs `tools/check.sh python shell c` on push and
+`.github/workflows/ci.yml` runs `tools/check.sh python shell c docs` on push and
 pull request, so green CI means the same thing as a clean local run.
 
 `ztest` is the one gate CI skips: it needs a Zephyr workspace and SDK (~5 GB)
@@ -403,12 +429,12 @@ OCD_ROOT=/opt/openocd-rebuilt ~/hybrid/mcu/flash.sh \
 ```
 
 Upgrading Zephyr has its own checklist — see
-[mcu.md](docs/mcu.md#upgrading-zephyr).
+[mcu.md](docs/reference/mcu.md#upgrading-zephyr).
 
 ### Keep your own copies
 
 Two things on a provisioned board cannot be re-downloaded, and neither is this
-project's to redistribute (see [THIRD-PARTY.md](THIRD-PARTY.md)). Copy both
+project's to redistribute (see [THIRD-PARTY.md](docs/third-party.md)). Copy both
 aside **before** running `provision/40-purge-arduino.sh`:
 
 ```bash
@@ -422,7 +448,7 @@ The `.hex` is what `restore-arduino-firmware.sh` wants in `STOCK_FW`.
 losing it costs time rather than capability.
 
 Push after meaningful changes — the hardware findings in
-[hardware.md](docs/hardware.md) are not written down anywhere else.
+[hardware.md](docs/reference/hardware.md) are not written down anywhere else.
 
 ---
 
@@ -445,4 +471,4 @@ MIT — see [LICENSE](LICENSE). Every first-party file carries an
 
 A few files belong to other projects and keep their own terms — ST's SVD,
 Zephyr's `.clang-format`, and the panel wiring `matrix.c` reads out of
-ArduinoCore-zephyr. They are listed in [THIRD-PARTY.md](THIRD-PARTY.md).
+ArduinoCore-zephyr. They are listed in [THIRD-PARTY.md](docs/third-party.md).

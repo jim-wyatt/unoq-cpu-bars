@@ -61,9 +61,12 @@ mkdir -p "$BIN"
 
 echo "=== Python tooling -> $VENV ==="
 [ -x "$VENV/bin/python" ] || uv venv "$VENV"
-# Installed from the [dev] extra so the versions live in pyproject.toml.
-uv pip install --python "$VENV/bin/python" -q -e "$PROJECT/python[dev]"
-echo "  ruff $("$VENV"/bin/ruff --version | awk '{print $2}'), mypy $("$VENV"/bin/mypy --version | awk '{print $2}')"
+# Installed from the [dev] and [docs] extras so the versions live in
+# pyproject.toml. [docs] is here as well as in provisioning because the docs
+# build is a quality gate (tools/check.sh docs) - a broken link should fail for
+# whoever is editing, not only on the board.
+uv pip install --python "$VENV/bin/python" -q -e "$PROJECT/python[dev,docs]"
+echo "  ruff $("$VENV"/bin/ruff --version | awk '{print $2}'), mypy $("$VENV"/bin/mypy --version | awk '{print $2}'), mkdocs $("$VENV"/bin/mkdocs --version | awk '{print $3}')"
 
 echo "=== shellcheck $SHELLCHECK_VERSION -> $BIN ==="
 have=""

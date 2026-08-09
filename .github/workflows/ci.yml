@@ -47,4 +47,4 @@ jobs:
       - name: Run gates
         run: |
           export PATH="$HOME/.local/bin:$PATH"
-          tools/check.sh python shell c
+          tools/check.sh python shell c docs

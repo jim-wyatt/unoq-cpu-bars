@@ -1,0 +1,77 @@
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
+name: docs site
+
+# MANUAL ONLY, on purpose.
+#
+# This publishes the documentation to a public URL. The repository is going to
+# be renamed and its history squashed before it is announced (issue #27), so
+# publishing on every push to main would put a half-finished site at an address
+# that is about to change.
+#
+# When that is settled, add:
+#
+#   push:
+#     branches: [main]
+#     paths: ['docs/**', 'mkdocs.yml', 'tools/mkdocs_hooks.py', ...]
+#
+# and it becomes continuous. Until then: Actions -> docs site -> Run workflow.
+#
+# ONE-TIME SETUP: Settings -> Pages -> Source -> "GitHub Actions". Without that
+# the deploy step fails with a 404 on the Pages API, which reads like a
+# permissions bug and is not.
+on:
+  workflow_dispatch:
+
+# Least privilege: the build job gets none of these, the deploy job gets the
+# two the Pages action requires.
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install the docs toolchain
+        run: |
+          uv venv .venv
+          uv pip install --python .venv/bin/python -e 'python[docs]'
+
+      - name: Build (strict)
+        # The same script the board runs, so a site that builds here builds
+        # there. --strict means a broken internal link fails the job.
+        run: tools/build-docs.sh
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: share/learn
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

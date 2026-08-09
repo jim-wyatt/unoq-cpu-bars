@@ -11,13 +11,22 @@ dependencies = ["pyserial", "gpiod", "smpclient"]
 # not appear on PATH: `python -m unoq.cpubars` works either way.
 [project.scripts]
 unoq-cpu-bars = "unoq.cpubars:main"
-unoq-build-docs = "unoq.docsite:main"
 unoq-learn = "unoq.learn:main"
 
 # Install with:  uv pip install --python ~/hybrid/.venv/bin/python -e 'python[dev]'
 # Everything below is also what tools/check.sh runs.
 [project.optional-dependencies]
 dev = ["pytest>=8", "pytest-cov", "mypy", "ruff", "clang-format"]
+# The documentation site (tools/build-docs.sh). Separate from `dev` because it
+# is the only part of the toolchain the board needs at PROVISIONING time - the
+# drive and the web server are built from it - while `dev` is only needed by
+# someone changing the code.
+#
+# mkdocs is pinned below 2.0 deliberately. Material's maintainers have said
+# MkDocs 2.0 removes the plugin system and the theming system outright, with no
+# migration path; this site uses three plugins and a theme. Revisit when the
+# situation is clearer, not when the version number goes up.
+docs = ["mkdocs>=1.6,<2", "mkdocs-material>=9.7,<10"]
 
 [build-system]
 requires = ["hatchling"]

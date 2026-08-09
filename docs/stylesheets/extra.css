@@ -1,0 +1,202 @@
+/*
+ * Copyright (c) 2026 Jim Wyatt
+ * SPDX-License-Identifier: MIT
+ *
+ * Everything here is either the project's colour, or a correction to a
+ * Material default that does not suit long technical prose. It is deliberately
+ * short: a theme you have rewritten is a theme you now maintain.
+ */
+
+/* --------------------------------------------------------------------------
+ * palette
+ *
+ * Teal rather than Material's stock indigo, and a warmer ink than pure black.
+ * `primary: custom` / `accent: custom` in mkdocs.yml is what routes the theme
+ * through these variables.
+ * ----------------------------------------------------------------------- */
+
+[data-md-color-primary="custom"] {
+  --md-primary-fg-color: #0f6e6a;
+  --md-primary-fg-color--light: #159089;
+  --md-primary-fg-color--dark: #0a4f4c;
+  --md-primary-bg-color: #ffffff;
+  --md-primary-bg-color--light: #ffffffb3;
+}
+
+[data-md-color-accent="custom"] {
+  --md-accent-fg-color: #0d8b83;
+  --md-accent-fg-color--transparent: #0d8b831a;
+  --md-accent-bg-color: #ffffff;
+  --md-accent-bg-color--light: #ffffffb3;
+}
+
+/* In dark mode the header keeps the deep teal instead of going flat grey, and
+ * links lift to something readable against it. */
+[data-md-color-scheme="slate"] {
+  --md-hue: 210;
+  --md-default-bg-color: #14181c;
+  --md-typeset-a-color: #3fc3b8;
+}
+
+[data-md-color-scheme="slate"][data-md-color-primary="custom"] {
+  --md-primary-fg-color: #0c3b3a;
+  --md-primary-fg-color--dark: #082726;
+}
+
+[data-md-color-scheme="slate"][data-md-color-accent="custom"] {
+  --md-accent-fg-color: #3fc3b8;
+  --md-accent-fg-color--transparent: #3fc3b81a;
+}
+
+/* --------------------------------------------------------------------------
+ * prose
+ * ----------------------------------------------------------------------- */
+
+/* Material sets 0.8rem, which is comfortable for API reference and cramped for
+ * pages that are mostly argument. */
+.md-typeset {
+  font-size: 0.775rem;
+  line-height: 1.72;
+}
+
+/* A measure. Past about 80 characters the eye loses the start of the next line,
+ * and these pages have long paragraphs. */
+.md-content__inner > p,
+.md-content__inner > ul,
+.md-content__inner > ol,
+.md-content__inner > blockquote {
+  max-width: 46rem;
+}
+
+.md-typeset h1 {
+  font-weight: 700;
+  letter-spacing: -0.012em;
+  color: var(--md-default-fg-color);
+}
+
+.md-typeset h2 {
+  font-weight: 650;
+  letter-spacing: -0.008em;
+  margin-top: 2.2em;
+  padding-bottom: 0.25em;
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
+}
+
+.md-typeset h3 {
+  font-weight: 620;
+}
+
+/* Tables carry a lot of the reference material. Uppercase headers separate the
+ * header row from the body without needing a heavy rule. */
+.md-typeset table:not([class]) th {
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--md-default-fg-color--light);
+}
+
+/* --------------------------------------------------------------------------
+ * the home page
+ *
+ * `.hero` and the card grid below are used only by docs/index.md, which is the
+ * one page written as HTML-in-markdown rather than prose.
+ * ----------------------------------------------------------------------- */
+
+.hero {
+  margin: 0 0 3rem;
+  padding: 2.4rem 0 2.6rem;
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
+}
+
+.hero h1 {
+  font-size: 2.3rem;
+  line-height: 1.12;
+  letter-spacing: -0.022em;
+  margin: 0 0 0.6rem;
+  max-width: 20ch;
+}
+
+.hero p {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--md-default-fg-color--light);
+  max-width: 44rem;
+  margin: 0 0 1.4rem;
+}
+
+.hero .md-button {
+  margin: 0 0.4rem 0.4rem 0;
+}
+
+/* The one-line summary of what the two chips are, under the hero. Grid rather
+ * than a table because a table implies you should read across, and here the
+ * point is the contrast between two columns. */
+.split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1.4rem;
+  margin: 2rem 0;
+}
+
+.split > div {
+  padding: 1.1rem 1.2rem;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.35rem;
+  background: var(--md-code-bg-color);
+}
+
+.split h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--md-primary-fg-color);
+}
+
+/* --------------------------------------------------------------------------
+ * diagrams
+ *
+ * Hand-authored SVG referenced as an image, so GitHub renders it too. They are
+ * drawn in mid-tones with no background fill, which is what lets one file work
+ * on both the light and the dark scheme.
+ * ----------------------------------------------------------------------- */
+
+.md-typeset figure img,
+.md-typeset img[src$=".svg"] {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+}
+
+.md-typeset figure {
+  margin: 2rem auto;
+}
+
+.md-typeset figcaption {
+  font-size: 0.68rem;
+  color: var(--md-default-fg-color--light);
+  max-width: 34rem;
+  margin: 0.6rem auto 0;
+}
+
+/* --------------------------------------------------------------------------
+ * callouts
+ *
+ * The GitHub-alert blockquotes in the source become title-less admonitions
+ * (see tools/mkdocs_hooks.py), so the empty title bar has to go.
+ * ----------------------------------------------------------------------- */
+
+.md-typeset .admonition > .admonition-title:empty,
+.md-typeset details > summary:empty {
+  display: none;
+}
+
+.md-typeset .admonition,
+.md-typeset details {
+  font-size: 0.72rem;
+  border-width: 0 0 0 0.15rem;
+  border-radius: 0 0.2rem 0.2rem 0;
+  box-shadow: none;
+  background: var(--md-code-bg-color);
+}

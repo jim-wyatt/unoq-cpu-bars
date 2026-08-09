@@ -23,3 +23,8 @@ htmlcov/
 # not ours to redistribute (THIRD-PARTY.md), and the image is ~2 GB of build
 # artefact. Rebuild both with share/fetch-vscode.sh + share/build-image.sh.
 *.img
+
+# The rendered documentation site. Built from docs/ by tools/build-docs.sh, on
+# the board at provisioning time and in CI. Generated HTML in git makes every
+# content diff unreadable and goes stale the moment someone forgets to rebuild.
+/share/learn/

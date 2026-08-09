@@ -131,6 +131,8 @@ at [Start here](docs/learn/start-here.md).
 │   ├── flash-all.sh        bootloader + app, for recovery
 │   ├── ztest.sh            twister on native_sim
 │   └── restore-arduino-firmware.sh
+├── status/                 the two RGB LEDs Linux can drive, and their unit
+│                           (NOT under usb/ — they report on the whole board)
 ├── tests/                  bats suites for the shell — see tests/README.md
 ├── python/                 MPU-side package (editable install — do not move)
 │   ├── unoq/               link.py (GPIOs), mcu.py (shell), fota.py,
@@ -143,7 +145,6 @@ at [Start here](docs/learn/start-here.md).
 │   ├── bind-guard.sh       stop a brownout loop becoming permanent
 │   ├── uplink-fallback.sh  wifi back on if USB gives no internet after boot
 │   ├── wifi.sh             radio off, once the USB link can carry the traffic
-│   ├── leds.sh             board state on the two RGB LEDs Linux can drive
 │   ├── status.sh           the whole USB picture in one read-only command
 │   └── *.rules, *.service  udev-driven, because there is no UDC until you
 │                           plug into a computer — see usb.md

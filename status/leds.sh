@@ -3,11 +3,11 @@
 # SPDX-License-Identifier: MIT
 # Drive the two RGB LEDs Linux owns: connectivity, and whether anything failed.
 #
-#   sudo ~/hybrid/usb/leds.sh once     # sample, set, exit
-#   sudo ~/hybrid/usb/leds.sh run      # loop forever - what the service runs
-#   sudo ~/hybrid/usb/leds.sh off      # dark, kernel triggers handed back
-#   sudo ~/hybrid/usb/leds.sh test     # cycle the colours, to learn them
-#   ~/hybrid/usb/leds.sh explain       # what the colours mean, no root needed
+#   sudo ~/hybrid/status/leds.sh once     # sample, set, exit
+#   sudo ~/hybrid/status/leds.sh run      # loop forever - what the service runs
+#   sudo ~/hybrid/status/leds.sh off      # dark, kernel triggers handed back
+#   sudo ~/hybrid/status/leds.sh test     # cycle the colours, to learn them
+#   ~/hybrid/status/leds.sh explain       # what the colours mean, no root needed
 #
 # WHY
 # ---
@@ -81,6 +81,11 @@ PROBE_IP="${UNOQ_LED_PROBE_IP:-1.1.1.1}"
 BRIDGE="${UNOQ_USB_BRIDGE:-br-usb}"
 G="${UNOQ_GADGET_DIR:-/sys/kernel/config/usb_gadget/unoq}"
 LEDS="${UNOQ_LED_DIR:-/sys/class/leds}"
+# The bind guard is asked whether it has given up, which is half of what LED 2
+# reports. Overridable rather than hardcoded as "$HERE/bind-guard.sh": that
+# assumed the two scripts live in the same directory, which made this untestable
+# and would have broken silently the moment either moved.
+GUARD="${UNOQ_BIND_GUARD:-$HERE/../usb/bind-guard.sh}"
 
 # LED 1, driven from here as one colour at a time. Order: red, green, blue.
 # Reached by name through a nameref in set_rgb, which shellcheck cannot follow.
@@ -178,7 +183,7 @@ usb_link_up() {
 
 guard_tripped() {
   local out
-  out="$("$HERE/bind-guard.sh" status 2>/dev/null)" || return 1
+  out="$("$GUARD" status 2>/dev/null)" || return 1
   echo "$out" | awk -F'[ /]' '/^attempts:/ {exit !($2 >= $3)}'
 }
 

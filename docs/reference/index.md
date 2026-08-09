@@ -102,7 +102,7 @@ with MCU() as mcu:
 
 ```bash
 ~/hybrid/usb/status.sh                   # the whole USB picture in one read
-~/hybrid/usb/leds.sh explain             # what the LED colours mean
+~/hybrid/status/leds.sh explain             # what the LED colours mean
 systemctl --failed                       # what needs a human
 journalctl -u unoq-cpu-bars -n 50        # or any other unit
 ```

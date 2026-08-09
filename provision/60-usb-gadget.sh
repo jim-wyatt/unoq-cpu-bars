@@ -141,11 +141,10 @@ install_unit "$PROJECT/usb/unoq-usb-confirm.service"
 # The other half of turning wifi off: the guard covers a bind that kills the
 # board, this covers a bind that works and still leaves it with no way out.
 install_unit "$PROJECT/usb/unoq-uplink-fallback.service"
-# The status LEDs. Installed here because everything they report - the gadget
-# being bound, a computer answering, the guard having tripped - is defined by
-# the scripts in usb/, and because the moment they matter is a moment nobody can
-# log in to start them.
-install_unit "$PROJECT/usb/unoq-leds.service"
+# The status LEDs are NOT installed here any more. They report on the whole
+# board, not just the USB link, and installing them from an optional feature
+# meant a board provisioned without `--with-usb-gadget` had no way to say
+# anything at all. See provision/35-status-leds.sh.
 # enable, but do not --now start it blindly: starting is harmless (no UDC
 # means it builds the definition and exits) and proves the scripts run.
 if systemctl is-enabled --quiet unoq-usb-gadget.service 2>/dev/null; then
@@ -175,18 +174,6 @@ else
     fail "could not enable unoq-uplink-fallback.service"
   did "wifi fallback enabled at boot"
 fi
-# Started as well as enabled: unlike the gadget units there is nothing to wait
-# for, and a board that has just been provisioned should light up now rather
-# than at the next reboot.
-if systemctl is-enabled --quiet unoq-leds.service 2>/dev/null &&
-  systemctl is-active --quiet unoq-leds.service; then
-  skip "status LEDs already running"
-else
-  systemctl enable --now unoq-leds.service >/dev/null 2>&1 ||
-    warn "could not start unoq-leds.service - check: journalctl -u unoq-leds"
-  did "status LEDs enabled and started ($PROJECT/usb/leds.sh explain)"
-fi
-
 step "build the gadget now (no bind without a host)"
 if systemctl restart unoq-usb-gadget.service 2>/dev/null; then
   did "service ran"

@@ -36,6 +36,7 @@ tools/check.sh docs           # one area
   PASS  shellcheck           shell mistakes
   PASS  shfmt                shell layout
   PASS  bats (shell behaviour)  35 tests, no board involved
+  PASS  zephyr version pin   the two places it is written agree
   PASS  clang-format         C layout
   PASS  docs (mkdocs --strict)  every documentation link resolves
 ```
@@ -213,7 +214,7 @@ flowchart TD
   A["you type: git commit"] --> B["pre-commit hook<br/><small>check.sh --fast</small>"]
   B -->|passes| C["commit lands"]
   C --> D["git push"]
-  D --> E["GitHub Actions<br/><small>check.sh python shell c docs</small>"]
+  D --> E["GitHub Actions<br/><small>checks · changes · firmware</small>"]
   F["you, before pushing:<br/>check.sh<br/><small>+ the MCU suite</small>"] -.-> D
 ```
 
@@ -222,11 +223,27 @@ slow to sit in front of one. CI runs the same script — that matters, because a
 green CI then means the same thing as a clean local run rather than something
 adjacent to it.
 
-CI runs it as **two** jobs, and the split is worth copying. The fast gates —
-lint, types, tests, docs — finish in about thirty seconds. The firmware job
-cross-compiles for the real Cortex-M33 and runs the MCU suites, and needs a
-Zephyr workspace and the SDK first. Separating them means a missing comma fails
-in thirty seconds instead of behind a toolchain download.
+CI splits it into three jobs, and the shape is worth copying:
+
+| job | time | what it is for |
+|---|---|---|
+| `checks` | ~30 s | lint, types, tests, coverage, docs |
+| `changes` | ~2 s | does this change touch anything the firmware is built from? |
+| `firmware` | ~5 min | cross-compile for the Cortex-M33, sign, run the MCU suites |
+
+The expensive one is **gated twice**. It `needs: checks`, so thirty seconds of
+linting decides whether five minutes of Zephyr download begins at all; and it is
+skipped entirely when `changes` says nothing under `mcu/` moved. Most changes to
+this repository are documentation, and none of those can affect a Cortex-M33
+binary.
+
+That gating proved itself on its first run: a workflow with a broken action
+reference failed `checks` in two seconds, and `firmware` never started.
+
+> [!WARNING]
+> A skipped job reports as **skipped**, not **success**. If `firmware` were ever
+> made a required check for merging, a documentation-only change would sit
+> unmergeable forever. Require the job that always runs.
 
 > [!NOTE]
 > Until recently the second job did not exist, and **a change that broke the

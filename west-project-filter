@@ -1,0 +1,34 @@
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
+#
+# The west manifest project filter: which Zephyr modules get cloned.
+#
+# ONE FILE, TWO CONSUMERS, because the alternative is two copies that drift:
+#
+#   provision/user/30-zephyr-workspace.sh   the board's ~/zephyrproject
+#   .github/workflows/ci.yml                the CI workspace
+#
+# The Zephyr VERSION cannot be shared this way - west needs it inside west.yml
+# for CI and on the `west init` command line for the board - so that one is
+# written twice and gated by tools/check-zephyr-pin.sh. The filter has no such
+# constraint, so it is shared outright and there is nothing to keep in sync.
+#
+# WHY CI FILTERS AT ALL, when a runner has the disk for everything.
+# `west update` clones each project separately, and the cost is per-repo, not
+# per-byte: 68 projects took 159s, almost all of it connection overhead on
+# modules for hardware this board does not have. Filtering to what an STM32
+# target actually builds from cuts that to roughly a third.
+#
+# It also closes a divergence. The board built ~20 modules while CI built 68,
+# and this repository's own rule is that a CI job which compiles a different
+# Zephyr from the board is worse than no CI job. That applied to the version;
+# it applies to the module set for the same reason.
+#
+# HOW TO CHANGE IT: add the module, then build. `-hal_.*` drops every vendor
+# HAL and the `+` entries add back the ones an STM32U585 needs; a new dependency
+# usually shows up as a missing Kconfig symbol or a missing device-tree binding
+# rather than as an obvious "module not found".
+#
+# Format: the first line below that is neither blank nor a comment is the
+# filter, passed verbatim to `west config manifest.project-filter`.
+-hal_.*,+hal_stm32,+hal_st,-lvgl,-cmsis-dsp,-cmsis-nn,-lora-basics-modem,-loramac-node,-acpica,-hostap,-openthread,-nrf_wifi,-trusted-firmware-m,-trusted-firmware-a,-tf-m-tests,-psa-arch-tests,-nrf_hw_models,-edtt,-net-tools

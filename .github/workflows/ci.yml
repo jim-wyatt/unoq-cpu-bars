@@ -183,11 +183,31 @@ jobs:
           # be renamed. See manifest.self.path.
           path: app
 
+      - name: Read the shared module filter
+        # Read, not duplicated. The board's provisioning script reads the same
+        # file, so CI cannot quietly start building a different module set from
+        # the one anybody runs - the same argument as the version pin.
+        id: filter
+        run: |
+          f=app/west-project-filter
+          # `|| true`: Actions runs this with `bash -e -o pipefail`, so a file
+          # of nothing but comments would make grep exit 1 and kill the step
+          # here - before the check below could say why. Let it come back empty
+          # and report it properly.
+          v="$(grep -vE '^[[:space:]]*(#|$)' "$f" | head -1 || true)"
+          [ -n "$v" ] || { echo "no filter line in $f" >&2; exit 1; }
+          echo "value=$v" >>"$GITHUB_OUTPUT"
+          echo "module filter: $v"
+
       - name: Set up Zephyr
         uses: zephyrproject-rtos/action-zephyr-setup@v1
         with:
           app-path: app
           toolchains: arm-zephyr-eabi
+          # Cuts `west update` from 68 projects to roughly 20. The action's own
+          # pip/SDK/ccache caches were already hitting; this is the part of the
+          # job that was never cacheable, only avoidable.
+          west-project-filter: ${{ steps.filter.outputs.value }}
 
       - name: Build the firmware for the real board
         # The thing that was missing. native_sim below exercises the logic; only

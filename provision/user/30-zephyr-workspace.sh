@@ -13,6 +13,9 @@
 # hardware this board does not have. It is not cosmetic - a 3.6 GiB board with
 # a 10 GB rootfs does not have 7 GB to spare.
 #
+# It lives in ../../west-project-filter and is READ from there, because CI now
+# builds the same module set and a second copy would drift. Edit that file.
+#
 # NEVER `rm -rf` a module directory without filtering it out first: west would
 # then be managing a project whose checkout has vanished, and every subsequent
 # `west update` fails. Change the filter, then delete.
@@ -28,7 +31,12 @@ WS="${ZEPHYR_WORKSPACE:-$HOME/zephyrproject}"
 ZEPHYR_VERSION="${ZEPHYR_VERSION:-v4.4.2}"
 PYTHON_VERSION="${WS_PYTHON:-3.13}"
 
-FILTER='-hal_.*,+hal_stm32,+hal_st,-lvgl,-cmsis-dsp,-cmsis-nn,-lora-basics-modem,-loramac-node,-acpica,-hostap,-openthread,-nrf_wifi,-trusted-firmware-m,-trusted-firmware-a,-tf-m-tests,-psa-arch-tests,-nrf_hw_models,-edtt,-net-tools'
+# Shared with CI rather than copied into it - see the file's own header. Read,
+# not sourced, so the same bytes reach `west config` here and the workflow there.
+FILTER_FILE="$PROJECT/west-project-filter"
+[ -r "$FILTER_FILE" ] || fail "missing $FILTER_FILE - the module filter lives there now"
+FILTER="$(grep -vE '^[[:space:]]*(#|$)' "$FILTER_FILE" | head -1)"
+[ -n "$FILTER" ] || fail "$FILTER_FILE has no filter line"
 
 command -v uv >/dev/null 2>&1 || fail "uv missing - run provision/user/10-host-tools.sh first"
 
@@ -65,7 +73,12 @@ else
 fi
 
 step "manifest filter"
-current="$("$WS/.venv/bin/west" -z "$WS" config manifest.project-filter 2>/dev/null || true)"
+# `cd "$WS"`, not `-z "$WS"`: -z is --zephyr-base, which is not how west finds a
+# workspace. Read from outside, it returned empty every time, so this compared
+# the filter against "" and reported "changed" on every run of an idempotent
+# script. The write below always used `cd` and was therefore always correct -
+# only the reporting lied, which is why it survived.
+current="$(cd "$WS" && "$WS/.venv/bin/west" config manifest.project-filter 2>/dev/null || true)"
 if [ "$current" = "$FILTER" ]; then
   skip "filter already set"
 else

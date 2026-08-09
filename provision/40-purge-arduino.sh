@@ -34,9 +34,19 @@ else
 fi
 
 # The stock MCU firmware is Arduino's build and is not redistributable, so it
-# cannot be recovered from this repo, or from apt, or from anywhere else once
-# this script has run: after the purge ~/.arduino15 is gone and so is the only
-# copy on the board. Getting this wrong costs a factory reset.
+# cannot be recovered from this repo or from apt.
+#
+# This comment used to say ~/.arduino15 is gone after the purge, and that is
+# simply not true - apt removes packages, not files in $HOME. Measured after a
+# real run of this script: ~/.arduino15 is still there, 621 MB of it, stock
+# .hex included. Overstating the danger is its own kind of wrong, because the
+# next person to read it learns to discount what this file says.
+#
+# What actually eats the image is a FACTORY RESTORE, which is also what puts it
+# back. So the honest position is: the copy is cheap, take it early
+# (bootstrap.sh does, in preflight), and refuse here if there is none - not
+# because this script deletes it, but because this script is the point after
+# which nobody thinks to look for it again.
 #
 # The image is FOUND, not guessed at. This used to glob
 # .../hardware/zephyr/*/variants/*/*.hex, which matches nothing on core 0.55.2 -
@@ -64,7 +74,7 @@ else
   # bootstrap run and is read, if at all, after the fact.
   fail "no stock MCU firmware found under $TARGET_HOME/.arduino15 and none in
         $BACKUP_DIR. It is Arduino's build - not in this repo, not in apt -
-        and this script is about to delete the only copy on the board.
+        and after this script nobody looks for it again until they need it.
 
         Find and copy it first:
           find ~/.arduino15 -name '*stm32u585xx*.hex'

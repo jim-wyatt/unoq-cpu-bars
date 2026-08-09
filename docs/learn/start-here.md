@@ -76,6 +76,7 @@ Three kinds of thing appear on every page:
 **Try it** blocks are commands to run on the board. You learn embedded
 development by watching real hardware do something, and being surprised.
 
+> [!TIP]
 > **Go deeper** boxes like this one point at the reference documentation —
 > [hardware.md](../reference/hardware.md), [mcu.md](../reference/mcu.md), [usb.md](../reference/usb.md) and friends.
 > Those pages are written for someone who already knows the material and wants

@@ -165,6 +165,16 @@ sudo systemctl start unoq-cpu-bars
 Look at `uptime_ms` in the output: it will be a few seconds. You just restarted a
 computer.
 
+> [!TIP]
+> **Go deeper** — Zephyr's
+> [west documentation](https://docs.zephyrproject.org/latest/develop/west/index.html)
+> explains the workspace model, and
+> [CMake's reference](https://cmake.org/cmake/help/latest/) is what you will
+> need the first time you add a source file. If you want to be able to read what
+> a cross-compiler produced, the free
+> [CS:APP lab assignments](https://csapp.cs.cmu.edu/3e/labs.html) teach exactly
+> that skill.
+
 ## Check yourself
 
 1. Why can't you run `gcc` on your MCU source and flash the result?
@@ -172,4 +182,5 @@ computer.
 3. You flash a signed application onto a completely blank chip. Verification
    passes and nothing runs. What is missing?
 
-Next: what those 104 LEDs are actually doing, and why the number 962 matters.
+Next: how that build knew this board has an LED panel, a TIM17 and a console
+on lpuart1 — because it did not detect any of it.

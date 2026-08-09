@@ -64,8 +64,8 @@ no network to reach.
 
 ## The course
 
-Short chapters, meant in order. Each one introduces an idea, then puts you in
-front of the real board to watch it happen.
+Sixteen short chapters, meant in order. Each one introduces an idea, then puts
+you in front of the real board to watch it happen.
 
 <div class="grid cards" markdown>
 

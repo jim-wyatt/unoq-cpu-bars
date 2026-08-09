@@ -127,6 +127,12 @@ caught because someone ran it.
 | `provision/` | Turning a factory board into this one, one numbered step at a time |
 | `docs/` | This course, and the reference it links into |
 
+> [!TIP]
+> **Go deeper** — [Further reading](../further-reading.md) is the annotated
+> list of the free material this whole course is built on, grouped by which
+> chapter it extends. If you only open three: **Operating Systems: Three Easy
+> Pieces**, the **Zephyr documentation**, and **Bootlin's training slides**.
+
 ## Finally
 
 The reference documentation — [hardware.md](../reference/hardware.md), [mcu.md](../reference/mcu.md),

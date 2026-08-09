@@ -44,6 +44,20 @@ application, decides which slot to boot, performs swaps, and enforces probation.
 Ours is **MCUboot**, and this is why the previous page had you flash the
 bootloader and the application together.
 
+```mermaid
+stateDiagram-v2
+  direction LR
+  [*] --> Running: slot 0, confirmed
+  Running --> Pending: upload to slot 1,<br/>mark it "test"
+  Pending --> Confirmed: the new image says<br/>"I am fine"
+  Pending --> Running: reset arrives first —<br/>the OLD image comes back
+  Confirmed --> [*]: this is now<br/>what boots
+```
+
+The arrow that matters is the one going backwards. Nothing has to *detect* a bad
+update; an update that fails to confirm is simply undone by the next reset,
+including the reset caused by the thing crashing.
+
 ## What a bootloader does, in order
 
 1. The chip powers on and starts executing at a fixed address. **That is the
@@ -181,6 +195,15 @@ Be clear about the limits:
 
 SWD remains the recovery path of last resort, which is why this board's design
 keeps those wires available even though you rarely need them.
+
+> [!TIP]
+> **Go deeper** — [MCUboot's own documentation](https://docs.mcuboot.com/) is
+> the source for slots, swap and the confirm flag; this page is a
+> simplification of its "Design" chapter. The wire protocol underneath is
+> [Zephyr's SMP](https://docs.zephyrproject.org/latest/services/device_mgmt/smp_protocol.html).
+> [Interrupt](https://interrupt.memfault.com/blog/) has the best free writing
+> anywhere on firmware update strategies that survive contact with real
+> devices.
 
 ## Check yourself
 

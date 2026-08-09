@@ -19,8 +19,21 @@ site_description: >-
   A course in hybrid MPU + MCU development, taught on one board: Linux and a
   microcontroller sharing a circuit, and how to make them cooperate.
 site_author: Jim Wyatt
-site_url: https://jim-wyatt.github.io/unoq-cpu-bars/
 copyright: Copyright &copy; 2026 Jim Wyatt &middot; MIT licensed
+
+# site_url is deliberately NOT set, and this is load-bearing rather than an
+# omission. With it, the `privacy` plugin bakes an ABSOLUTE url into the theme
+# bundle for the assets it vendors - so the mermaid renderer would be fetched
+# from the public site every time a page with a diagram was opened. On the USB
+# drive, on a laptop with no network, that is a diagram that never appears.
+#
+# Without it the same reference comes out relative, and one build works from
+# Pages, from the board, and from a folder. Verify after changing anything here:
+#
+#   grep -o '.\{30\}unpkg.com/mermaid' share/learn/assets/javascripts/bundle.*.js
+#
+# It must NOT start with https://. The cost is a sitemap without absolute URLs
+# and no canonical link tag; the offline case is worth more than the SEO.
 
 repo_url: https://github.com/jim-wyatt/unoq-cpu-bars
 repo_name: jim-wyatt/unoq-cpu-bars
@@ -175,12 +188,17 @@ nav:
       - learn/two-computers.md
       - learn/the-linux-side.md
       - learn/the-microcontroller-side.md
+      - learn/from-power-to-prompt.md
       - learn/how-they-talk.md
       - learn/from-source-to-chip.md
+      - learn/how-the-build-knows-your-hardware.md
       - learn/the-led-matrix.md
       - learn/updating-safely.md
       - learn/one-cable-many-devices.md
+      - learn/four-lights.md
       - learn/debugging-without-a-screen.md
+      - learn/knowing-it-works.md
+      - learn/from-factory-to-this.md
       - learn/make-it-yours.md
   - Reference:
       - reference/hardware.md

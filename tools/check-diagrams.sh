@@ -158,6 +158,28 @@ trap 'cleanup; rm -rf "$WORK"; rm -f "$SITE/_selftest.html"' EXIT
 
 self="$(render "http://127.0.0.1:$PORT/_selftest.html")"
 if [ "$self" != 1 ]; then
+  # Run it ONCE more with stderr kept. Everywhere else stderr is discarded,
+  # because a working chromium is noisy (dbus, UPower, GPU probing) and it would
+  # bury the per-page results. Here it is the only thing that can say WHY, and
+  # the alternative is another guess and another CI round - which is how this
+  # gate has already burned an afternoon.
+  echo "--- what the browser said, verbatim ---" >&2
+  timeout "$PAGE_TIMEOUT" "$BROWSER" \
+    --headless --no-sandbox --disable-gpu --disable-dev-shm-usage \
+    --no-first-run --disable-extensions --disable-background-networking \
+    --user-data-dir="$WORK/diag" \
+    --virtual-time-budget="$BUDGET_MS" \
+    --dump-dom "http://127.0.0.1:$PORT/_selftest.html" 2>&1 >/dev/null |
+    head -20 >&2
+  diag_rc="${PIPESTATUS[0]}"
+  echo "--- exit status: $diag_rc  (124 = killed by the ${PAGE_TIMEOUT}s timeout) ---" >&2
+  # And prove the server is serving, so a fixture that 404s is never mistaken
+  # for a browser that cannot render.
+  printf 'fixture over HTTP: %s\nlibrary over HTTP: %s\n\n' \
+    "$(curl -sS -o /dev/null -w '%{http_code}, %{size_download} bytes' \
+      "http://127.0.0.1:$PORT/_selftest.html" 2>&1)" \
+    "$(curl -sS -o /dev/null -w '%{http_code}, %{size_download} bytes' \
+      "http://127.0.0.1:$PORT/$lib" 2>&1)" >&2
   cat >&2 <<EOF
 THE HARNESS IS BROKEN, not the site.
 

@@ -22,6 +22,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/shell/shell.h>
 #include <zephyr/settings/settings.h>
+#include <zephyr/dfu/mcuboot.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -58,7 +59,7 @@ SETTINGS_STATIC_HANDLER_DEFINE(app, "app", NULL, app_settings_set, NULL, NULL);
  */
 static int cmd_app_status(const struct shell *sh, size_t argc, char **argv)
 {
-	status_leds_link_activity();
+	status_leds_link_seen();
 	ARG_UNUSED(argc);
 	ARG_UNUSED(argv);
 	shell_print(sh, APP_STATUS_FMT, k_uptime_get(), flip != 0, matrix_sweeps());
@@ -80,7 +81,7 @@ static void redraw(void)
 
 static int cmd_app_bars(const struct shell *sh, size_t argc, char **argv)
 {
-	status_leds_link_activity();
+	status_leds_link_seen();
 	int n = (int)argc - 1;
 
 	if (!app_bars_count_valid(n)) {
@@ -111,7 +112,7 @@ static int cmd_app_bars(const struct shell *sh, size_t argc, char **argv)
  * it is mounted, so it is not something the firmware can assume. */
 static int cmd_app_matrix_px(const struct shell *sh, size_t argc, char **argv)
 {
-	status_leds_link_activity();
+	status_leds_link_seen();
 	int row = atoi(argv[1]);
 	int col = atoi(argv[2]);
 	int level = atoi(argv[3]);
@@ -146,7 +147,7 @@ static int cmd_app_matrix_px(const struct shell *sh, size_t argc, char **argv)
 
 static int cmd_app_matrix_flip(const struct shell *sh, size_t argc, char **argv)
 {
-	status_leds_link_activity();
+	status_leds_link_seen();
 	ARG_UNUSED(argc);
 	ARG_UNUSED(argv);
 
@@ -160,39 +161,13 @@ static int cmd_app_matrix_flip(const struct shell *sh, size_t argc, char **argv)
 
 static int cmd_app_matrix_off(const struct shell *sh, size_t argc, char **argv)
 {
-	status_leds_link_activity();
+	status_leds_link_seen();
 	ARG_UNUSED(argc);
 	ARG_UNUSED(argv);
 
 	bar_count = 0;
 	matrix_off();
 	shell_print(sh, "ok matrix off");
-	return 0;
-}
-
-/* Linux pushes eMMC activity down to us, because it cannot show it itself: the
- * kernel's mmc0, disk-activity and disk-write triggers are all offered on this
- * board and none of them fire. So the MPU samples /sys/block/mmcblk0/stat and
- * sends the verdict here. */
-static int cmd_app_io(const struct shell *sh, size_t argc, char **argv)
-{
-	status_leds_link_activity();
-
-	if (argc != 2) {
-		shell_error(sh, "usage: app io <0|1>");
-		return -EINVAL;
-	}
-
-	char *end = NULL;
-	long busy = strtol(argv[1], &end, 10);
-
-	if (end == argv[1] || *end != '\0' || busy < 0 || busy > 1) {
-		shell_error(sh, "usage: app io <0|1>");
-		return -EINVAL;
-	}
-
-	status_leds_set_io(busy != 0);
-	shell_print(sh, "ok io=%ld", busy);
 	return 0;
 }
 
@@ -210,8 +185,6 @@ SHELL_STATIC_SUBCMD_SET_CREATE(app_cmds,
 			       SHELL_CMD_ARG(bars, NULL, "Draw CPU bars: app bars <pct> [pct ...]",
 					     cmd_app_bars, 2, APP_BARS_MAX - 1),
 			       SHELL_CMD(matrix, &matrix_cmds, "LED panel control", NULL),
-			       SHELL_CMD_ARG(io, NULL, "eMMC activity from the host: app io <0|1>",
-					     cmd_app_io, 2, 0),
 			       SHELL_SUBCMD_SET_END);
 SHELL_CMD_REGISTER(app, &app_cmds, "UNO Q application commands", NULL);
 
@@ -233,13 +206,25 @@ int main(void)
 	/* LED 3 and LED 4. A board without them still runs everything else, so
 	 * this only reports. */
 	status_leds_init();
-	printk("status LEDs %s\n", status_leds_present() ? "ready" : "unavailable");
+
+	/* LED 3 answers the question you actually have after an update: is this
+	 * the firmware that will still be here after the next reset? MCUboot
+	 * runs a new image unconfirmed the first time, and reverts it unless
+	 * something confirms it - so "unconfirmed" is a real, temporary,
+	 * invisible state, and yellow is the only place it is visible without
+	 * reading the slot table over the wire. */
+	bool confirmed = boot_is_img_confirmed();
+
+	status_leds_set_image_confirmed(confirmed);
+	printk("status LEDs %s, image %s\n", status_leds_present() ? "ready" : "unavailable",
+	       confirmed ? "confirmed" : "UNCONFIRMED (reverts on next reset)");
 
 	if (matrix_init() == 0) {
 		printk("LED matrix ready (%dx%d, flip=%d)\n", APP_MATRIX_ROWS, APP_MATRIX_COLS,
 		       flip != 0);
 	} else {
 		printk("LED matrix unavailable\n");
+		status_leds_set_fault();
 	}
 
 	return 0;

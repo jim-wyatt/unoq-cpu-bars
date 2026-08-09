@@ -10,7 +10,7 @@ board that is already provisioned** — which is every board the scripts had bee
 tested on until then.
 
 The common shape is worth stating up front, because it is what to look for
-next: of the fourteen findings below, **five reported success** and four more
+next: of the seventeen findings below, **five reported success** and five more
 printed a warning that read as noise. Only two announced themselves as errors.
 A check that cannot pass is indistinguishable from a check that always passes,
 unless you run it somewhere it matters.
@@ -33,6 +33,9 @@ Status as of the runs on 2026-08-08/09. Fixed items link to the commit.
 | 12 | `40-purge-arduino.sh` claimed the purge deletes `~/.arduino15` | it does not — apt removes packages, not `$HOME`. 621 MB still there after a real run | fixed |
 | 13 | Attaching the fileshare after the gadget was built left the drive exported **read-write** | the read-only protection `usb.md` insists on was absent on every board following the documented order | fixed |
 | 14 | Nothing locked `/dev/ttyHS1`, so two openers interleaved | 6 of 8 reads correct, 2 failing with an error that blames a disconnected cable | fixed |
+| 15 | `fwupd.service` masked but `fwupd-refresh.timer` left enabled | a permanently failed unit on a board with nothing wrong — found by the new alarm LED, seconds after it was first enabled | fixed |
+| 16 | `mmc0`, `disk-activity`, `disk-write` LED triggers never fire | offered, selectable, and inert: 0 of 400 samples under sustained writes | worked around |
+| 17 | Firmware read the MCUboot image state once at boot | LED 3 sat on yellow through a successful confirm — stale, in the exact way the Linux LEDs were designed not to be | fixed |
 
 ---
 
@@ -114,6 +117,34 @@ gone forever": the purge is the point after which nobody thinks to look for the
 image again, and a restore months later will not feel connected to it.
 
 ---
+
+### 15, 16, 17 — what an indicator is worth, and what it costs to get wrong
+
+Adding four status LEDs took an afternoon and turned up three separate problems,
+none of which were about LEDs.
+
+**15.** The "a unit has failed" LED came on within *seconds* of first being
+enabled. `10-optimize-board.sh` masks `fwupd.service` but left
+`fwupd-refresh.timer` enabled; it fires daily, cannot reach the masked daemon,
+and leaves a failed unit forever. That would have made the new alarm useless
+from birth — **an indicator that is always on is not an indicator**, which is
+the same disease as a warning nobody reads.
+
+**16.** The kernel offers `mmc0`, `disk-activity` and `disk-write` in every
+LED's trigger list. All three can be selected without complaint. None of them
+fire — measured at 0 of 400 samples with 400 MB of `O_DIRECT` writes in flight.
+**Being listed is not being implemented**, and a trigger you can select is not a
+trigger that fires. `/sys/block/mmcblk0/stat` does move, and is checkable.
+
+**17.** The firmware called `boot_is_img_confirmed()` once, in `main()`.
+Confirming happens over SMP long afterwards, so LED 3 stayed yellow through a
+successful confirm — showing something that *had* been true. This is exactly the
+failure `usb/leds.sh` was written to avoid ("a stale LED is worse than a dark
+one, because it is confidently wrong"), reintroduced in C two files away. Having
+the principle written down did not stop it; **watching the board did.**
+
+The through-line: every one of these was found by looking at hardware, not by
+reading code or running tests. The suite was green throughout.
 
 ### 14 — mostly working, which is worse than broken
 

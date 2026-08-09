@@ -127,13 +127,27 @@ fi
 
 if wanted c; then
   cd "$PROJECT" || exit 1
+  # Static, instant, no network - so it runs here rather than in the mcu area,
+  # which --fast skips and which is exactly when a version drift would land.
+  run "zephyr version pin" "$PROJECT/tools/check-zephyr-pin.sh"
   mapfile -t CFILES < <(git ls-files 'mcu/**/*.c' 'mcu/**/*.h' 2>/dev/null)
   CF="$VENV/bin/clang-format"
-  command -v clang-format >/dev/null 2>&1 && [ ! -x "$CF" ] && CF=clang-format
-  if [ ${#CFILES[@]} -gt 0 ]; then
-    if [ ! -x "$CF" ] && ! command -v "$CF" >/dev/null 2>&1; then
-      FAILED+=("clang-format (missing tool)")
-      printf '%s    MISSING: clang-format - run tools/install-dev-tools.sh%s\n' "$RED" "$OFF"
+  # Deliberately NO fallback to a clang-format on PATH. There used to be one,
+  # and it is how the gate came to disagree with itself: the board formatted an
+  # enum onto one line, CI wanted it expanded, and the "fix" was to run the
+  # other version. A formatter that answers differently in two places is not a
+  # gate. Same argument as the shellcheck and shfmt pins in install-dev-tools.sh.
+  if [ ${#CFILES[@]} -gt 0 ] && have clang-format "clang-format"; then
+    # The pin lives in pyproject.toml, so it cannot drift from what gets
+    # installed. A venv built before the pin has the wrong version and would
+    # otherwise fail silently in exactly the confusing way this is meant to end.
+    want="$(sed -n 's/.*clang-format==\([0-9.]*\).*/\1/p' "$PROJECT/python/pyproject.toml")"
+    got="$("$CF" --version 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+)+' | head -1)"
+    if [ -n "$want" ] && [ "$want" != "$got" ]; then
+      FAILED+=("clang-format (version $got, pinned at $want)")
+      printf '%s    VERSION: clang-format is %s, pyproject.toml pins %s%s\n' \
+        "$RED" "$got" "$want" "$OFF"
+      printf '    refresh the venv:  tools/install-dev-tools.sh\n'
     elif [ "$FIX" = 1 ]; then
       run "clang-format (write)" "$CF" -i "${CFILES[@]}"
     else

@@ -348,12 +348,22 @@ want it lower.
 
 ### CI
 
-`.github/workflows/ci.yml` runs `tools/check.sh python shell c docs` on push and
-pull request, so green CI means the same thing as a clean local run.
+`.github/workflows/ci.yml` runs two jobs on push and pull request, so green CI
+means the same thing as a clean local run:
 
-`ztest` is the one gate CI skips: it needs a Zephyr workspace and SDK (~5 GB)
-that is not worth installing per job. Run it on the board with
-`tools/check.sh mcu`.
+| job | what it does |
+|---|---|
+| `checks` | `tools/check.sh python shell c docs` — ~30 seconds |
+| `firmware` | cross-compiles `mcu/app` for `arduino_uno_q`, reports the image size against the 416K slot, then runs the MCU suites on `native_sim` |
+
+They are separate so a missing comma fails in thirty seconds rather than behind
+a toolchain download.
+
+The Zephyr version is pinned in **two** places — `provision/user/30-zephyr-workspace.sh`
+for the board's standalone workspace, and `west.yml` for CI, which needs the repo
+to be its own manifest repo. `tools/check-zephyr-pin.sh` is a gate that fails if
+they disagree, because a CI job compiling a different Zephyr from the board is
+worse than no CI job at all.
 
 The runner is x86_64 while the board is aarch64. That is fine here — `gpiod`
 ships manylinux wheels for both, and the tests use fakes, so nothing in the job

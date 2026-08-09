@@ -16,7 +16,13 @@ unoq-learn = "unoq.learn:main"
 # Install with:  uv pip install --python ~/hybrid/.venv/bin/python -e 'python[dev]'
 # Everything below is also what tools/check.sh runs.
 [project.optional-dependencies]
-dev = ["pytest>=8", "pytest-cov", "mypy", "ruff", "clang-format"]
+# clang-format is PINNED, unlike the rest. Ruff and mypy disagreeing between
+# versions produces a new diagnostic, which is a real finding; a formatter
+# disagreeing produces a gate that passes locally and fails in CI, which
+# teaches people to ignore the gate. Bump it deliberately, reformat in the same
+# commit, and never as a side effect of someone re-running the installer.
+# Same reasoning as the shellcheck and shfmt pins in tools/install-dev-tools.sh.
+dev = ["pytest>=8", "pytest-cov", "mypy", "ruff", "clang-format==22.1.8"]
 # The documentation site (tools/build-docs.sh). Separate from `dev` because it
 # is the only part of the toolchain the board needs at PROVISIONING time - the
 # drive and the web server are built from it - while `dev` is only needed by

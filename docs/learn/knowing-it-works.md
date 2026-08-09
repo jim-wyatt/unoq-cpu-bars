@@ -152,17 +152,32 @@ slow to sit in front of one. CI runs the same script — that matters, because a
 green CI then means the same thing as a clean local run rather than something
 adjacent to it.
 
-Two honest gaps in that picture, both of them open issues:
+CI runs it as **two** jobs, and the split is worth copying. The fast gates —
+lint, types, tests, docs — finish in about thirty seconds. The firmware job
+cross-compiles for the real Cortex-M33 and runs the MCU suites, and needs a
+Zephyr workspace and the SDK first. Separating them means a missing comma fails
+in thirty seconds instead of behind a toolchain download.
 
-- **CI runs on x86_64; the board is aarch64.** For this project that is fine —
-  the tests use fakes and the libraries ship wheels for both — but it means CI
-  proves the logic, not the board.
-- **CI never compiles the firmware.** A full Zephyr workspace and SDK is about
-  5 GB, which is a lot to install per job, so the MCU suite runs on the board
-  only. A change that breaks the firmware build gets a green tick.
+> [!NOTE]
+> Until recently the second job did not exist, and **a change that broke the
+> firmware build got a green tick** — nothing outside the board ever compiled
+> it. That is the failure mode to watch for in any CI setup: not a test that
+> fails, but a thing nobody checks that everyone assumes is checked.
 
-Naming those in the documentation is deliberate. A test suite you have oversold
-is worse than a small one you have described accurately.
+One gap remains, and naming it is deliberate — a test suite you have oversold is
+worse than a small one you have described accurately:
+
+- **CI runs on x86_64; the board is aarch64.** For the Python that is fine: the
+  tests use fakes and the libraries ship wheels for both. The firmware
+  cross-compiles, so its output is identical either way. But nothing in CI runs
+  on the actual hardware, so CI proves the logic and the build, never the board.
+
+There is also a subtler trap the firmware job had to avoid. Zephyr's version is
+now pinned in **two** places — the board's provisioning script, and a `west.yml`
+that CI needs because of how its setup action works. If those drift, CI compiles
+a different Zephyr from the one you are running, and reports green about
+software nobody has. `tools/check-zephyr-pin.sh` is a gate whose entire job is
+to fail when they disagree.
 
 ## Try it
 
@@ -214,8 +229,8 @@ this gate existed, and nothing noticed for months.
 2. `bars.c` is tested on your laptop and `matrix.c` is not. What is the property
    of each that decides that, and how did the design make it true?
 3. Coverage is 100%. Give a concrete bug that could still be in the code.
-4. CI never builds the firmware. Describe a change that would pass every gate
-   here and still leave the board unable to boot.
+4. Nothing in CI runs on real hardware. Describe a change that would pass every
+   gate here and still leave the board unable to boot.
 
 Next: how a factory-fresh board becomes this one, one idempotent script at a
 time.

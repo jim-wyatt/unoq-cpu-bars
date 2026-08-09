@@ -10,16 +10,16 @@ board that is already provisioned** — which is every board the scripts had bee
 tested on until then.
 
 The common shape is worth stating up front, because it is what to look for
-next: of the nine findings below, **four reported success** and three more
+next: of the twelve findings below, **five reported success** and four more
 printed a warning that read as noise. Only two announced themselves as errors.
 A check that cannot pass is indistinguishable from a check that always passes,
 unless you run it somewhere it matters.
 
-Status as of the run on 2026-08-08/09. Fixed items link to the commit.
+Status as of the runs on 2026-08-08/09. Fixed items link to the commit.
 
 | # | What | How it presented | Status |
 |---|---|---|---|
-| 1 | Stock firmware backup globbed `variants/`, image is in `firmwares/` | `warn` then carried on into the purge, deleting the only copy | fixed |
+| 1 | Stock firmware backup globbed `variants/`, image is in `firmwares/` | `warn`, then carried on into the purge having saved nothing — see #12 for what that does and does not cost | fixed |
 | 2 | SDK 1.0.1 nests toolchains under `gnu/` | verify failed on a good install; **and** the idempotency check never matched, so every re-run re-downloaded ~1 GB | fixed |
 | 3 | `tr -d '\0'` on the devicetree `compatible` | `unrecognised board` on every UNO Q and VENTUNO Q ever | fixed |
 | 4 | avahi advertises *both* bridge addresses | `<host>.local` resolved to the unreachable `10.55.0.1` half the time | fixed |
@@ -29,6 +29,8 @@ Status as of the run on 2026-08-08/09. Fixed items link to the commit.
 | 8 | No host C compiler on the image at all | `check.sh mcu` and `ztest.sh` could never have run | fixed |
 | 9 | Venv check tested 3 of the 5 packages it installs | `smbus2` and `spidev` absent, reported `0 changed, 5 already correct` | fixed |
 | 10 | VS Code machine settings lived only in `~/.vscode-server` | restore wiped them; nothing said so, the board just swapped sooner | fixed |
+| 11 | `70-learning-web.sh` printed only the first address per interface, and ignored link state | advertised `10.55.0.1` and a **down** `docker0`, hid the one address the host can reach | fixed |
+| 12 | `40-purge-arduino.sh` claimed the purge deletes `~/.arduino15` | it does not — apt removes packages, not `$HOME`. 621 MB still there after a real run | fixed |
 
 ---
 
@@ -86,35 +88,64 @@ For scale, on this board VS Code Server plus its Claude Code instances was
 1875 MB of 3.6 GB, of which ~620 MB was a second extension host left behind by a
 window whose connection had gone away.
 
-### 1 — the only unrecoverable one
+### 1 — a guard that saved nothing, and how bad that actually was
 
 The stock MCU firmware is Arduino's build: not in this repo, not in apt. The
 backup step globbed a path that has not existed since core 0.55.2, warned, and
-continued into `apt_remove arduino-*`.
+continued into `apt_remove arduino-*` having saved nothing.
 
 Now: `bootstrap.sh` takes the copy during **preflight**, while the tree is
 certainly still there, and the purge **refuses** without one. The find logic
 lives in `lib.sh` because two callers need the same answer and the path has
 already moved once.
 
-Worth recording, because it was not obvious at the time: the image is
-**recoverable**. It ships in the `arduino-*` debs, so a factory restore brings
-it back. Losing it costs a restore, not the board.
+Two corrections to how this was first written up, both in the direction of it
+being *less* dramatic — recorded because #12 is about exactly this failure mode:
+
+- The purge does **not** delete `~/.arduino15`, so the image survives it. What
+  the broken glob cost was the *deliberate* copy, not the last one.
+- The image is **recoverable** regardless: it ships in the `arduino-*` debs, so
+  a factory restore brings it back. Losing it costs a restore, not the board.
+
+The guard still earns its place, for a narrower reason than "otherwise it is
+gone forever": the purge is the point after which nobody thinks to look for the
+image again, and a restore months later will not feel connected to it.
 
 ---
 
-## Still unvalidated on this board
+### 12 — a warning that was worse than wrong
 
-Not bugs — features nobody has run since the restore. Each is a plausible home
-for finding #10.
+`40-purge-arduino.sh` said the purge takes `~/.arduino15` with it, so the stock
+image is gone forever. Measured after a real run: `~/.arduino15` is still there,
+**621 MB of it**, stock `.hex` included. apt removes packages, not files in
+`$HOME`.
 
-| Feature | State |
+Overstating a danger is its own failure mode. The reader who checks and finds it
+untrue learns to discount everything else the file says — and this file is one
+where the other warnings are real.
+
+What actually eats the image is a **factory restore**, which is also what puts
+it back. The guard still belongs here, for a different reason than stated: not
+because this script deletes the image, but because it is the point after which
+nobody thinks to look for it again.
+
+---
+
+## Validated on this board
+
+Everything below was run end to end after the fixes above, on 2026-08-09.
+
+| Feature | Result |
 |---|---|
-| `--with-cpu-bars` | Never run. The LED matrix demo — the worked example the README leads with. |
-| Fileshare image | Never built. `drive backing file <none>`, so the USB drive appears **empty**. |
-| `--with-purge` | Never run. Now safe: the firmware backup exists and the guard works. |
-| `--with-learning` | Never run. |
-| FOTA | Never exercised end to end on this board. |
+| CPU-bars demo | Drives the panel: MCU sweep counter `0 → 29,627`, and `+10,554` across a controlled 20-frame run. Boot service stable, 0 restarts, holds `/dev/ttyHS1` as documented. |
+| Fileshare image | Builds with MBR + FAT32 at `+1048576`, mounts read-only, and attaches to the live gadget by **re-inserting the medium** — no unbind, so an SSH session over the same cable survives it. |
+| Learning web | `HTTP 200`, reachable on the leased USB address. |
+| **FOTA** | Full cycle *and* the safety property: upload → staged; `test`+`reset` → swapped with `confirmed: False`; **reset without confirming reverted automatically**; `test`+`reset`+`confirm` survived a further reset. |
+| `--with-purge` | Removed four packages, reclaimed ~400 MB, OpenOCD verified working afterwards, all services still up. |
+| MCU suites | 26/26 cases, 2/2 suites (needs the `gcc` from finding #8). |
+| Host suites | 106 tests, 100% coverage, all 7 gates. |
+
+Nothing in this table had been run on this board before today.
 
 ## Decisions taken, for the refactor
 

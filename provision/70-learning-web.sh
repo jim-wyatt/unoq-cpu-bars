@@ -91,6 +91,29 @@ fi
 summary
 echo
 echo "Reachable at:"
+# Every global address on every interface that is actually UP.
+#
+# This printed only $3 - the FIRST address of each interface - and skipped the
+# state column entirely. Both halves were wrong in the same direction, which is
+# to say it advertised addresses that do not work and hid the one that does:
+#
+#   br-usb  UP    10.55.0.1/24 192.168.137.210/24    <- second address dropped
+#   docker0 DOWN  172.17.0.1/16                      <- printed anyway
+#
+# In client mode the leased address is the ONLY one a plugged-in computer can
+# reach; 10.55.0.1 needs a static route on the host, and docker0 is a bridge
+# whose daemon 20-dev-tools.sh disables. So the two addresses it offered were
+# the unreachable one and the meaningless one.
+#
+# $2 is the operational state in `ip -br` output, and it is DOWN for docker0
+# while `show ... up` is not - that filter matches IFF_UP, which a bridge with
+# no carrier still has.
 ip -4 -br addr show scope global 2>/dev/null |
-  awk -v p="$PORT" '{gsub(/\/.*/, "", $3); if ($3) print "  http://" $3 ":" p "/"}'
+  awk -v p="$PORT" '$2 == "UP" {
+    for (i = 3; i <= NF; i++) {
+      a = $i
+      gsub(/\/.*/, "", a)
+      if (a) print "  http://" a ":" p "/"
+    }
+  }'
 echo "Logs:  journalctl -u unoq-learn -f"

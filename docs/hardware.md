@@ -100,6 +100,74 @@ the driver masks only the low eleven pins when it tri-states the port.
 
 See [mpu.md](mpu.md#cpu-bars-on-the-led-matrix) for the display built on this.
 
+## The four RGB LEDs
+
+Separate from the 8x13 matrix, and split across both processors. This trips
+people up, because only half of them are visible from Linux.
+
+| | Driven by | Named |
+|---|---|---|
+| **LED 1** | Linux | `unoq:user-red1` / `-green1` / `-blue1` |
+| **LED 2** | Linux | `unoq:panic-red2` / `unoq:wlan-green2` / `unoq:bt-blue2` |
+| **LED 3** | **STM32** | `led3_red` / `led3_green` / `led3_blue` |
+| **LED 4** | **STM32** | `led4_red` / `led4_green` / `led4_blue` |
+
+They sit above the matrix, opposite the USB-C port.
+
+### Six sysfs entries are two LEDs
+
+`/sys/class/leds/unoq:*` lists six writable channels, and it is very natural to
+read that as six indicators. It is not: they are the red, green and blue
+channels of two RGB packages, and the `-1` / `-2` suffixes are the only hint.
+
+**sysfs cannot tell you this.** Every channel gets its own directory and its own
+`brightness` file whether it is one package or six, and they all hang off the
+same `gpio-leds` platform node. Lighting four channels to mean four separate
+things produces two cyan LEDs, which is how this was discovered.
+
+### `mmc0::` is not one of them
+
+There is a seventh entry, `mmc0::`, and it is a different animal:
+
+```
+unoq:user-red1  ->  platform/leds/leds/...            (gpio-leds)
+mmc0::          ->  platform/soc@0/4744000.mmc/leds/  (the MMC controller)
+```
+
+The MMC subsystem registers it so a board *can* wire an activity light to it.
+Nothing is wired to it here. It has `max_brightness 255` where the real ones
+have 1, and it will never light.
+
+### The disk-activity triggers do not fire
+
+`mmc0`, `disk-activity` and `disk-write` are all offered in every LED's trigger
+list, and all of them accept being selected. **None of them do anything.**
+Measured with 400 MB of `O_DIRECT` writes in flight, sampling brightness 400
+times: on in **zero** samples, for all three.
+
+Being listed is not being implemented. If you want disk activity on a LED here,
+you must sample `/sys/block/mmcblk0/stat` yourself - that counter does move.
+
+### What this project shows on them
+
+`usb/leds.sh` (Linux) and `mcu/app/src/status_leds.c` (firmware):
+
+| | LED 1 | LED 2 | LED 3 | LED 4 |
+|---|---|---|---|---|
+| green | internet reachable | all units healthy | image **confirmed** | MPU spoke recently |
+| yellow | — | — | image **unconfirmed**, reverts on reset | — |
+| blue | cable, but no route beyond | — | — | — |
+| red | no uplink at all | unit failed / bind guard tripped | subsystem failed | MPU silent >4s |
+
+LED 4 is worth understanding: it shows the *absence* of traffic. A blink per
+message would be a clock - `cpubars` sends twice a second, so it would blink
+twice a second forever and mean nothing. The tick stopping is the news, and it
+is news Linux cannot deliver, because a host that has stopped talking cannot
+report that it stopped.
+
+`~/hybrid/usb/leds.sh explain` prints the current scheme; `... test` cycles the
+colours so you can learn which physical LED is which.
+
 ## How the MPU flashes the MCU
 
 There is no external debug probe. The MPU bit-bangs SWD on its own GPIO lines

@@ -69,43 +69,42 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH"
           tools/check.sh python shell c docs
 
-  # The browser half of the diagram check. Its own job, gated on `changes`,
-  # because it is slow (a browser launch per page) and because it has twice
-  # failed for reasons that were nothing to do with the diagrams - once hanging
-  # a job for fifteen minutes, once reporting every page broken on a build that
-  # renders perfectly on the board.
+  # THE BROWSER GATE IS NOT HERE, AND THAT IS DELIBERATE.
   #
-  # The cheap half of the same check - library vendored, init script loaded by
-  # every page that needs it - runs inside `checks` above as `diagram assets`,
-  # in a tenth of a second. That is the gate protecting the offline constraint
-  # on every pull request. This one is the proof that they actually draw.
-  diagrams:
-    needs: changes
-    if: needs.changes.outputs.docs == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: astral-sh/setup-uv@v9.0.0
-        with:
-          enable-cache: true
-
-      - name: Set up Python
-        run: uv python install 3.13
-
-      - name: Install the docs toolchain
-        # Only the docs extra; this job does not lint or type-check anything.
-        run: |
-          uv venv .venv
-          uv pip install --python .venv/bin/python -e 'python[docs]'
-
-      - name: Do the diagrams actually draw?
-        # ubuntu-latest ships google-chrome; the script finds whichever of the
-        # usual names exists. It builds the site itself, so no step above needs
-        # to leave one behind.
-        run: tools/check-diagrams.sh
+  # tools/check-diagrams.sh opens a real browser on every page that has a
+  # diagram. It is the only thing that can prove one actually draws, it runs on
+  # the board as part of `tools/check.sh`, and it passes there - 12 diagrams
+  # across 11 pages, every time.
+  #
+  # On a GitHub runner it has never once worked. Three attempts:
+  #
+  #   1. hung, and took an unrelated pull request to the 15-minute job timeout
+  #      with chrome still alive
+  #   2. reported "0 of 1 drew" on all 11 pages of a build that renders
+  #      perfectly here - a shared --user-data-dir serialising the launches
+  #   3. chromium 150 never exits from --dump-dom at all. Killed by the
+  #      per-page timeout, exit 124, with the fixture (200, 238 bytes) and the
+  #      library (200, 3566058 bytes) both confirmed served. Nothing wrong
+  #      with the site; --virtual-time-budget simply does not end the process.
+  #
+  # Three rounds, three infrastructure failures, zero true findings. A gate
+  # with that record is not protecting the site, it is taxing every pull
+  # request and training us to ignore a red tick.
+  #
+  # WHAT STILL GUARDS THE INVARIANT: `checks` above runs `diagram assets`,
+  # which asserts in 0.26s and with no browser that the library is vendored
+  # rather than fetched, that the theme bundle references it relatively, that
+  # mermaid-init.js shipped, and that every page carrying a diagram loads it.
+  # That is the entire regression class that has ever actually bitten us, and
+  # it is checked on every pull request. What is left uncovered is narrow:
+  # mermaid.run() throwing once called. The board checks that before each push.
+  #
+  # TO BRING IT BACK, one of:
+  #   - pin chrome-headless-shell (the supported --dump-dom path) rather than
+  #     using whatever chromium the runner image ships
+  #   - drive one long-lived browser over the DevTools protocol instead of
+  #     launching one per page, which also makes it ~10x faster
+  # Tracked as an issue; do not re-add it by simply uncommenting a job.
 
   # Does this change touch anything the firmware is built from?
   #
@@ -121,20 +120,17 @@ jobs:
     timeout-minutes: 5
     outputs:
       firmware: ${{ steps.filter.outputs.firmware }}
-      docs: ${{ steps.filter.outputs.docs }}
     steps:
       - id: filter
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           # Anything that is not a pull request - a push to main, a manual run -
-          # runs everything. The point is to skip work that cannot matter, not
-          # to find excuses; main should always have a proven firmware build and
-          # a site whose diagrams have been seen to draw.
+          # builds. The point is to skip work that cannot matter, not to find
+          # excuses; main should always have a proven firmware build.
           if [ "${{ github.event_name }}" != "pull_request" ]; then
             echo "firmware=true" >>"$GITHUB_OUTPUT"
-            echo "docs=true" >>"$GITHUB_OUTPUT"
-            echo "not a pull request - running everything"
+            echo "not a pull request - building"
             exit 0
           fi
           files=$(gh api --paginate \
@@ -151,18 +147,6 @@ jobs:
             echo "nothing under mcu/ changed - skipping the firmware build"
           fi
 
-          # Everything that can change what a rendered page contains. mkdocs.yml
-          # is here because extra_javascript lives in it, and the hooks because
-          # they rewrite markdown on its way to HTML. Erring wide on purpose:
-          # the cost of a false positive is two minutes, and the cost of a false
-          # negative is diagrams silently coming out as grey text again.
-          if grep -qE '^(docs/|mkdocs\.yml|tools/(mkdocs_hooks\.py|build-docs\.sh|check-diagram)|\.github/workflows/ci\.yml)' <<<"$files"; then
-            echo "docs=true" >>"$GITHUB_OUTPUT"
-            echo "documentation inputs changed - checking the diagrams in a browser"
-          else
-            echo "docs=false" >>"$GITHUB_OUTPUT"
-            echo "no documentation inputs changed - skipping the browser gate"
-          fi
 
   # The MCU half. Split into its own job because it needs a Zephyr workspace and
   # the SDK, which the gates above do not - so a formatting mistake still fails

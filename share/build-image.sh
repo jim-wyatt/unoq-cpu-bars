@@ -221,9 +221,21 @@ else
 fi
 
 if [ -d "$PROJECT/share/learn" ]; then
-  rsync -a "$PROJECT/share/learn/" "$MOUNT/" 2>/dev/null ||
-    cp -r "$PROJECT/share/learn/." "$MOUNT/"
-  did "learning content synced from share/learn/"
+  # --delete, because a copy that only ever grows is a copy that lies.
+  #
+  # This was a plain `rsync -a` while the generator wrote one flat directory of
+  # pages, where the file set never shrank and stale files could not accumulate.
+  # The moment the site grew subdirectories, the drive ended up carrying BOTH
+  # layouts - twenty pages from the old build sitting beside the new tree, all
+  # still reachable, all quietly out of date. Exactly the disagreement between
+  # the three copies that rebuilding here is supposed to prevent.
+  #
+  # --exclude protects the installers, which are on the drive and are NOT in
+  # share/learn: rsync does not delete excluded paths, so this deletes stale
+  # documentation without touching the ~2 GB that took an hour to download.
+  rsync -a --delete --exclude '/vscode/' "$PROJECT/share/learn/" "$MOUNT/" 2>/dev/null ||
+    fail "could not sync the documentation onto $MOUNT"
+  did "learning content synced from share/learn/ (stale pages removed)"
 else
   warn "$PROJECT/share/learn missing - no landing page on the drive"
 fi

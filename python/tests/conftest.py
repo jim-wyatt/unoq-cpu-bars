@@ -101,7 +101,11 @@ def serial_factory(monkeypatch: pytest.MonkeyPatch) -> Any:
     created: list[FakeSerial] = []
 
     def make(**kwargs: Any) -> list[FakeSerial]:
-        def _factory(port: str, baud: int, timeout: float = 0.3) -> FakeSerial:
+        def _factory(
+            port: str, baud: int, timeout: float = 0.3, exclusive: bool = False
+        ) -> FakeSerial:
+            # exclusive is accepted and ignored: the fake is the only opener by
+            # construction, but MCU must be free to ask for the lock.
             fake = FakeSerial(port, baud, timeout, **kwargs)
             created.append(fake)
             return fake

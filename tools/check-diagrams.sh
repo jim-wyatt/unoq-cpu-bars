@@ -85,8 +85,96 @@ for _ in $(seq 1 20); do
   sleep 0.25
 done
 
-PROFILE="$(mktemp -d)"
-trap 'cleanup; rm -rf "$PROFILE"' EXIT
+WORK="$(mktemp -d)"
+trap 'cleanup; rm -rf "$WORK"' EXIT
+
+# render <url> - print the number of diagrams the browser marked as drawn, or
+# the word "broken" if the browser itself failed. Those two are DIFFERENT
+# ANSWERS and conflating them cost a whole debugging session: `grep -c` prints
+# "0" for empty input, so a browser that produced nothing at all was reported as
+# "0 of 1 diagrams drew" - which reads as "your markup is wrong" when it means
+# "the browser never ran".
+render() {
+  local url="$1" dom rc
+  # A FRESH PROFILE PER LAUNCH. Chrome puts a SingletonLock in the profile
+  # directory, and a previous instance that has not finished tearing down makes
+  # the next one wait on it. Sharing one directory across eleven sequential
+  # launches worked on this board and produced a 45s-then-1s alternating pattern
+  # on the runner - half the pages timing out, the rest returning empty.
+  local profile="$WORK/profile.$$.$RANDOM"
+  # HARD TIMEOUT, non-negotiable. On a GitHub runner an earlier version of this
+  # hung on the first page and took the whole job to its fifteen-minute limit
+  # with chrome still alive. A gate that can hang is worse than no gate: it
+  # turns an unrelated pull request into a fifteen-minute wait and a red tick.
+  #
+  # Plain --headless, NOT --headless=old: old headless was removed from Chrome
+  # in 132, so on any current runner that flag is at best ignored. The board's
+  # Chromium 151 draws diagrams identically under both, which is exactly why
+  # the difference stayed invisible here.
+  #
+  # --disable-dev-shm-usage because CI containers give /dev/shm 64 MB, where
+  # chrome deadlocks rather than failing.
+  dom="$(timeout "$PAGE_TIMEOUT" "$BROWSER" \
+    --headless --no-sandbox --disable-gpu --disable-dev-shm-usage \
+    --no-first-run --disable-extensions --disable-background-networking \
+    --user-data-dir="$profile" \
+    --virtual-time-budget="$BUDGET_MS" \
+    --dump-dom "$url" 2>/dev/null)"
+  rc=$?
+  rm -rf "$profile"
+  # Empty output means the browser died or timed out. A real page always comes
+  # back with at least an <html> element, diagrams or not.
+  if [ "$rc" != 0 ] || [ -z "$dom" ]; then
+    echo broken
+    return
+  fi
+  grep -c 'data-processed="true"' <<<"$dom"
+}
+
+# SELF-TEST FIRST, against a fixture this script writes itself.
+#
+# Without this, every failure looks like "the diagrams are broken" - and the
+# last two were not. One was a profile lock, one was a headless-mode flag. Both
+# reported eleven confident failures about markup that was perfectly correct,
+# which is the most expensive kind of wrong a gate can be.
+#
+# The fixture uses the SAME vendored library and the SAME init script as the
+# real pages, so if it draws, the browser and the library both work and a zero
+# on a real page is genuinely that page's fault.
+lib="$(cd "$SITE" && find assets/external -name 'mermaid*.js' 2>/dev/null | head -1)"
+if [ -z "$lib" ]; then
+  echo "no vendored mermaid in $SITE - run tools/check-diagram-assets.sh for why" >&2
+  exit 1
+fi
+cat >"$SITE/_selftest.html" <<EOF
+<!doctype html><html><body>
+<pre class="mermaid">graph LR
+  A[in] --> B[out]</pre>
+<script src="$lib"></script>
+<script src="assets/javascripts/mermaid-init.js"></script>
+</body></html>
+EOF
+trap 'cleanup; rm -rf "$WORK"; rm -f "$SITE/_selftest.html"' EXIT
+
+self="$(render "http://127.0.0.1:$PORT/_selftest.html")"
+if [ "$self" != 1 ]; then
+  cat >&2 <<EOF
+THE HARNESS IS BROKEN, not the site.
+
+A one-diagram fixture, using this build's own vendored library and init script,
+came back as "$self" instead of 1. That is the browser, this script, or the
+library - not the documentation. Nothing below would have been trustworthy, so
+no pages were checked.
+
+  browser:  $BROWSER ($("$BROWSER" --version 2>/dev/null || echo 'version unknown'))
+  library:  $lib
+
+Reproduce it by hand:
+  python3 -m http.server $PORT --directory $SITE &
+  $BROWSER --headless --no-sandbox --dump-dom http://127.0.0.1:$PORT/_selftest.html
+EOF
+  exit 1
+fi
 
 fail=0
 checked=0
@@ -96,25 +184,8 @@ while IFS= read -r page; do
   want="$(grep -c 'class="mermaid"' "$SITE/$page")"
   [ "$want" = 0 ] && continue
   checked=$((checked + 1))
-  # HARD TIMEOUT, non-negotiable. On a GitHub runner this hung on the very first
-  # page and took the whole job to its fifteen-minute limit with chrome still
-  # alive. A gate that can hang is worse than no gate: it turns an unrelated
-  # pull request into a fifteen-minute wait and a red tick, for no information.
-  #
-  # --headless=old because --dump-dom belongs to the OLD headless mode. Chrome's
-  # new headless (the default for plain --headless since 112) is the most likely
-  # reason it hung, and the board's older chromium is why it worked here.
-  #
-  # --disable-dev-shm-usage because CI containers give /dev/shm 64 MB, where
-  # chrome deadlocks rather than failing.
-  got="$(timeout "$PAGE_TIMEOUT" "$BROWSER" \
-    --headless=old --no-sandbox --disable-gpu --disable-dev-shm-usage \
-    --no-first-run --disable-extensions --disable-background-networking \
-    --user-data-dir="$PROFILE" \
-    --virtual-time-budget="$BUDGET_MS" \
-    --dump-dom "http://127.0.0.1:$PORT/$page" 2>/dev/null |
-    grep -c 'data-processed="true"')"
-  if [ -z "$got" ]; then
+  got="$(render "http://127.0.0.1:$PORT/$page")"
+  if [ "$got" = broken ]; then
     printf '  FAIL  %-46s the browser produced nothing (timed out after %ss?)\n' \
       "$page" "$PAGE_TIMEOUT"
     fail=1
@@ -125,7 +196,7 @@ while IFS= read -r page; do
     printf '  FAIL  %-46s %s of %s diagrams drew\n' "$page" "$got" "$want"
     fail=1
   fi
-done < <(cd "$SITE" && find . -name '*.html' -printf '%P\n' | sort)
+done < <(cd "$SITE" && find . -name '*.html' ! -name '_selftest.html' -printf '%P\n' | sort)
 
 if [ "$fail" != 0 ]; then
   cat >&2 <<EOF

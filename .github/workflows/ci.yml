@@ -3,14 +3,24 @@
 name: checks
 
 # Runs the same gates as tools/check.sh, so a green CI means the same thing as
-# a clean local run. Two jobs:
+# a clean local run. Four jobs:
 #
+#   changes    seconds. Decides which of the expensive two below run at all.
 #   checks     lint, format, types, tests, coverage, docs. Thirty seconds.
-#   firmware   compiles for the real Cortex-M33 and runs the MCU suites.
-#              Slower, because it needs a Zephyr workspace and the SDK.
+#   diagrams   opens a real browser on every page that has one. ~2 minutes.
+#   firmware   compiles for the real Cortex-M33 and runs the MCU suites. ~5
+#              minutes, because it needs a Zephyr workspace and the SDK.
 #
-# They are split so a missing comma still fails fast, rather than behind a
-# toolchain download.
+# THE SHAPE HERE IS DELIBERATE. `checks` is the one that runs on everything, so
+# it is kept to the gates that are fast and cannot hang. The two slow ones are
+# each gated on `changes`, and both run in PARALLEL with `checks` rather than
+# behind it - a documentation pull request should not wait on a Zephyr download
+# to find out its links are fine.
+#
+# The cost of getting this wrong is not hypothetical: the browser gate was
+# briefly inside `checks`, which took every pull request in the repository from
+# thirty seconds to five and a half minutes, including ones that touched no
+# documentation at all.
 #
 # The runner is x86_64 while the board is aarch64. That is fine for `checks`:
 # gpiod ships manylinux wheels for both, and the tests use fakes rather than
@@ -57,7 +67,45 @@ jobs:
       - name: Run gates
         run: |
           export PATH="$HOME/.local/bin:$PATH"
-          tools/check.sh python shell c docs diagrams
+          tools/check.sh python shell c docs
+
+  # The browser half of the diagram check. Its own job, gated on `changes`,
+  # because it is slow (a browser launch per page) and because it has twice
+  # failed for reasons that were nothing to do with the diagrams - once hanging
+  # a job for fifteen minutes, once reporting every page broken on a build that
+  # renders perfectly on the board.
+  #
+  # The cheap half of the same check - library vendored, init script loaded by
+  # every page that needs it - runs inside `checks` above as `diagram assets`,
+  # in a tenth of a second. That is the gate protecting the offline constraint
+  # on every pull request. This one is the proof that they actually draw.
+  diagrams:
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v9.0.0
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install the docs toolchain
+        # Only the docs extra; this job does not lint or type-check anything.
+        run: |
+          uv venv .venv
+          uv pip install --python .venv/bin/python -e 'python[docs]'
+
+      - name: Do the diagrams actually draw?
+        # ubuntu-latest ships google-chrome; the script finds whichever of the
+        # usual names exists. It builds the site itself, so no step above needs
+        # to leave one behind.
+        run: tools/check-diagrams.sh
 
   # Does this change touch anything the firmware is built from?
   #
@@ -73,22 +121,26 @@ jobs:
     timeout-minutes: 5
     outputs:
       firmware: ${{ steps.filter.outputs.firmware }}
+      docs: ${{ steps.filter.outputs.docs }}
     steps:
       - id: filter
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           # Anything that is not a pull request - a push to main, a manual run -
-          # builds. The point is to skip work that cannot matter, not to find
-          # excuses; main should always have a proven firmware build.
+          # runs everything. The point is to skip work that cannot matter, not
+          # to find excuses; main should always have a proven firmware build and
+          # a site whose diagrams have been seen to draw.
           if [ "${{ github.event_name }}" != "pull_request" ]; then
             echo "firmware=true" >>"$GITHUB_OUTPUT"
-            echo "not a pull request - building"
+            echo "docs=true" >>"$GITHUB_OUTPUT"
+            echo "not a pull request - running everything"
             exit 0
           fi
           files=$(gh api --paginate \
             "repos/${{ github.repository }}/pulls/${{ github.event.number }}/files" \
             --jq '.[].filename')
+
           # west.yml and this workflow are in the list because both change what
           # gets built, without any C file moving.
           if grep -qE '^(mcu/|west\.yml|\.github/workflows/ci\.yml)' <<<"$files"; then
@@ -97,6 +149,19 @@ jobs:
           else
             echo "firmware=false" >>"$GITHUB_OUTPUT"
             echo "nothing under mcu/ changed - skipping the firmware build"
+          fi
+
+          # Everything that can change what a rendered page contains. mkdocs.yml
+          # is here because extra_javascript lives in it, and the hooks because
+          # they rewrite markdown on its way to HTML. Erring wide on purpose:
+          # the cost of a false positive is two minutes, and the cost of a false
+          # negative is diagrams silently coming out as grey text again.
+          if grep -qE '^(docs/|mkdocs\.yml|tools/(mkdocs_hooks\.py|build-docs\.sh|check-diagram)|\.github/workflows/ci\.yml)' <<<"$files"; then
+            echo "docs=true" >>"$GITHUB_OUTPUT"
+            echo "documentation inputs changed - checking the diagrams in a browser"
+          else
+            echo "docs=false" >>"$GITHUB_OUTPUT"
+            echo "no documentation inputs changed - skipping the browser gate"
           fi
 
   # The MCU half. Split into its own job because it needs a Zephyr workspace and

@@ -169,8 +169,20 @@ if wanted docs; then
   cd "$PROJECT" || exit 1
   # --strict, so a link to a page that moved fails here instead of 404ing for
   # a reader. This gate is the reason the docs tree can be reorganised at all.
-  have mkdocs "docs (mkdocs --strict)" &&
+  if have mkdocs "docs (mkdocs --strict)"; then
     run "docs (mkdocs --strict)" "$PROJECT/tools/build-docs.sh"
+    # Deliberately not chained onto the build with &&: `run` always succeeds
+    # (it records the failure rather than propagating it), so a && here would
+    # look like a dependency and enforce nothing. If the build failed there is
+    # no site to inspect and this reports that, which is a second failure line
+    # for one root cause - noisy, but never silently skipped.
+    #
+    # A tenth of a second, no browser, and it guards the constraint the whole
+    # site is designed around: the diagram library is on disk rather than at a
+    # CDN, and every page that needs the init script loads it. The browser gate
+    # below proves diagrams DRAW; this proves they COULD without a network.
+    run "diagram assets (offline)" "$PROJECT/tools/check-diagram-assets.sh"
+  fi
 fi
 
 # --- diagrams ---------------------------------------------------------------

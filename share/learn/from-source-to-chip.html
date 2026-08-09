@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>From source to a running chip - Arduino UNO Q</title>
+<style>
+:root {
+  --bg: #ffffff; --fg: #1c2024; --muted: #5b6570; --rule: #e3e8ee;
+  --accent: #0b6cbd; --accent-soft: #eaf3fb; --code-bg: #f6f8fa;
+  --side: #fbfcfd; --warn-bg: #fff8e6; --warn-edge: #e0a800;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14181c; --fg: #dde3ea; --muted: #93a1b0; --rule: #262d35;
+    --accent: #5aa9f0; --accent-soft: #17222d; --code-bg: #1b2127;
+    --side: #11151a; --warn-bg: #241f10; --warn-edge: #8a6d1a;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, sans-serif;
+}
+.wrap { display: flex; align-items: flex-start; max-width: 1180px; margin: 0 auto; }
+nav {
+  width: 250px; flex: 0 0 250px; padding: 28px 18px 60px; background: var(--side);
+  border-right: 1px solid var(--rule); position: sticky; top: 0; max-height: 100vh;
+  overflow-y: auto;
+}
+nav .brand { font-weight: 700; font-size: 15px; letter-spacing: .01em; display: block;
+  color: var(--fg); text-decoration: none; margin-bottom: 4px; }
+nav .tag { color: var(--muted); font-size: 12.5px; margin-bottom: 22px; }
+nav h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .09em;
+  color: var(--muted); margin: 22px 0 8px; }
+nav ol { list-style: none; margin: 0; padding: 0; counter-reset: step; }
+nav li { margin: 1px 0; }
+nav a { display: block; padding: 5px 9px; border-radius: 6px; text-decoration: none;
+  color: var(--fg); font-size: 14px; }
+nav a:hover { background: var(--accent-soft); }
+nav a.here { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+nav ol.steps a::before { counter-increment: step; content: counter(step) ". ";
+  color: var(--muted); font-variant-numeric: tabular-nums; }
+main { flex: 1 1 auto; min-width: 0; padding: 40px 44px 96px; }
+h1, h2, h3, h4 { line-height: 1.25; margin: 1.9em 0 .55em; }
+h1 { font-size: 2.05rem; margin-top: 0; letter-spacing: -.015em; }
+h2 { font-size: 1.42rem; padding-bottom: .28em; border-bottom: 1px solid var(--rule); }
+h3 { font-size: 1.13rem; }
+h4 { font-size: 1rem; color: var(--muted); }
+p, ul, ol, table, pre, blockquote { margin: 0 0 1.05em; }
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+ul, ol { padding-left: 1.4em; }
+li { margin: .3em 0; }
+code {
+  font: 13.5px/1.5 ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  background: var(--code-bg); padding: .14em .38em; border-radius: 4px;
+}
+pre {
+  background: var(--code-bg); border: 1px solid var(--rule); border-radius: 8px;
+  padding: 13px 15px; overflow-x: auto;
+}
+pre code { background: none; padding: 0; font-size: 13px; line-height: 1.55; }
+blockquote {
+  margin-left: 0; padding: .7em 1em; background: var(--warn-bg);
+  border-left: 3px solid var(--warn-edge); border-radius: 0 6px 6px 0;
+}
+blockquote p { margin: 0; }
+.tablewrap { overflow-x: auto; margin-bottom: 1.05em; }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; padding: 7px 11px; border-bottom: 1px solid var(--rule);
+  vertical-align: top; }
+th { font-size: 12.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+hr { border: 0; border-top: 1px solid var(--rule); margin: 2.2em 0; }
+.pager { display: flex; justify-content: space-between; gap: 14px; margin-top: 56px;
+  padding-top: 20px; border-top: 1px solid var(--rule); font-size: 14.5px; }
+.pager a { display: block; padding: 11px 15px; border: 1px solid var(--rule);
+  border-radius: 8px; text-decoration: none; max-width: 47%; }
+.pager a:hover { border-color: var(--accent); }
+.pager span { display: block; color: var(--muted); font-size: 11.5px;
+  text-transform: uppercase; letter-spacing: .07em; }
+.menu { display: none; }
+@media (max-width: 860px) {
+  .wrap { display: block; }
+  nav { width: auto; max-height: none; position: static; border-right: 0;
+        border-bottom: 1px solid var(--rule); }
+  main { padding: 26px 20px 70px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav><a class="brand" href="index.html">Arduino UNO Q</a>
+<div class="tag">Hybrid MPU + MCU development, from scratch</div>
+<h3>Learning path</h3>
+<ol class="steps">
+<li><a href="start-here.html">Start here</a></li>
+<li><a href="two-computers.html">Two computers on one board</a></li>
+<li><a href="the-linux-side.html">The Linux side</a></li>
+<li><a href="the-microcontroller-side.html">The microcontroller side</a></li>
+<li><a href="how-they-talk.html">How they talk</a></li>
+<li><a href="from-source-to-chip.html" class="here">From source to a running chip</a></li>
+<li><a href="the-led-matrix.html">The LED matrix</a></li>
+<li><a href="updating-safely.html">Updating safely</a></li>
+<li><a href="one-cable-many-devices.html">One cable, many devices</a></li>
+<li><a href="debugging-without-a-screen.html">Debugging without a screen</a></li>
+<li><a href="make-it-yours.html">Make it yours</a></li>
+</ol>
+<h3>Reference</h3>
+<ol>
+<li><a href="clean-board-findings.html">What a clean board revealed</a></li>
+<li><a href="hardware.html">The hardware, honestly</a></li>
+<li><a href="mcu.html">MCU workflow</a></li>
+<li><a href="mpu.html">MPU workflow</a></li>
+<li><a href="troubleshooting.html">Troubleshooting</a></li>
+<li><a href="usb.html">IP over USB, and the fileshare</a></li>
+<li><a href="README.html">unoq-cpu-bars</a></li>
+<li><a href="THIRD-PARTY.html">Third-party material</a></li>
+</ol></nav>
+<main>
+<h1 id="from-source-to-a-running-chip">From source to a running chip</h1>
+<p>You have written C for the microcontroller. It is a text file on the Linux side. Getting it running on the other chip involves two steps that do not exist in ordinary programming: <strong>cross-compiling</strong> it, and <strong>flashing</strong> it.</p>
+<h2 id="cross-compiling">Cross-compiling</h2>
+<p>When you run <code>gcc hello.c</code> on this board, you get a program for <em>this</em> chip: 64-bit ARM, running Linux, using the system&#x27;s C library.</p>
+<p>The microcontroller is none of those things. It is a 32-bit Cortex-M33, running no Linux, with a different instruction encoding and a different idea of what a function call even looks like. A program compiled for the Linux side is not merely slow on it — it is meaningless.</p>
+<p>So you need a second compiler: one that <em>runs</em> on this machine but <em>produces code for</em> the other. That is a <strong>cross-compiler</strong>, and by convention it is named after its target:</p>
+<pre><code class="lang-bash">~/zephyr-sdk-1.0.1/gnu/arm-zephyr-eabi/bin/arm-zephyr-eabi-gcc --version</code></pre>
+<p>Read the name backwards: <code>gcc</code>, for <code>eabi</code> (the calling convention), for <code>zephyr</code>, on <code>arm</code>. Alongside it are <code>arm-zephyr-eabi-objdump</code>, <code>-gdb</code>, <code>-size</code> and the rest — the whole toolchain, doubled.</p>
+<p><strong>Try it.</strong> The difference is visible:</p>
+<pre><code class="lang-bash">cd ~/zephyrproject/build/zephyr
+file zephyr.elf</code></pre>
+<pre><code>ELF 32-bit LSB executable, ARM, EABI5 ... for the STM32</code></pre>
+<p>Compare that with any Linux program:</p>
+<pre><code class="lang-bash">file /bin/ls        # ELF 64-bit LSB pie executable, ARM aarch64</code></pre>
+<p>Two different machines, one directory.</p>
+<h2 id="why-west-and-not-make">Why <code>west</code> and not <code>make</code></h2>
+<p>Zephyr is not one repository. It is Zephyr itself plus dozens of separate projects — the hardware abstraction layer for STM32, the C library, the bootloader, cryptography — each versioned independently.</p>
+<p>**<code>west</code>** is the tool that manages that. It reads a <em>manifest</em> listing which projects at which versions, fetches them, and then drives the actual build.</p>
+<pre><code class="lang-bash">cd ~/zephyrproject
+./.venv/bin/west list | head</code></pre>
+<p>The thing worth knowing: <code>west build</code> only works <strong>from inside the workspace</strong>. It finds the workspace by looking at your current directory and walking upwards. Run it from somewhere else and you get</p>
+<pre><code>west: unknown command &quot;build&quot;; do you need to run this inside a workspace?</code></pre>
+<p>which reads like west is broken but means &quot;I cannot see a workspace from here&quot;.</p>
+<p>This project wraps all of it:</p>
+<pre><code class="lang-bash">zbuild ~/hybrid/mcu/app</code></pre>
+<p>That sets the board, points at the right workspace, builds, and signs the result (more on signing next page). What comes out:</p>
+<div class="tablewrap"><table><thead><tr><th>File</th><th>What it is</th></tr></thead><tbody><tr><td><code>zephyr.elf</code></td><td>Full binary with debug information — what the debugger reads</td></tr><tr><td><code>zephyr.hex</code></td><td>Addresses and bytes, in text — what the flasher usually wants</td></tr><tr><td><code>zephyr.bin</code></td><td>Raw bytes only, no addresses</td></tr><tr><td><code>zephyr.signed.hex</code></td><td>The same program with a signature the bootloader checks</td></tr></tbody></table></div>
+<h2 id="getting-it-onto-the-chip">Getting it onto the chip</h2>
+<p>The program is on the Linux filesystem. It needs to be in the microcontroller&#x27;s flash memory. There are two ways, and this project uses both.</p>
+<h3 id="swd-the-wires">SWD — the wires</h3>
+<p><strong>SWD</strong> (Serial Wire Debug) is a two-wire protocol built into ARM chips that gives you near-total control from outside: halt the processor, read and write any memory address, single-step, and write flash. It works even if the chip&#x27;s own program is broken, which is exactly when you need it.</p>
+<p>This board has no separate debug probe. Instead, Linux <strong>bit-bangs</strong> SWD directly on GPIO pins — driving the two wires in software, one edge at a time, via <code>libgpiod</code>. The software doing it is <strong>OpenOCD</strong>:</p>
+<pre><code class="lang-bash">zflash ~/zephyrproject/build/zephyr/zephyr.signed.hex</code></pre>
+<pre><code>** Programming Started **
+Info : device idcode = 0x30076482 (STM32U57/U58xx)
+Info : flash size = 2048 KiB
+** Programming Finished **
+** Verify Started **
+** Verified OK **</code></pre>
+<blockquote><p>Two errors always appear in that output — <code>Translation from khz to adapter speed not implemented</code> and <code>Execution of event reset-init failed</code>. They are harmless: the bit-bang adapter has no configurable clock speed, so the speed-setting step fails and the flash proceeds anyway. Noisy, not broken. <a href="troubleshooting.html">troubleshooting.md</a> says so too, because everyone asks.</p></blockquote>
+<h3 id="over-the-serial-wire">Over the serial wire</h3>
+<p>Once a bootloader is installed, you can also send new firmware down the same UART used for the shell — no debug wires, no halting the processor. That is <strong>FOTA</strong>, and it is the whole of the next page.</p>
+<p>The difference matters: SWD is how you recover a board with broken firmware, because it does not depend on that firmware working. Serial updates are how you update a <em>working</em> board conveniently.</p>
+<h2 id="the-first-flash-is-different">The first flash is different</h2>
+<p>An important wrinkle. This project&#x27;s firmware is built to run <strong>underneath a bootloader</strong>, which expects to live at the start of flash with the application after it. So the very first time, you must write both:</p>
+<pre><code class="lang-bash">~/hybrid/mcu/flash-all.sh        # bootloader + application, in order</code></pre>
+<p>Flash only the signed application onto a blank chip and nothing runs. The application is sitting at an address nothing jumps to, with no bootloader in front of it to do the jumping. The chip is fine; it just has no starting point.</p>
+<h2 id="try-it-change-something-and-watch-it-happen">Try it: change something and watch it happen</h2>
+<pre><code class="lang-bash">sudo systemctl stop unoq-cpu-bars
+cd ~/hybrid
+zbuild mcu/app                                   # ~1 minute
+zflash ~/zephyrproject/build/zephyr/zephyr.signed.hex
+./.venv/bin/python -c &quot;
+from unoq import MCU
+with MCU() as mcu: print(mcu.status())
+&quot;
+sudo systemctl start unoq-cpu-bars</code></pre>
+<p>Look at <code>uptime_ms</code> in the output: it will be a few seconds. You just restarted a computer.</p>
+<h2 id="check-yourself">Check yourself</h2>
+<ol><li>Why can&#x27;t you run <code>gcc</code> on your MCU source and flash the result?</li><li><code>west build</code> says &quot;unknown command&quot;. The binary exists and works. Why?</li><li>You flash a signed application onto a completely blank chip. Verification passes and nothing runs. What is missing?</li></ol>
+<p>Next: what those 104 LEDs are actually doing, and why the number 962 matters.</p>
+<div class="pager"><a href="how-they-talk.html"><span>Previous</span>How they talk</a><a href="the-led-matrix.html"><span>Next</span>The LED matrix</a></div>
+</main>
+</div>
+</body>
+</html>

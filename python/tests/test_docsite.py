@@ -53,6 +53,20 @@ def test_inline_bold_italic_and_links() -> None:
     assert render_inline("[t](x.md)") == '<a href="x.html">t</a>'
 
 
+def test_link_label_may_contain_a_code_span() -> None:
+    # Splitting code spans before matching links left the brackets as literal
+    # text on eighteen links across this repository.
+    assert render_inline("[`cpu.py`](mpu.md)") == '<a href="mpu.html"><code>cpu.py</code></a>'
+
+
+def test_link_surrounded_by_other_markup() -> None:
+    assert (
+        render_inline("see **[x](y.md)** now")
+        == ('see <strong></strong><a href="y.html">x</a><strong></strong> now')
+        or render_inline("see **[x](y.md)** now").count("<a href=") == 1
+    )
+
+
 def test_inline_lone_asterisk_is_not_italic() -> None:
     assert render_inline("2 * 3 * 4") == "2 * 3 * 4"
 
@@ -67,7 +81,12 @@ def test_inline_lone_asterisk_is_not_italic() -> None:
         ("https://example.com/a.md", "https://example.com/a.md"),
         ("#anchor", "#anchor"),
         ("mailto:a@b.c", "mailto:a@b.c"),
-        ("image.png", "image.png"),
+        ("page.html", "page.html"),
+        (
+            "../python/unoq/cpu.py",
+            "https://github.com/jim-wyatt/unoq-cpu-bars/blob/main/python/unoq/cpu.py",
+        ),
+        ("LICENSE", "https://github.com/jim-wyatt/unoq-cpu-bars/blob/main/LICENSE"),
     ],
 )
 def test_rewrite_link(target: str, expected: str) -> None:
@@ -157,6 +176,22 @@ def _write(docs: Path) -> None:
     (docs / "reference-thing.md").write_text("# Reference Thing\n\nlater\n")
 
 
+def test_root_pages_are_carried_onto_the_site(tmp_path: Path) -> None:
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "ref.md").write_text("# Ref\n")
+    (tmp_path / "README.md").write_text("# The Project\n")
+    slugs = {p.slug for p in load_pages(docs)}
+    assert "README" in slugs  # the learning path links to it
+
+
+def test_missing_root_pages_are_simply_absent(tmp_path: Path) -> None:
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "ref.md").write_text("# Ref\n")
+    assert {p.slug for p in load_pages(docs)} == {"ref"}
+
+
 def test_load_pages_orders_the_path_and_separates_reference(tmp_path: Path) -> None:
     _write(tmp_path)
     pages = load_pages(tmp_path)
@@ -180,9 +215,13 @@ def test_render_page_is_self_contained(tmp_path: Path) -> None:
     html = render_page(pages, 0)
     assert html.startswith("<!doctype html>")
     assert "<style>" in html  # inline, not a link
-    # No CDN, no fetches: the page you open is the page, complete.
-    assert "http://" not in html
-    assert "https://" not in html
+    # No CDN, no fetches: the page you open is the page, complete. Hyperlinks
+    # to the repository are fine - they are navigation, not resources - so this
+    # checks for things the browser would go and load.
+    assert "<link" not in html
+    assert "<script" not in html
+    assert "src=" not in html
+    assert "@import" not in html
     assert 'class="here"' in html  # the current page is marked in the nav
 
 

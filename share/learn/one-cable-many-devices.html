@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>One cable, many devices - Arduino UNO Q</title>
+<style>
+:root {
+  --bg: #ffffff; --fg: #1c2024; --muted: #5b6570; --rule: #e3e8ee;
+  --accent: #0b6cbd; --accent-soft: #eaf3fb; --code-bg: #f6f8fa;
+  --side: #fbfcfd; --warn-bg: #fff8e6; --warn-edge: #e0a800;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14181c; --fg: #dde3ea; --muted: #93a1b0; --rule: #262d35;
+    --accent: #5aa9f0; --accent-soft: #17222d; --code-bg: #1b2127;
+    --side: #11151a; --warn-bg: #241f10; --warn-edge: #8a6d1a;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, sans-serif;
+}
+.wrap { display: flex; align-items: flex-start; max-width: 1180px; margin: 0 auto; }
+nav {
+  width: 250px; flex: 0 0 250px; padding: 28px 18px 60px; background: var(--side);
+  border-right: 1px solid var(--rule); position: sticky; top: 0; max-height: 100vh;
+  overflow-y: auto;
+}
+nav .brand { font-weight: 700; font-size: 15px; letter-spacing: .01em; display: block;
+  color: var(--fg); text-decoration: none; margin-bottom: 4px; }
+nav .tag { color: var(--muted); font-size: 12.5px; margin-bottom: 22px; }
+nav h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .09em;
+  color: var(--muted); margin: 22px 0 8px; }
+nav ol { list-style: none; margin: 0; padding: 0; counter-reset: step; }
+nav li { margin: 1px 0; }
+nav a { display: block; padding: 5px 9px; border-radius: 6px; text-decoration: none;
+  color: var(--fg); font-size: 14px; }
+nav a:hover { background: var(--accent-soft); }
+nav a.here { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+nav ol.steps a::before { counter-increment: step; content: counter(step) ". ";
+  color: var(--muted); font-variant-numeric: tabular-nums; }
+main { flex: 1 1 auto; min-width: 0; padding: 40px 44px 96px; }
+h1, h2, h3, h4 { line-height: 1.25; margin: 1.9em 0 .55em; }
+h1 { font-size: 2.05rem; margin-top: 0; letter-spacing: -.015em; }
+h2 { font-size: 1.42rem; padding-bottom: .28em; border-bottom: 1px solid var(--rule); }
+h3 { font-size: 1.13rem; }
+h4 { font-size: 1rem; color: var(--muted); }
+p, ul, ol, table, pre, blockquote { margin: 0 0 1.05em; }
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+ul, ol { padding-left: 1.4em; }
+li { margin: .3em 0; }
+code {
+  font: 13.5px/1.5 ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  background: var(--code-bg); padding: .14em .38em; border-radius: 4px;
+}
+pre {
+  background: var(--code-bg); border: 1px solid var(--rule); border-radius: 8px;
+  padding: 13px 15px; overflow-x: auto;
+}
+pre code { background: none; padding: 0; font-size: 13px; line-height: 1.55; }
+blockquote {
+  margin-left: 0; padding: .7em 1em; background: var(--warn-bg);
+  border-left: 3px solid var(--warn-edge); border-radius: 0 6px 6px 0;
+}
+blockquote p { margin: 0; }
+.tablewrap { overflow-x: auto; margin-bottom: 1.05em; }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; padding: 7px 11px; border-bottom: 1px solid var(--rule);
+  vertical-align: top; }
+th { font-size: 12.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+hr { border: 0; border-top: 1px solid var(--rule); margin: 2.2em 0; }
+.pager { display: flex; justify-content: space-between; gap: 14px; margin-top: 56px;
+  padding-top: 20px; border-top: 1px solid var(--rule); font-size: 14.5px; }
+.pager a { display: block; padding: 11px 15px; border: 1px solid var(--rule);
+  border-radius: 8px; text-decoration: none; max-width: 47%; }
+.pager a:hover { border-color: var(--accent); }
+.pager span { display: block; color: var(--muted); font-size: 11.5px;
+  text-transform: uppercase; letter-spacing: .07em; }
+.menu { display: none; }
+@media (max-width: 860px) {
+  .wrap { display: block; }
+  nav { width: auto; max-height: none; position: static; border-right: 0;
+        border-bottom: 1px solid var(--rule); }
+  main { padding: 26px 20px 70px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav><a class="brand" href="index.html">Arduino UNO Q</a>
+<div class="tag">Hybrid MPU + MCU development, from scratch</div>
+<h3>Learning path</h3>
+<ol class="steps">
+<li><a href="start-here.html">Start here</a></li>
+<li><a href="two-computers.html">Two computers on one board</a></li>
+<li><a href="the-linux-side.html">The Linux side</a></li>
+<li><a href="the-microcontroller-side.html">The microcontroller side</a></li>
+<li><a href="how-they-talk.html">How they talk</a></li>
+<li><a href="from-source-to-chip.html">From source to a running chip</a></li>
+<li><a href="the-led-matrix.html">The LED matrix</a></li>
+<li><a href="updating-safely.html">Updating safely</a></li>
+<li><a href="one-cable-many-devices.html" class="here">One cable, many devices</a></li>
+<li><a href="debugging-without-a-screen.html">Debugging without a screen</a></li>
+<li><a href="make-it-yours.html">Make it yours</a></li>
+</ol>
+<h3>Reference</h3>
+<ol>
+<li><a href="clean-board-findings.html">What a clean board revealed</a></li>
+<li><a href="hardware.html">The hardware, honestly</a></li>
+<li><a href="mcu.html">MCU workflow</a></li>
+<li><a href="mpu.html">MPU workflow</a></li>
+<li><a href="troubleshooting.html">Troubleshooting</a></li>
+<li><a href="usb.html">IP over USB, and the fileshare</a></li>
+<li><a href="README.html">unoq-cpu-bars</a></li>
+<li><a href="THIRD-PARTY.html">Third-party material</a></li>
+</ol></nav>
+<main>
+<h1 id="one-cable-many-devices">One cable, many devices</h1>
+<p>Plug the board into a computer and it becomes a <strong>network adapter</strong> and a <strong>USB drive</strong>, over the same cable that is powering it. You are very likely reading this page through exactly that.</p>
+<p>This is the part of the board that most surprises people, so it is worth understanding rather than just using.</p>
+<h2 id="host-and-device">Host and device</h2>
+<p>Every USB connection has two ends with different jobs.</p>
+<p>The <strong>host</strong> is in charge. It supplies power, asks what is connected, assigns addresses, and starts every transfer. Your laptop is a host. USB devices never speak unless spoken to.</p>
+<p>The <strong>device</strong> (or peripheral) answers. A mouse, a webcam, a memory stick.</p>
+<p>Most chips can only be one or the other. This board&#x27;s USB-C port can be <strong>either</strong> — and that is why plugging it into a computer changes what the board <em>is</em>, not just what it is connected to.</p>
+<blockquote><p><strong>The trap.</strong> The port cannot be both at once. While the board is a device to your laptop, it is not a host — a hub, a keyboard or a USB stick plugged into it is simply gone until you disconnect. There is one USB controller, and it has one job at a time. This is a hardware fact, not a setting.</p></blockquote>
+<p>Which role it takes is negotiated by the USB-C connector itself, from the electrical signals on the cable. <strong>You cannot switch it from software</strong> — a real disappointment if you have done this on a Raspberry Pi, where you can.</p>
+<h2 id="being-a-device-on-purpose-the-gadget">Being a device on purpose: the gadget</h2>
+<p>Linux can pretend to be a USB device. The framework is called <strong>USB gadget</strong>, and you configure it by <em>making directories</em>:</p>
+<pre><code class="lang-bash">ls /sys/kernel/config/usb_gadget/unoq/</code></pre>
+<p>This is <strong>configfs</strong>: a filesystem where creating a directory creates an object in the kernel. Making a directory called <code>functions/ncm.usb0</code> does not create a folder — it creates a USB network function.</p>
+<p>A gadget is assembled from:</p>
+<ul><li><strong>Functions</strong> — the individual things it can be: a network adapter (<code>ncm</code>), a disk (<code>mass_storage</code>), a serial port (<code>acm</code>).</li><li><strong>Configurations</strong> — sets of functions offered together. A host picks one.</li><li><strong>A UDC</strong> — the actual USB controller. Writing its name into the gadget&#x27;s <code>UDC</code> file is the moment the board appears on the host. This is called <strong>binding</strong>.</li></ul>
+<p>Ours offers a network adapter <em>and</em> a drive in one configuration, which is why a single cable gives you both.</p>
+<p><strong>Try it:</strong></p>
+<pre><code class="lang-bash">~/hybrid/usb/status.sh</code></pre>
+<p>That prints the whole picture: the role, the controller, both configurations and their functions, the bridge, the addresses, and the recent log.</p>
+<h2 id="why-the-address-is-unusual">Why the address is unusual</h2>
+<p>Two computers connected by a cable both need IP addresses, and something has to hand them out.</p>
+<p>Normally the board runs a DHCP server and gives your laptop an address on <code>10.55.0.0/24</code> — a deliberately obscure range, because a board handing out <code>192.168.0.x</code> on a cable would collide with the network the laptop is already on and break its real connection.</p>
+<p>But if you turn on <strong>internet sharing</strong> on your computer — so the board can reach the internet through it — Windows and macOS stop negotiating. Windows pins its end to <code>192.168.137.1</code> and runs <em>its own</em> DHCP server. It will never accept an address from us.</p>
+<p>So the board has two modes, and the setting lives in <code>/etc/default/unoq-usb</code>:</p>
+<div class="tablewrap"><table><thead><tr><th>Mode</th><th>Board</th><th>Right when</th></tr></thead><tbody><tr><td><code>server</code></td><td>is <code>10.55.0.1</code>, hands the computer an address</td><td>the computer is just something you reach the board from</td></tr><tr><td><code>client</code></td><td>asks the computer for an address</td><td>the computer is sharing its internet with the board</td></tr></tbody></table></div>
+<p>If both ends try to be the server, you get two computers on one wire with addresses on different networks, unable to see each other — which looks exactly like a dead cable, with nothing logged anywhere.</p>
+<h2 id="the-cable-is-also-the-power">The cable is also the power</h2>
+<p>Here is where this gets genuinely tricky, and it explains several defensive things in this project.</p>
+<p>As a device, the board is powered <em>by</em> the host. A laptop port with no power negotiation supplies quite a modest amount — not much for four CPU cores plus a microcontroller.</p>
+<p>Two consequences:</p>
+<p><strong>Every cable change is also a power cut.</strong> You cannot watch the board being plugged in, because it is rebooting as you do it. No session survives it. That is why <code>status.sh</code> exists: whatever went wrong has always already finished by the time you can look, so the post-mortem needs to be one command.</p>
+<p><strong>Binding can brown out the board.</strong> Binding re-enumerates the port, which can draw enough current to drop the voltage and reset the board. Then it boots, the cable is still there, it binds again, and it browns out again — a loop with no window in which to log in and stop it.</p>
+<p>This project handles that with a <strong>bind guard</strong>: it counts boots that never proved themselves healthy, and after three it refuses to bind. The board gives up the gadget and keeps the network, which is the right way round — the gadget is the thing being experimented with, the network is how you get in to fix it. If wifi has been turned off, the guard turns it back on.</p>
+<p>That is the same pattern as firmware rollback from the previous page: <strong>try the new thing, fall back automatically if it does not confirm itself.</strong></p>
+<p><strong>Try it — see the guard&#x27;s state:</strong></p>
+<pre><code class="lang-bash">~/hybrid/usb/bind-guard.sh status
+journalctl -b -u unoq-usb-bind -t unoq-bind-guard</code></pre>
+<h2 id="the-drive">The drive</h2>
+<p>The board also offers a read-only disk — the one this documentation is on.</p>
+<p>It is a single file, <code>~/unoq-share.img</code>, containing a partition table and a FAT32 filesystem. The gadget exports that file as a disk; the board mounts the same file read-only to serve it over HTTP. <strong>One copy, two ways out</strong>, so the drive and the web page cannot disagree about what is on the board.</p>
+<p>Two details that took experimentation to get right:</p>
+<ul><li><strong>It has a partition table.</strong> Formatting the image directly works fine on Linux and Windows will often refuse to assign it a drive letter. A real USB stick has an MBR; so does this.</li><li><strong>It is exported read-only.</strong> If the host could write while the board has the filesystem mounted, both would be caching the same blocks with neither aware of the other, and FAT does not survive that for long.</li></ul>
+<blockquote><p><strong>Go deeper.</strong> <a href="usb.html">usb.md</a> has all of it: why NCM rather than RNDIS on Windows 11, why the route metric is 700, why there are two systemd units, and the full troubleshooting list.</p></blockquote>
+<h2 id="check-yourself">Check yourself</h2>
+<ol><li>You plug a USB keyboard into the board&#x27;s port while it is connected to your laptop. What happens, and why?</li><li>Your laptop has internet sharing on and the board cannot be reached at all. What is the most likely cause?</li><li>Why does the bind guard give up the <em>gadget</em> rather than retrying it?</li></ol>
+<p>Next: finding out what is wrong when nothing can tell you.</p>
+<div class="pager"><a href="updating-safely.html"><span>Previous</span>Updating safely</a><a href="debugging-without-a-screen.html"><span>Next</span>Debugging without a screen</a></div>
+</main>
+</div>
+</body>
+</html>

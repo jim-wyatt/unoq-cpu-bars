@@ -97,6 +97,15 @@ hr { border: 0; border-top: 1px solid var(--rule); margin: 2.2em 0; }
 <ol class="steps">
 <li><a href="start-here.html">Start here</a></li>
 <li><a href="two-computers.html">Two computers on one board</a></li>
+<li><a href="the-linux-side.html">The Linux side</a></li>
+<li><a href="the-microcontroller-side.html">The microcontroller side</a></li>
+<li><a href="how-they-talk.html">How they talk</a></li>
+<li><a href="from-source-to-chip.html">From source to a running chip</a></li>
+<li><a href="the-led-matrix.html">The LED matrix</a></li>
+<li><a href="updating-safely.html">Updating safely</a></li>
+<li><a href="one-cable-many-devices.html">One cable, many devices</a></li>
+<li><a href="debugging-without-a-screen.html">Debugging without a screen</a></li>
+<li><a href="make-it-yours.html">Make it yours</a></li>
 </ol>
 <h3>Reference</h3>
 <ol>
@@ -106,6 +115,8 @@ hr { border: 0; border-top: 1px solid var(--rule); margin: 2.2em 0; }
 <li><a href="mpu.html">MPU workflow</a></li>
 <li><a href="troubleshooting.html">Troubleshooting</a></li>
 <li><a href="usb.html">IP over USB, and the fileshare</a></li>
+<li><a href="README.html">unoq-cpu-bars</a></li>
+<li><a href="THIRD-PARTY.html">Third-party material</a></li>
 </ol></nav>
 <main>
 <h1 id="mcu-workflow">MCU workflow</h1>
@@ -116,7 +127,7 @@ hr { border: 0; border-top: 1px solid var(--rule); margin: 2.2em 0; }
 <pre><code class="lang-bash">zbuild ~/hybrid/mcu/app                      # this project&#x27;s app
 zbuild samples/hello_world                   # any upstream Zephyr sample
 zbuild ~/hybrid/mcu/app -p always            # pristine rebuild</code></pre>
-<p>(<code>zbuild</code> / <code>zflash</code> are aliases from [<code>env.sh</code>](../env.sh); the scripts are <code>mcu/zbuild.sh</code> and <code>mcu/flash.sh</code>.)</p>
+<p>(<code>zbuild</code> / <code>zflash</code> are aliases from <a href="https://github.com/jim-wyatt/unoq-cpu-bars/blob/main/env.sh"><code>env.sh</code></a>; the scripts are <code>mcu/zbuild.sh</code> and <code>mcu/flash.sh</code>.)</p>
 <p><code>zbuild</code> signs automatically when <code>CONFIG_BOOTLOADER_MCUBOOT=y</code>, and links <code>compile_commands.json</code> into both this project and the Zephyr workspace so clangd works in either.</p>
 <p><strong>Each app gets its own build directory.</strong> This project&#x27;s app builds into <code>~/zephyrproject/build</code> — the path named by every doc, VS Code task and <code>launch.json</code>. Anything else builds into <code>~/zephyrproject/build-&lt;name&gt;</code>:</p>
 <pre><code class="lang-bash">zbuild ~/hybrid/mcu/app        # -&gt; ~/zephyrproject/build
@@ -149,10 +160,10 @@ uptime_ms=12216 flip=0 sweeps=1043712
 unoq:~$ app bars 100 50 25 0
 ok bars=4</code></pre>
 <p><code>sweeps</code> counts LED-matrix refresh passes — see <a href="mpu.html#is-it-actually-running">mpu.md</a>.</p>
-<p>Command groups: <code>app</code> (yours), <code>gpio</code>, <code>i2c</code>, <code>device</code>, <code>kernel</code>, <code>devmem</code> — poke hardware without rebuilding. Drive any of them from Python with [<code>unoq.MCU.cmd()</code>](mpu.md#the-unoq-package).</p>
+<p>Command groups: <code>app</code> (yours), <code>gpio</code>, <code>i2c</code>, <code>device</code>, <code>kernel</code>, <code>devmem</code> — poke hardware without rebuilding. Drive any of them from Python with <a href="mpu.html#the-unoq-package"><code>unoq.MCU.cmd()</code></a>.</p>
 <p>SMP/MCUmgr shares this UART. It registers <strong>no</strong> <code>mcumgr</code> command — the shell detects SMP frames in the byte stream, so <code>mcumgr: command not found</code> is expected, not a fault.</p>
 <h2 id="what-the-firmware-is">What the firmware is</h2>
-<p>[<code>mcu/app/src/main.c</code>](../mcu/app/src/main.c) is the <code>app</code> shell command group and nothing else. <code>main()</code> loads the persisted panel orientation, brings up the matrix, and returns — there is no main loop, because everything that runs after init runs on its own: the shell has its own thread, and the panel is refreshed from a timer ISR inside <code>matrix.c</code>.</p>
+<p><a href="https://github.com/jim-wyatt/unoq-cpu-bars/blob/main/mcu/app/src/main.c"><code>mcu/app/src/main.c</code></a> is the <code>app</code> shell command group and nothing else. <code>main()</code> loads the persisted panel orientation, brings up the matrix, and returns — there is no main loop, because everything that runs after init runs on its own: the shell has its own thread, and the panel is refreshed from a timer ISR inside <code>matrix.c</code>.</p>
 <p>One byte of state is persisted in NVS (<code>storage_partition</code>): the panel orientation set by <code>app matrix flip</code>. That is a property of how the board is mounted rather than of the running session, so it survives power cycles and firmware updates.</p>
 <h2 id="debugging">Debugging</h2>
 <p>Open this folder in VS Code and pick <strong>Debug (attach)</strong> or <strong>Debug (flash then run)</strong>. OpenOCD runs on the board; you get breakpoints, memory view, and peripheral registers decoded from <code>.vscode/STM32U585.svd</code> (202 peripherals).</p>
@@ -161,7 +172,7 @@ ok bars=4</code></pre>
 ~/hybrid/mcu/ztest.sh -p arduino_uno_q   # cross-compile for the board</code></pre>
 <p>Use <code>native_sim/native/64</code>; plain <code>native_sim</code> is 32-bit and fails on aarch64 with a <code>CONFIG_64BIT</code> error.</p>
 <p>Two suites run, 26 cases in total:</p>
-<ul><li>**<code>bars</code>** compiles [<code>mcu/app/src/bars.c</code>](../mcu/app/src/bars.c) — the firmware&#x27;s own rasteriser, not a copy — and checks the drawing rules on the host, because a charlieplexed panel cannot be read back on the board. These are the only place the drawing rules are checked at all, so they assert properties (bars stay in their columns, height never falls as load rises, rotation is a true rotation) rather than a few remembered frames.</li><li>**<code>link_protocol</code>** tests [<code>mcu/app/include/app_proto.h</code>](../mcu/app/include/app_proto.h), the contract that <code>main.c</code>, these tests and <code>unoq/mcu.py</code> all depend on agreeing.</li></ul>
+<ul><li>**<code>bars</code>** compiles <a href="https://github.com/jim-wyatt/unoq-cpu-bars/blob/main/mcu/app/src/bars.c"><code>mcu/app/src/bars.c</code></a> — the firmware&#x27;s own rasteriser, not a copy — and checks the drawing rules on the host, because a charlieplexed panel cannot be read back on the board. These are the only place the drawing rules are checked at all, so they assert properties (bars stay in their columns, height never falls as load rises, rotation is a true rotation) rather than a few remembered frames.</li><li>**<code>link_protocol</code>** tests <a href="https://github.com/jim-wyatt/unoq-cpu-bars/blob/main/mcu/app/include/app_proto.h"><code>mcu/app/include/app_proto.h</code></a>, the contract that <code>main.c</code>, these tests and <code>unoq/mcu.py</code> all depend on agreeing.</li></ul>
 <h3 id="the-mcu-suite-tests-the-firmware-not-a-copy-of-it">The MCU suite tests the firmware, not a copy of it</h3>
 <p><code>app_proto.h</code> holds the MPU↔MCU contract: the <code>app status</code> format string, the panel geometry, the bar limits, the settings key. Three parties depend on it agreeing —</p>
 <pre><code>mcu/app/src/main.c        produces the status line, validates bars

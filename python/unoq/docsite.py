@@ -57,12 +57,25 @@ _ITALIC = re.compile(r"(?<!\*)\*([^*\s][^*]*)\*(?!\*)")
 _CODE_SPLIT = re.compile(r"(`[^`]+`)")
 
 
-def rewrite_link(target: str) -> str:
-    """Point a markdown link at its rendered page.
+# Where a reader is sent for files the site does not carry - source code, the
+# licence, shell scripts. Rendering those as pages too was tempting, but the
+# course is prose about code, not a code browser, and the repository is public.
+SOURCE_BASE = "https://github.com/jim-wyatt/unoq-cpu-bars/blob/main/"
 
-    The site is flat - every page lands in one directory - so `docs/usb.md`,
-    `../usb.md` and `usb.md` all mean the same file and all become `usb.html`.
-    External links and in-page anchors are left exactly as written.
+
+def rewrite_link(target: str) -> str:
+    """Point a markdown link at something that exists.
+
+    Three cases:
+
+    - `.md` becomes `.html`. The site is flat - every page lands in one
+      directory - so `docs/usb.md`, `../usb.md` and `usb.md` all mean the same
+      file and all become `usb.html`.
+    - Anything already external, or an in-page anchor, is left alone.
+    - Everything else is a repository path the site does not carry:
+      `../python/unoq/cpu.py`, `LICENSE`, a shell script. Those become links to
+      the repository, because a link that 404s off the drive is worse than one
+      that needs the network - the reader can at least see where to look.
     """
     if target.startswith(("http://", "https://", "#", "mailto:")):
         return target
@@ -72,16 +85,13 @@ def rewrite_link(target: str) -> str:
         anchor = f"#{anchor}"
     if target.endswith(".md"):
         return f"{Path(target).stem}.html{anchor}"
-    return f"{target}{anchor}"
+    if target.endswith(".html"):
+        return f"{target}{anchor}"
+    return SOURCE_BASE + target.lstrip("./").removeprefix("../") + anchor
 
 
-def _link_tag(match: re.Match[str]) -> str:
-    """`[text](target)` as an anchor, with the target pointed at the site."""
-    return f'<a href="{escape(rewrite_link(match.group(2)))}">{match.group(1)}</a>'
-
-
-def render_inline(text: str) -> str:
-    """Render inline markup, escaping everything that is not markup.
+def _render_plain(text: str) -> str:
+    """Everything inline except links: code spans, bold, italic, escaping.
 
     Code spans are split out first and escaped without further processing, so
     that `**not bold**` inside backticks survives as literal asterisks - which
@@ -93,10 +103,30 @@ def render_inline(text: str) -> str:
             out.append(f"<code>{escape(part[1:-1])}</code>")
             continue
         piece = escape(part)
-        piece = _LINK.sub(_link_tag, piece)
         piece = _BOLD.sub(r"<strong>\1</strong>", piece)
         piece = _ITALIC.sub(r"<em>\1</em>", piece)
         out.append(piece)
+    return "".join(out)
+
+
+def render_inline(text: str) -> str:
+    """Render inline markup, escaping everything that is not markup.
+
+    Links are matched FIRST, on the raw text, and their label is then rendered
+    like any other run. Doing it the other way round - code spans first - splits
+    ``[`unoq/cpu.py`](mpu.md)`` into three pieces before the link pattern ever
+    sees it, so the brackets survive into the page as literal text. Eighteen
+    links across this repository were rendering that way, because naming a file
+    in a link label is the single most natural thing to write in these docs.
+    """
+    out: list[str] = []
+    pos = 0
+    for match in _LINK.finditer(text):
+        out.append(_render_plain(text[pos : match.start()]))
+        href = escape(rewrite_link(match.group(2)))
+        out.append(f'<a href="{href}">{_render_plain(match.group(1))}</a>')
+        pos = match.end()
+    out.append(_render_plain(text[pos:]))
     return "".join(out)
 
 
@@ -296,6 +326,12 @@ def _order_and_name(stem: str) -> tuple[int, str]:
     return 999, stem
 
 
+# Repository-root pages worth carrying onto the board. The learning path links
+# to both, so without them the site has dead links - and the README is the one
+# page that explains what the project as a whole is.
+ROOT_PAGES = ("README.md", "THIRD-PARTY.md")
+
+
 def load_pages(docs: Path) -> list[Page]:
     """Read docs/learn/*.md as the learning path and docs/*.md as reference."""
     pages: list[Page] = []
@@ -304,7 +340,9 @@ def load_pages(docs: Path) -> list[Page]:
         text = path.read_text(encoding="utf-8")
         body, outline = render_markdown(text)
         pages.append(Page(name, page_title(text, name), "learn", order, body, outline))
-    for path in sorted(docs.glob("*.md")):
+    reference = sorted(docs.glob("*.md"))
+    reference += [p for name in ROOT_PAGES if (p := docs.parent / name).is_file()]
+    for path in reference:
         text = path.read_text(encoding="utf-8")
         body, outline = render_markdown(text)
         pages.append(Page(path.stem, page_title(text, path.stem), "reference", 500, body, outline))

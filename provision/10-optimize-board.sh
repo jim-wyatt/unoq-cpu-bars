@@ -48,6 +48,28 @@ disable_unit ModemManager.service
 # REVERT: systemctl unmask fwupd && systemctl start fwupd
 step "fwupd"
 mask_unit fwupd.service
+# ...and the timer that feeds it, which is a separate unit and was left running.
+#
+# fwupd-refresh.timer fires daily, fwupd-refresh.service tries to download
+# metadata, cannot reach the masked daemon, and exits 1. The board then carries
+# a permanently failed unit - visible in `systemctl --failed` forever, on a
+# board where nothing is wrong.
+#
+# That matters more than the tidiness: this project now lights an LED when any
+# unit has failed, as the general "a human should look" signal. A failure that
+# is always present makes that indicator useless, which is the same disease as a
+# warning nobody reads. An alarm that is always on is not an alarm.
+#
+# Found, fittingly, by the LED itself - it came on within seconds of being
+# enabled for the first time, and this was why.
+# REVERT: systemctl unmask fwupd && systemctl enable --now fwupd-refresh.timer
+disable_unit fwupd-refresh.timer
+if systemctl is-failed --quiet fwupd-refresh.service 2>/dev/null; then
+  systemctl reset-failed fwupd-refresh.service >/dev/null 2>&1
+  did "cleared the failed state fwupd-refresh.service was left in"
+else
+  skip "fwupd-refresh.service not in a failed state"
+fi
 
 # --- Unattended apt: causes multi-hundred-MB spikes at random times, which
 # --- is what pushes a 3.6 GB board into swap mid-build.
@@ -201,8 +223,20 @@ fi
 
 # ===================== TIER 2 - opt in with UNOQ_TIER2=1 ====================
 
-if [ "${UNOQ_TIER2:-0}" = "1" ]; then
-  step "TIER 2 (UNOQ_TIER2=1)"
+# TIER 2 is now ON by default, and the reason is worth stating because it is a
+# change of policy rather than of fact.
+#
+# Nothing in this stack uses Bluetooth or udisks2. The Arduino app framework is
+# disabled, there is no desktop, and removable media is mounted by hand on the
+# rare occasions it appears. They were opt-in because "might be wanted" felt
+# like the safe default; on a board with 3.6 GB where every service is competing
+# with a Zephyr build, the safe default is the other way round.
+#
+# They are DISABLED, not removed. Bluetooth hardware is still there and is a
+# perfectly good thing to explore - one command brings it back, and the revert
+# line below is that command. UNOQ_TIER2=0 skips this section entirely.
+if [ "${UNOQ_TIER2:-1}" = "1" ]; then
+  step "TIER 2 (UNOQ_TIER2=0 to keep these)"
   # Bluetooth ~5 MB + blueman-mechanism.
   # REVERT: systemctl enable --now bluetooth blueman-mechanism
   disable_unit bluetooth.service blueman-mechanism.service

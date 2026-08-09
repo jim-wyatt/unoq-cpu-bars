@@ -22,6 +22,29 @@ free -h | sed -n 2p
 # --- compile_commands.json, which zbuild.sh symlinks in from the west build.
 # ---
 # --- The version is discovered rather than pinned: Debian ships clangd-19
+# --- Host C compiler. The stock image has NO cc at all - gcc is `un`, not
+# --- merely absent - and two things quietly need one.
+#
+# native_sim. The ztest suites build for the host, not the MCU, so they do not
+# use the Zephyr SDK's arm-zephyr-eabi toolchain that everything else here
+# relies on. Without gcc, twister reports
+#
+#   CMake Error ... Could not find CMAKE_C_COMPILER using the following names: gcc
+#
+# for every suite, which means `tools/check.sh mcu` and mcu/ztest.sh - the gate
+# the README tells you to run on the board - could never have passed on a board
+# provisioned by this repo. The firmware builds fine throughout, because that is
+# a cross build and carries its own compiler, so nothing else hints at it.
+#
+# spidev. It is a C extension with no aarch64 wheel, so pip builds it from
+# source. 10-optimize-board.sh already installs python3-dev for the headers,
+# which is only half of what compiling needs - and provisioning the headers
+# without the compiler is a strong tell that this was the missing half.
+#
+# REVERT: apt-get remove -y gcc make
+step "host C compiler"
+apt_install gcc make
+
 # --- here, but a later image ships a different one and a pinned name 404s.
 # REVERT: apt-get remove -y clangd-<v> && rm /usr/bin/clangd
 step "clangd"

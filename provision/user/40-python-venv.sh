@@ -33,12 +33,51 @@ step "hardware libraries"
 # gpiod drives the BOOT0/link lines, pyserial the shell, smpclient the FOTA
 # path. smbus2 and spidev are for the Qwiic/SPI headers - not used by the
 # CPU-bars demo, but this is the venv you get a REPL in.
-if "$VENV/bin/python" -c 'import gpiod, serial, smpclient' 2>/dev/null; then
-  skip "gpiod, pyserial, smpclient present"
+#
+# One list, used for BOTH the install and the check. It used to install five
+# packages and then test three of them, so a venv holding gpiod, pyserial and
+# smpclient but missing smbus2 and spidev reported "already correct" and stayed
+# broken forever - which is what this board did. The install branch never runs
+# again once the subset is satisfied, so the gap is not merely undetected, it is
+# unreachable.
+#
+# The mapping has to be written out because it is not derivable: pyserial
+# imports as `serial`. That asymmetry is the reason the short list looked
+# complete enough to leave alone.
+HW_LIBS="gpiod:gpiod smbus2:smbus2 pyserial:serial spidev:spidev smpclient:smpclient"
+
+# The package names, split out once, so the install and the messages below
+# cannot disagree with the list above either.
+HW_PKGS=""
+for pair in $HW_LIBS; do
+  HW_PKGS="$HW_PKGS ${pair%%:*}"
+done
+HW_PKGS="${HW_PKGS# }"
+
+hw_missing() {
+  local pair pkg mod out=""
+  for pair in $HW_LIBS; do
+    pkg="${pair%%:*}"
+    mod="${pair##*:}"
+    "$VENV/bin/python" -c "import $mod" 2>/dev/null || out="$out $pkg"
+  done
+  echo "${out# }"
+}
+
+MISSING="$(hw_missing)"
+if [ -z "$MISSING" ]; then
+  skip "all hardware libraries present: $HW_PKGS"
 else
-  uv pip install --python "$VENV/bin/python" -q gpiod smbus2 pyserial spidev smpclient ||
-    fail "could not install the hardware libraries"
-  did "hardware libraries installed"
+  # Everything, not just what is missing: uv resolves the set together, and a
+  # re-run costs nothing when they are already there.
+  # shellcheck disable=SC2086  # deliberate word splitting of the package list
+  uv pip install --python "$VENV/bin/python" -q $HW_PKGS ||
+    fail "could not install the hardware libraries (missing:$MISSING)
+        spidev is a C extension - if it failed to build, the board is missing
+        gcc or python3-dev. provision/20-dev-tools.sh installs both."
+  STILL="$(hw_missing)"
+  [ -z "$STILL" ] || fail "still missing after install:$STILL"
+  did "hardware libraries installed ($MISSING)"
 fi
 
 step "unoq package (editable)"

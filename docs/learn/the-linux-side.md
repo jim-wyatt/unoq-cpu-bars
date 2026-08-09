@@ -158,6 +158,7 @@ sleep 5; kill %1      # stop it
 You have just used the Linux half for the two things it is good at: reading
 system state out of a file, and doing arithmetic on it. It never touched an LED.
 
+> [!TIP]
 > **Go deeper.** [mpu.md](../reference/mpu.md) covers the Linux-side hardware access in
 > detail — the `unoq` Python API, the GPIO lines, and the demo end to end.
 

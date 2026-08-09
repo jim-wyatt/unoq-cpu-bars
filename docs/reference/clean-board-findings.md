@@ -206,6 +206,60 @@ Everything below was run end to end after the fixes above, on 2026-08-09.
 
 Nothing in this table had been run on this board before today.
 
+## Found later, while writing the course
+
+### 18. U-Boot names all five MCU control lines, and disagrees about one
+
+Reconstructing the boot chain for
+[From power to prompt](../learn/from-power-to-prompt.md) meant reading the
+bootloader partitions. `boot_a` holds U-Boot, and its embedded devicetree names
+`mcu-swdio-state`, `mcu-swclk-state`, `mcu-boot0-state`, `mcu-nrst-state` and
+`mcu-spi-rdy-state`, mapped to GPIO 25, 26, 37, 38 and 70.
+
+Four match what this project worked out empirically. The fifth does not: GPIO 70
+is what makes `/dev/ttyHS1` produce bytes, and this project calls it a *UART link
+enable*; U-Boot calls it an **SPI ready** line. Recorded in
+[hardware.md](hardware.md), unresolved, and worth chasing — a hardware SPI
+channel between the two chips would be far faster than the 115200 line
+everything currently goes through.
+
+Reproduce with:
+
+```bash
+sudo dd if=/dev/disk/by-partlabel/boot_a bs=1M count=16 2>/dev/null \
+  | strings -n 4 | grep -A2 -E '^mcu-.*-state$'
+```
+
+### 19. Nineteen documentation links were dead on GitHub
+
+The previous documentation generator rendered every page into one flat
+directory, so a link written as `hardware.md` from `docs/learn/` resolved
+correctly on the site and 404'd in the repository. Nineteen of them. Nothing
+noticed, because the site was the only surface anyone checked.
+
+Building with `mkdocs --strict` against the real directory tree found all of
+them at once. `tools/check.sh docs` now fails on the next one.
+
+The general shape is worth keeping: **a generator that is forgiving about its
+input hides bugs in the input.**
+
+### 20. The offline site nearly shipped needing the network
+
+Material for MkDocs' `privacy` plugin vendors the assets the theme would
+otherwise fetch at page load — which is what makes the USB drive work with no
+internet. With `site_url` set, it rewrites those references to *absolute* URLs
+on the public site, so the mermaid renderer would have been fetched from GitHub
+Pages every time a page with a diagram was opened.
+
+Removing `site_url` makes the same reference relative. Caught by grepping the
+built bundle, not by anything failing:
+
+```bash
+grep -o '.\{30\}unpkg.com/mermaid' share/learn/assets/javascripts/bundle.*.js
+```
+
+It must not start with `https://`. The comment in `mkdocs.yml` says so.
+
 ## Decisions taken, for the refactor
 
 - **Keep the `10.55.0.0/24` server mode.** It is not legacy; it is what makes

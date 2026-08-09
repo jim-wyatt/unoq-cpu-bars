@@ -124,6 +124,15 @@ chart involves two very different jobs:
 | How tall is each bar? | Linux | Arithmetic again — percentage to pixels |
 | Which LED is lit *right now*? | MCU | 10 μs of slack, forever |
 
+```mermaid
+flowchart LR
+  A["/proc/stat<br/><small>counters</small>"] --> B["cpu.py<br/><small>percentages</small>"]
+  B -->|"4 numbers,<br/>twice a second"| C["bars.c<br/><small>rasteriser</small>"]
+  C --> D["104 brightness<br/>values"]
+  D --> E["matrix.c<br/><small>ISR, every 10 µs</small>"]
+  E --> F(["the panel"])
+```
+
 The message between them is tiny: a few numbers saying how tall each bar is.
 Everything expensive happens on Linux; everything time-critical happens on the
 microcontroller; the wire between carries almost nothing.
@@ -179,6 +188,7 @@ Then load a core and watch the real thing respond:
 yes > /dev/null & sleep 6; kill %1
 ```
 
+> [!TIP]
 > **Go deeper.** The panel wiring — which pin pair lights which LED — is a table
 > taken from Arduino's own core, credited in [THIRD-PARTY.md](../third-party.md).
 > The driver is `mcu/app/src/matrix.c`; the rasteriser is `bars.c`.

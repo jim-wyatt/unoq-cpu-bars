@@ -30,6 +30,35 @@ set by us — and when they are wrong, a perfectly good board looks broken.
 ~/hybrid/mcu/link-up.sh      # BOOT0=0, link-enable=1
 ```
 
+### They are documented, in the bootloader
+
+"Nobody documents" was true of everything Arduino publishes and false of what
+Arduino ships. U-Boot lives in the `boot_a` / `boot_b` partitions, and its
+embedded devicetree names all five lines and sets their power-on state:
+
+```bash
+sudo dd if=/dev/disk/by-partlabel/boot_a bs=1M count=16 2>/dev/null \
+  | strings -n 4 | grep -A2 -E '^mcu-.*-state$'
+```
+
+| Name in U-Boot's devicetree | GPIO | What this project calls it |
+|---|---|---|
+| `mcu-swdio-state` | 25 | SWD swdio |
+| `mcu-swclk-state` | 26 | SWD swclk |
+| `mcu-boot0-state` | 37 | BOOT0 |
+| `mcu-nrst-state` | 38 | SWD srst |
+| `mcu-spi-rdy-state` | 70 | UART link enable |
+
+Two things follow. The states these lines are in before Linux starts are set by
+U-Boot, not by anything on the rootfs — which is why they are sane at boot even
+with `arduino-router` disabled.
+
+And the last row disagrees with itself. Line 70 is empirically what makes
+`/dev/ttyHS1` produce bytes, which is why this project calls it a UART enable.
+U-Boot calls it an **SPI ready** line. Both descriptions can be true of one pin,
+but it is evidence that the two chips were wired for a faster channel than a
+115200 serial line, and nothing here uses it. Unresolved — see the open issues.
+
 `flash.sh` calls this automatically, and `unoq.MCU` calls it on construction.
 `unoq-link.service` applies it at boot.
 

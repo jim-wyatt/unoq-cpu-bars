@@ -78,6 +78,18 @@ Say the microcontroller sends the number 1234. You read the file and get `12`.
 Is that the whole message? Is more coming? Has 34 been lost, or is it merely
 late? The wire cannot tell you — bytes arrive when they arrive, in any grouping.
 
+```mermaid
+sequenceDiagram
+    participant M as MCU
+    participant W as the wire
+    participant L as Linux
+    M->>W: "1234\n"
+    W-->>L: read() → "12"
+    Note over L: is that all?<br/>is more coming?<br/>was 34 lost?
+    W-->>L: read() → "34\n"
+    Note over L: the newline is the<br/>only thing that said<br/>"that was a message"
+```
+
 Every serial protocol solves this somehow:
 
 - **A terminator**: send text and agree that a newline ends a message. Simple,
@@ -157,6 +169,17 @@ one is far lower than the cost of waiting for confirmation.
 
 **Choosing whether a message needs an answer is a real design decision**, and
 "always" is usually the wrong one.
+
+> [!TIP]
+> **Go deeper** — [Beej's Guide to Network Programming](https://beej.us/guide/bgnet/)
+> is nominally about sockets and is the friendliest explanation anywhere of the
+> lesson on this page: bytes are not messages. For framing schemes with a proper
+> worst case, read
+> [Consistent Overhead Byte Stuffing](https://en.wikipedia.org/wiki/Consistent_Overhead_Byte_Stuffing);
+> for why a checksum you invented is weaker than you think, Ross Williams'
+> [Painless Guide to CRC Error Detection](https://www.zlib.net/crc_v3.txt).
+> [SparkFun's serial tutorial](https://learn.sparkfun.com/tutorials/serial-communication)
+> covers the electrical layer this page skims over.
 
 ## Check yourself
 

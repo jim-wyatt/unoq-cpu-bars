@@ -176,6 +176,7 @@ in the sense you are used to, and it is answering. Leave with `Ctrl-t q`, then:
 sudo systemctl start unoq-cpu-bars
 ```
 
+> [!TIP]
 > **Go deeper.** [mcu.md](../reference/mcu.md) covers building, flashing, debugging, the
 > shell and the firmware tests. [hardware.md](../reference/hardware.md) has the flash layout
 > and the pins.
@@ -188,4 +189,5 @@ sudo systemctl start unoq-cpu-bars
 3. The LED matrix dimensions are written in a C header and again in Python. Why
    is that not simply a bug?
 
-Next: the wire between them, and the two pins that make the whole thing work.
+Next: both chips are awake — but nothing you wrote runs for the first ten
+seconds. What is in charge before that?

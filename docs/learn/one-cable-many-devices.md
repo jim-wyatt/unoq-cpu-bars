@@ -55,6 +55,16 @@ A gadget is assembled from:
 - **A UDC** — the actual USB controller. Writing its name into the gadget's `UDC`
   file is the moment the board appears on the host. This is called **binding**.
 
+```mermaid
+flowchart LR
+  subgraph G["the gadget, built in configfs"]
+    F1["ncm.usb0<br/><small>network</small>"]
+    F2["rndis.usb0<br/><small>network, for Windows</small>"]
+    F3["mass_storage.0<br/><small>the UNO-Q drive</small>"]
+  end
+  G -->|"write the controller's<br/>name to UDC = bind"| H(["your computer<br/>sees all of it<br/>on one cable"])
+```
+
 Ours offers a network adapter *and* a drive in one configuration, which is why a
 single cable gives you both.
 
@@ -148,6 +158,7 @@ Two details that took experimentation to get right:
   filesystem mounted, both would be caching the same blocks with neither aware of
   the other, and FAT does not survive that for long.
 
+> [!TIP]
 > **Go deeper.** [usb.md](../reference/usb.md) has all of it: why NCM rather than RNDIS on
 > Windows 11, why the route metric is 700, why there are two systemd units, and
 > the full troubleshooting list.
@@ -160,4 +171,5 @@ Two details that took experimentation to get right:
    What is the most likely cause?
 3. Why does the bind guard give up the *gadget* rather than retrying it?
 
-Next: finding out what is wrong when nothing can tell you.
+Next: four LEDs, and the surprisingly hard question of what an indicator should
+actually say.

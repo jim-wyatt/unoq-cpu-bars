@@ -136,6 +136,19 @@ something.
 
 ## How they are actually wired
 
+```mermaid
+flowchart LR
+  subgraph MPU["MPU — Debian Linux"]
+    P["your Python"]
+  end
+  subgraph MCU["MCU — Zephyr"]
+    F["your firmware"]
+  end
+  P <-->|"UART · /dev/ttyHS1<br/><small>bytes, both ways</small>"| F
+  P -->|"BOOT0 + reset<br/><small>one wire each, Linux decides</small>"| F
+  P -->|"SWD<br/><small>write flash, inspect, halt</small>"| F
+```
+
 Three connections matter, and you will meet all of them:
 
 1. **A serial line (UART)** — a pair of wires carrying bytes, one bit at a time.
@@ -146,6 +159,7 @@ Three connections matter, and you will meet all of them:
 3. **A programming interface (SWD)** — separate wires used to write new software
    into the chip's flash memory and to inspect it while it runs.
 
+> [!TIP]
 > **Go deeper.** Two of those control lines are on GPIO pins that are documented
 > nowhere except [hardware.md](../reference/hardware.md) — working them out took real effort,
 > and getting them wrong makes the board look dead. That page is the record.

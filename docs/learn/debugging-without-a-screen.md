@@ -196,6 +196,14 @@ enforces.
 When you find yourself writing "remember to X first" in a README, ask whether
 the code could simply make X unnecessary or impossible to forget.
 
+> [!TIP]
+> **Go deeper** — [Julia Evans' blog](https://jvns.ca/) is the best free
+> writing on the Linux side of this: `strace`, sockets, permissions, all
+> illustrated and all honest about what is confusing.
+> [Interrupt](https://interrupt.memfault.com/blog/) is its equivalent for
+> firmware — fault handlers, coredumps and post-mortem debugging on chips with
+> no operating system to help you.
+
 ## Check yourself
 
 1. Your firmware works until you remove a `printk`, then fails. What kind of bug
@@ -204,4 +212,5 @@ the code could simply make X unnecessary or impossible to forget.
    convince you that it is true?
 3. The board reset five minutes ago and you want to know why. Which command?
 
-Next: what to build once the tour is over.
+Next: catching all of that before the wire, so the board is not where you find
+out you were wrong.

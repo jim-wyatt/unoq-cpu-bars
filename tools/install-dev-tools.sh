@@ -41,6 +41,7 @@ export PATH="$BIN:$PATH"
 # Bump these deliberately, and both ends move together.
 SHELLCHECK_VERSION="${SHELLCHECK_VERSION:-0.11.0}"
 SHFMT_VERSION="${SHFMT_VERSION:-3.13.1}"
+BATS_VERSION="${BATS_VERSION:-1.14.0}"
 
 case "$(uname -m)" in
   aarch64 | arm64)
@@ -105,6 +106,39 @@ else
   }
   chmod +x "$BIN/shfmt"
   echo "  installed $("$BIN/shfmt" --version)"
+fi
+
+echo "=== bats $BATS_VERSION -> $BIN ==="
+# The shell test runner. Pinned and installed from source like the two above,
+# rather than taken from apt: Debian ships 1.11.1, and a runner that differs
+# between the board and CI has the same problem a formatter does.
+#
+# bats is pure shell, so there is no architecture to pick - the same tarball
+# works on the board's aarch64 and on an x86_64 runner.
+have=""
+command -v bats >/dev/null 2>&1 && have="$(bats --version | awk '{print $2}')"
+if [ "$have" = "$BATS_VERSION" ]; then
+  echo "  already $BATS_VERSION"
+else
+  [ -n "$have" ] &&
+    echo "  found $have on PATH, installing $BATS_VERSION over it (CI and local must match)"
+  tmp="$(mktemp -d)"
+  if curl -fsSL "https://github.com/bats-core/bats-core/archive/refs/tags/v${BATS_VERSION}.tar.gz" |
+    tar -xz -C "$tmp" 2>/dev/null; then
+    # install.sh lays out bin/ and libexec/ under the prefix; $BIN is
+    # $prefix/bin, so hand it the parent.
+    "$tmp/bats-core-${BATS_VERSION}/install.sh" "$(dirname "$BIN")" >/dev/null || {
+      echo "  could not install bats v$BATS_VERSION" >&2
+      rm -rf "$tmp"
+      exit 1
+    }
+  else
+    echo "  could not download bats v$BATS_VERSION" >&2
+    rm -rf "$tmp"
+    exit 1
+  fi
+  rm -rf "$tmp"
+  echo "  installed $("$BIN/bats" --version)"
 fi
 
 echo

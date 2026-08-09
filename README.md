@@ -131,6 +131,7 @@ at [Start here](docs/learn/start-here.md).
 │   ├── flash-all.sh        bootloader + app, for recovery
 │   ├── ztest.sh            twister on native_sim
 │   └── restore-arduino-firmware.sh
+├── tests/                  bats suites for the shell — see tests/README.md
 ├── python/                 MPU-side package (editable install — do not move)
 │   ├── unoq/               link.py (GPIOs), mcu.py (shell), fota.py,
 │   │                       cpu.py (/proc/stat), cpubars.py + learn.py (daemons)

@@ -1,0 +1,56 @@
+#!/bin/bash
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
+# The Zephyr version is written down twice. Fail if the two disagree.
+#
+#   tools/check-zephyr-pin.sh
+#
+# WHY IT IS WRITTEN TWICE
+# -----------------------
+# The board builds a standalone workspace at ~/zephyrproject, outside the
+# checkout, because the Zephyr tree is 3.3 GB and should survive deleting the
+# repository. CI cannot do that - the setup action needs the application repo to
+# BE the manifest repo (`west init -l`), so it needs a west.yml here.
+#
+# Two topologies, two declarations of the same version, and no mechanism in west
+# to share one. So: a gate instead of a convention. A CI job that compiles a
+# different Zephyr from the board is worse than no CI job at all, because it
+# reports green about something nobody is running.
+#
+# No network, instant, so it runs on every check.sh.
+set -uo pipefail
+
+PROJECT="$(cd "$(dirname "$0")/.." && pwd)"
+PROV="$PROJECT/provision/user/30-zephyr-workspace.sh"
+MANIFEST="$PROJECT/west.yml"
+
+# ZEPHYR_VERSION="${ZEPHYR_VERSION:-v4.4.1}"
+prov="$(sed -n 's/^ZEPHYR_VERSION=.*:-\(v[0-9][0-9.]*\)}.*/\1/p' "$PROV" | head -1)"
+#     revision: v4.4.1
+manifest="$(sed -n 's/^[[:space:]]*revision:[[:space:]]*\(v[0-9][0-9.]*\).*/\1/p' "$MANIFEST" | head -1)"
+
+fail=0
+if [ -z "$prov" ]; then
+  echo "could not read ZEPHYR_VERSION from $PROV" >&2
+  fail=1
+fi
+if [ -z "$manifest" ]; then
+  echo "could not read the zephyr revision from $MANIFEST" >&2
+  fail=1
+fi
+[ "$fail" = 0 ] || exit 1
+
+if [ "$prov" != "$manifest" ]; then
+  cat >&2 <<EOF
+Zephyr version pinned in two places, and they disagree:
+
+  provision/user/30-zephyr-workspace.sh   $prov   (what the board builds)
+  west.yml                                $manifest   (what CI builds)
+
+Change both. If you are upgrading Zephyr, docs/reference/mcu.md has the
+procedure - the SDK version usually moves with it.
+EOF
+  exit 1
+fi
+
+echo "Zephyr pinned at $prov in both the provisioning script and the manifest"

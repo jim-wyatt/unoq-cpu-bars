@@ -1,0 +1,38 @@
+# Copyright (c) 2026 Jim Wyatt
+# SPDX-License-Identifier: MIT
+#
+# A west manifest, used by CI only.
+#
+# On the board, provision/user/30-zephyr-workspace.sh builds a STANDALONE
+# workspace at ~/zephyrproject with `west init -m .../zephyr --mr <version>`,
+# and this file is ignored. That layout is deliberate: the Zephyr tree is 3.3 GB
+# and should survive deleting this checkout.
+#
+# CI cannot use that shape. zephyrproject-rtos/action-zephyr-setup runs
+# `west init -l`, which requires the application repository to BE the manifest
+# repository - so the same version has to be declared here as well.
+#
+# TWO PLACES, ONE VERSION: tools/check-zephyr-pin.sh fails if the revision below
+# and ZEPHYR_VERSION in 30-zephyr-workspace.sh disagree, and check.sh runs it on
+# every pass. A CI job that compiles a different Zephyr from the board is worse
+# than no CI job, because it reports green about something nobody is running.
+#
+# NO PROJECT FILTER HERE, unlike the board. The filter exists because a 10 GB
+# rootfs cannot hold 7 GB of vendor HALs; a runner can, and a shallow clone of
+# everything is far less likely to break than an allowlist that has to be kept
+# correct by hand.
+manifest:
+  self:
+    # The workflow checks this repository out at ./app rather than under its own
+    # name, so a repository rename cannot break the build.
+    path: app
+
+  remotes:
+    - name: zephyrproject-rtos
+      url-base: https://github.com/zephyrproject-rtos
+
+  projects:
+    - name: zephyr
+      remote: zephyrproject-rtos
+      revision: v4.4.1
+      import: true

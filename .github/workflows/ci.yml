@@ -3,13 +3,19 @@
 name: checks
 
 # Runs the same gates as tools/check.sh, so a green CI means the same thing as
-# a clean local run. The MCU suite is the exception: ztest needs a full Zephyr
-# workspace and SDK (~5 GB), which is not worth installing per job - run it on
-# the board with `tools/check.sh mcu`.
+# a clean local run. Two jobs:
 #
-# The runner is x86_64 while the board is aarch64. That is fine here: gpiod
-# ships manylinux wheels for both, and the tests use fakes rather than real
-# hardware, so nothing in this job depends on the architecture.
+#   checks     lint, format, types, tests, coverage, docs. Thirty seconds.
+#   firmware   compiles for the real Cortex-M33 and runs the MCU suites.
+#              Slower, because it needs a Zephyr workspace and the SDK.
+#
+# They are split so a missing comma still fails fast, rather than behind a
+# toolchain download.
+#
+# The runner is x86_64 while the board is aarch64. That is fine for `checks`:
+# gpiod ships manylinux wheels for both, and the tests use fakes rather than
+# real hardware. It is also fine for `firmware`, which cross-compiles - the
+# output is Cortex-M33 either way, and native_sim/native/64 is 64-bit on both.
 
 on:
   push:
@@ -48,3 +54,60 @@ jobs:
         run: |
           export PATH="$HOME/.local/bin:$PATH"
           tools/check.sh python shell c docs
+
+  # The MCU half. Split into its own job because it needs a Zephyr workspace and
+  # the SDK, which the gates above do not - so a formatting mistake still fails
+  # in thirty seconds rather than waiting on a toolchain download.
+  #
+  # This job exists because for a long time it did not: a change that broke the
+  # firmware build got a green tick, because nothing outside the board ever
+  # compiled it. The version it builds is held equal to the board's by
+  # tools/check-zephyr-pin.sh.
+  firmware:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Checked out under a fixed name rather than the repository's, because
+          # west.yml has to name this directory and the repository is going to
+          # be renamed. See manifest.self.path.
+          path: app
+
+      - name: Set up Zephyr
+        uses: zephyrproject-rtos/action-zephyr-setup@v1
+        with:
+          app-path: app
+          toolchains: arm-zephyr-eabi
+
+      - name: Build the firmware for the real board
+        # The thing that was missing. native_sim below exercises the logic; only
+        # this proves the code still compiles for a Cortex-M33, links inside the
+        # 416K slot, and signs for MCUboot.
+        working-directory: app
+        run: west build -b arduino_uno_q -d /tmp/build mcu/app
+
+      - name: Report the image size against the slot
+        # A build that succeeds and no longer fits is a build that bricks a
+        # board on the next update. 416K is the slot size from the flash layout
+        # in docs/reference/hardware.md.
+        working-directory: app
+        run: |
+          arm-zephyr-eabi-size /tmp/build/zephyr/zephyr.elf || true
+          ls -l /tmp/build/zephyr/zephyr.signed.hex 2>/dev/null || true
+
+      - name: Run the MCU test suites
+        # The same suites, on the same platform, as mcu/ztest.sh runs on the
+        # board. native_sim/native/64 rather than plain native_sim: the latter
+        # is a 32-bit target and fails on the board's aarch64 with a
+        # CONFIG_64BIT error, so the board picked /native/64 and CI matches it
+        # rather than testing a configuration nobody runs.
+        working-directory: app
+        run: |
+          python3 "$ZEPHYR_BASE/scripts/twister" \
+            -T mcu/tests \
+            -p native_sim/native/64 \
+            --outdir /tmp/twister-out \
+            --clobber-output \
+            -v

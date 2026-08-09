@@ -48,8 +48,20 @@ else
 fi
 
 step "systemd unit"
+# Capture the unit as it is now, so a CHANGED unit can be restarted. Without
+# this, a run that rewrites ExecStart reports "already enabled and running" and
+# leaves the old process in place - which is exactly what happened when the
+# script moved out of usb/: correct file on disk, stale process still running
+# from a path that no longer exists.
+before="$(cat /etc/systemd/system/unoq-leds.service 2>/dev/null)"
 install_unit "$PROJECT/status/unoq-leds.service"
-if systemctl is-enabled --quiet unoq-leds.service 2>/dev/null &&
+after="$(cat /etc/systemd/system/unoq-leds.service 2>/dev/null)"
+
+if [ "$before" != "$after" ] && systemctl is-active --quiet unoq-leds.service; then
+  systemctl restart unoq-leds.service >/dev/null 2>&1 ||
+    warn "could not restart unoq-leds.service - check: journalctl -u unoq-leds"
+  did "unit changed, service restarted"
+elif systemctl is-enabled --quiet unoq-leds.service 2>/dev/null &&
   systemctl is-active --quiet unoq-leds.service; then
   skip "already enabled and running"
 else

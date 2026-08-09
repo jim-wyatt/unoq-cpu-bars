@@ -18,7 +18,7 @@
   ],
 
   "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
-  "python.languageServer": "None",
+  "python.languageServer": "Default",
 
   "files.associations": {
     "*.overlay": "dts",

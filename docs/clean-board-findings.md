@@ -28,6 +28,7 @@ Status as of the run on 2026-08-08/09. Fixed items link to the commit.
 | 7 | Alias check ran in a non-interactive shell | `command -v zbuild` can never see an alias there; had never passed | fixed |
 | 8 | No host C compiler on the image at all | `check.sh mcu` and `ztest.sh` could never have run | fixed |
 | 9 | Venv check tested 3 of the 5 packages it installs | `smbus2` and `spidev` absent, reported `0 changed, 5 already correct` | fixed |
+| 10 | VS Code machine settings lived only in `~/.vscode-server` | restore wiped them; nothing said so, the board just swapped sooner | fixed |
 
 ---
 
@@ -63,6 +64,27 @@ run once and rarely.
 The tell was sitting in the tree the whole time: `10-optimize-board.sh` installs
 `python3-dev` *for spidev*, i.e. the headers, without the compiler that consumes
 them. Half a dependency is a stronger signal than none.
+
+### 10 — configuration that only existed on the machine
+
+`.vscode/settings.json` says the board-wide tuning lives in
+`~/.vscode-server/data/Machine/settings.json`. After the restore that file did
+not exist, and nothing anywhere said so.
+
+Every setting in it is one whose default merely *costs* something rather than
+breaking anything: `extensions.autoUpdate` came back on (which the README
+explicitly calls out as deliberately off), the file watcher went back to
+watching ~4 GB of Zephyr checkout and toolchain, and project-wide search walked
+all of it. The board simply ran hotter and swapped sooner.
+
+It now lives in `provision/user/vscode-machine-settings.json` and is installed
+by `50-shell-env.sh` if absent. The general rule: **configuration that is not in
+the repo does not survive a restore, and configuration whose absence is silent
+will not be noticed when it does not.**
+
+For scale, on this board VS Code Server plus its Claude Code instances was
+1875 MB of 3.6 GB, of which ~620 MB was a second extension host left behind by a
+window whose connection had gone away.
 
 ### 1 — the only unrecoverable one
 

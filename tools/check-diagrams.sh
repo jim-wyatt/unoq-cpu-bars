@@ -26,7 +26,16 @@ set -uo pipefail
 PROJECT="$(cd "$(dirname "$0")/.." && pwd)"
 SITE="${UNOQ_SITE:-$PROJECT/share/learn}"
 PORT="${UNOQ_DIAGRAM_PORT:-8099}"
-BUDGET_MS="${UNOQ_DIAGRAM_BUDGET_MS:-25000}"
+# What actually costs the time here is chromium STARTUP - about 5.5s per launch
+# on this board, eleven launches, so ~60s regardless of this number. Lowering it
+# from 25000 changed nothing measurable, and running the pages four at a time
+# was WORSE (77s): four chromium instances on a four-core 3.6 GB board contend
+# more than they gain.
+#
+# Making it genuinely fast means driving one browser over the DevTools protocol
+# instead of launching one per page, which is a dependency this gate does not
+# currently justify. It is excluded from --fast for that reason.
+BUDGET_MS="${UNOQ_DIAGRAM_BUDGET_MS:-8000}"
 
 # GitHub's ubuntu runners ship google-chrome; this board has chromium. Try the
 # usual names rather than assuming either.

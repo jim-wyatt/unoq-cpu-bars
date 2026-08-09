@@ -32,8 +32,12 @@ setup() {
 
   # install_unit writes to /etc and calls systemctl. Neither is acceptable in a
   # test, so the write goes to a temp root and systemctl is stubbed.
-  ETC="$BATS_TEST_TMPDIR/etc"
-  mkdir -p "$ETC/systemd/system"
+  # write_file is called with an absolute path, and the stub below prefixes
+  # $ETC - so the tree that actually gets written is $ETC/etc/systemd/system.
+  # Creating $ETC/systemd/system instead would work (the stub mkdir -p's) and
+  # read as though the assertions below were looking in the wrong place.
+  ETC="$BATS_TEST_TMPDIR/root"
+  mkdir -p "$ETC/etc/systemd/system"
   stub systemctl
   stub install_root
 
@@ -50,8 +54,19 @@ setup() {
 # alternative - a fixture script that calls it - would put a layer between the
 # test and the thing being tested for no gain.
 load_lib() {
+  # Fail loudly if lib.sh cannot be sourced. `|| true` here would mean a syntax
+  # error in lib.sh leaves install_unit undefined, `run` returns 127, and every
+  # test asserting "this should fail" passes for entirely the wrong reason -
+  # the same trap the fail() stub below fell into once already.
   # shellcheck disable=SC1090
-  source "$PROJECT/provision/lib.sh" 2>/dev/null || true
+  source "$PROJECT/provision/lib.sh" || {
+    echo "could not source provision/lib.sh" >&2
+    return 1
+  }
+  declare -F install_unit >/dev/null || {
+    echo "lib.sh sourced but install_unit is not defined" >&2
+    return 1
+  }
 
   PROJECT_UNDER_TEST="${1:-/opt/checkout}"
   PROJECT="$PROJECT_UNDER_TEST"
@@ -247,4 +262,23 @@ unit() {
         }
     fi
   done
+}
+
+@test "a '-' anywhere in a combined prefix still means optional" {
+  # systemd allows the prefix characters in combination and in any order, so
+  # `+-/path` is optional too. Detecting `-` only in first position and
+  # stripping it afterwards is stricter than systemd and rejects correct units.
+  load_lib "$BATS_TEST_TMPDIR"
+  src="$(unit combodash "[Service]" \
+    "ExecStartPre=+-$BATS_TEST_TMPDIR/bin/absent" \
+    "ExecStart=$BIN/thing")"
+  run install_unit "$src"
+  [ "$status" -eq 0 ]
+}
+
+@test "an '@' before a '-' does not make it required" {
+  load_lib "$BATS_TEST_TMPDIR"
+  src="$(unit atdash "[Service]" "ExecStart=@-$BATS_TEST_TMPDIR/bin/absent n")"
+  run install_unit "$src"
+  [ "$status" -eq 0 ]
 }

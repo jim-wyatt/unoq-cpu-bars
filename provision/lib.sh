@@ -236,16 +236,23 @@ install_unit() {
   while IFS= read -r line; do
     prog="${line#*=}"
     prog="${prog#"${prog%%[![:space:]]*}"}"
+    # Strip systemd's prefix characters (-, @, :, +, !) and note whether `-` was
+    # among them, in ONE pass. Testing for `-` first and stripping afterwards
+    # looks equivalent and is not: systemd allows the prefixes in combination
+    # and in any order, so `+-/path` would be seen as non-optional, have its `-`
+    # stripped, and then be required to exist - stricter than systemd, failing
+    # an install that is correct.
+    #
     # `-` means "a failure of this command is not a failure of the unit", which
-    # includes the program not being there at all. Enforcing existence on those
-    # would be stricter than systemd and would fail installs that are correct.
+    # includes the program not being there at all.
     optional=0
-    case "$prog" in -*) optional=1 ;; esac
-    # Strip systemd's prefix characters (-, @, :, +, !), which may be combined,
-    # then take the first word: the executable. Arguments are not our business.
     while :; do
       case "$prog" in
-        [-@:+!]*) prog="${prog#?}" ;;
+        -*)
+          optional=1
+          prog="${prog#?}"
+          ;;
+        [@:+!]*) prog="${prog#?}" ;;
         *) break ;;
       esac
     done

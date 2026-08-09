@@ -301,7 +301,16 @@ install_unit() {
         interp="${interp#"${interp%%[![:space:]]*}"}"
         # First word only. `#!/usr/bin/env python3` runs /usr/bin/env, which
         # resolves python3 from PATH itself - not ours to second-guess.
-        interp="${interp%% *}"
+        #
+        # Split on ANY whitespace, not a literal space: the kernel ends the
+        # interpreter name at a space OR a tab (fs/binfmt_script.c), so
+        # `#!/usr/bin/env<TAB>python3` names /usr/bin/env just as the spaced
+        # form does. Splitting on " " alone would leave the tab and the
+        # argument in $interp and fail -x on a shebang that works perfectly.
+        # This also drops a trailing CR from a CRLF file: the kernel would
+        # keep it and fail, but erring toward accepting costs us a missed
+        # diagnosis, while erring toward rejecting blocks a working install.
+        interp="${interp%%[[:space:]]*}"
         [ -x "$interp" ] || fail "$name runs a script whose interpreter is missing:
   script:      $prog
   interpreter: $interp
@@ -309,7 +318,7 @@ install_unit() {
   This is what produces 203/EXEC while the script itself looks fine. If the
   interpreter is under .venv, the checkout has probably moved - a virtualenv
   is not relocatable, and its shebangs are absolute. Rebuild it:
-    bash $PROJECT/provision/user/40-python-venv.sh"
+    bash \"$PROJECT/provision/user/40-python-venv.sh\""
         ;;
     esac
   done < <(grep -E '^(ExecStart|ExecStartPre|ExecStartPost|ExecStop|ExecReload)=' <<<"$rendered" || true)

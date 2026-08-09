@@ -407,3 +407,28 @@ unit() {
   run install_unit "$src"
   [ "$status" -eq 0 ]
 }
+
+@test "a tab-separated shebang splits on the tab, as the kernel does" {
+  # The kernel ends the interpreter name at a space OR a tab, so this shebang
+  # names /usr/bin/env and runs fine. Splitting on a literal space alone would
+  # leave "env<TAB>definitely-not-installed" in the interpreter and fail -x on
+  # a unit that works - a false failure that blocks provisioning outright.
+  load_lib "$BATS_TEST_TMPDIR"
+  printf '#!/usr/bin/env\tdefinitely-not-installed\n' >"$BIN/tabbed"
+  chmod +x "$BIN/tabbed"
+  src="$(unit tabbed "[Service]" "ExecStart=$BIN/tabbed")"
+  run install_unit "$src"
+  [ "$status" -eq 0 ]
+}
+
+@test "a missing interpreter is still caught when separated by a tab" {
+  # The other half: widening the split must not blind the check itself.
+  load_lib "$BATS_TEST_TMPDIR"
+  printf '#!%s/bin/absent\tfoo\n' "$BATS_TEST_TMPDIR" >"$BIN/tabbedbad"
+  chmod +x "$BIN/tabbedbad"
+  src="$(unit tabbedbad "[Service]" "ExecStart=$BIN/tabbedbad")"
+  run install_unit "$src"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"interpreter is missing"* ]]
+  [[ "$output" == *"absent"* ]]
+}

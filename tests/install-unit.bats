@@ -282,3 +282,39 @@ unit() {
   run install_unit "$src"
   [ "$status" -eq 0 ]
 }
+
+# --- a renderer that produces nothing ---------------------------------------
+
+@test "an unreadable source is a failure, not an empty unit" {
+  load_lib "$BATS_TEST_TMPDIR"
+  run install_unit "$BATS_TEST_TMPDIR/does-not-exist.service"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"cannot read"* ]]
+  [ ! -f "$ETC/etc/systemd/system/does-not-exist.service" ]
+}
+
+@test "an empty source file does not install an empty unit" {
+  # Empty output passes every check below it vacuously - grep finds no shell
+  # syntax and no Exec lines in nothing - and systemd loads an empty unit
+  # happily, so the service just never runs and nothing says why.
+  load_lib "$BATS_TEST_TMPDIR"
+  src="$BATS_TEST_TMPDIR/empty.service"
+  : >"$src"
+  run install_unit "$src"
+  [ "$status" -ne 0 ]
+  [ ! -f "$ETC/etc/systemd/system/empty.service" ]
+  # The MESSAGE matters, not just the refusal. "no [Section] header" would also
+  # be true of an empty file and would send someone looking for a typo in a
+  # file that has nothing in it at all. Asserting it here is also what keeps
+  # the emptiness check from looking redundant with the section check and
+  # being deleted - it is not redundant, it is more specific.
+  [[ "$output" == *"rendered to nothing"* ]]
+}
+
+@test "a file with no section header is rejected" {
+  load_lib "$BATS_TEST_TMPDIR"
+  src="$(unit nosection "# just a comment" "ExecStart=$BIN/thing")"
+  run install_unit "$src"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"no [Section] header"* ]]
+}

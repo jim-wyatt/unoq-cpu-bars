@@ -199,12 +199,23 @@ install_unit() {
       -e "s#^Group=arduino\$#Group=$TARGET_USER#" \
       "$src"
   }
+  [ -r "$src" ] || fail "install_unit: cannot read $src"
+
   # Captured for the checks below only. Command substitution strips trailing
   # newlines, so the WRITE re-runs the renderer and pipes it straight through -
   # a unit file that did not end in exactly one newline would otherwise be
   # rewritten on every run, turning the second run's `skip` into a `did` and
   # quietly destroying the idempotence signal a re-provision depends on.
-  rendered="$(render_unit)"
+  #
+  # EVERY FAILURE MODE OF THE RENDERER HAS TO BE CAUGHT HERE, because empty
+  # output passes all of the checks below vacuously - grep finds no shell
+  # syntax and no Exec lines in nothing - and the write pipeline would then
+  # install an empty unit file. systemd loads that happily and the service
+  # simply never runs.
+  rendered="$(render_unit)" || fail "install_unit: could not render $src"
+  [ -n "$rendered" ] || fail "install_unit: $src rendered to nothing"
+  grep -q '^\[' <<<"$rendered" ||
+    fail "install_unit: $src has no [Section] header - not a unit file"
 
   # SHELL SYNTAX SYSTEMD DOES NOT EXPAND.
   #

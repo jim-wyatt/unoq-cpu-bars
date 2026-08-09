@@ -2,25 +2,27 @@
 # SPDX-License-Identifier: MIT
 name: docs site
 
-# MANUAL ONLY, on purpose.
+# Publishes the documentation to GitHub Pages on every push to main - which
+# is normally a merge, but a direct push counts too, and should.
 #
-# This publishes the documentation to a public URL. The repository is going to
-# be renamed and its history squashed before it is announced (issue #27), so
-# publishing on every push to main would put a half-finished site at an address
-# that is about to change.
+# This was manual-only until now, on the argument that the repository is about
+# to be renamed (issue #27) and a half-finished site should not sit at an
+# address that is going to change. That trade has been made the other way
+# deliberately: a site nobody can see is not reviewable, and GitHub redirects
+# the old URL after a rename anyway, so the cost of publishing early is a
+# redirect and the cost of not publishing is that no one reads it.
 #
-# When that is settled, add:
-#
-#   push:
-#     branches: [main]
-#     paths: ['docs/**', 'mkdocs.yml', 'tools/mkdocs_hooks.py', ...]
-#
-# and it becomes continuous. Until then: Actions -> docs site -> Run workflow.
+# NOT filtered by path. The obvious `paths: [docs/**, mkdocs.yml]` is wrong
+# here: the site embeds source files through pymdownx.snippets, so a change to
+# mcu/app/src/bars.c changes a rendered page without touching docs/ at all. A
+# build is a minute; working out months later why the site is stale is not.
 #
 # ONE-TIME SETUP: Settings -> Pages -> Source -> "GitHub Actions". Without that
 # the deploy step fails with a 404 on the Pages API, which reads like a
 # permissions bug and is not.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 # Least privilege: the build job gets none of these, the deploy job gets the

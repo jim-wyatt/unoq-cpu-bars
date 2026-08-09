@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How they talk - Arduino UNO Q</title>
+<style>
+:root {
+  --bg: #ffffff; --fg: #1c2024; --muted: #5b6570; --rule: #e3e8ee;
+  --accent: #0b6cbd; --accent-soft: #eaf3fb; --code-bg: #f6f8fa;
+  --side: #fbfcfd; --warn-bg: #fff8e6; --warn-edge: #e0a800;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14181c; --fg: #dde3ea; --muted: #93a1b0; --rule: #262d35;
+    --accent: #5aa9f0; --accent-soft: #17222d; --code-bg: #1b2127;
+    --side: #11151a; --warn-bg: #241f10; --warn-edge: #8a6d1a;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, sans-serif;
+}
+.wrap { display: flex; align-items: flex-start; max-width: 1180px; margin: 0 auto; }
+nav {
+  width: 250px; flex: 0 0 250px; padding: 28px 18px 60px; background: var(--side);
+  border-right: 1px solid var(--rule); position: sticky; top: 0; max-height: 100vh;
+  overflow-y: auto;
+}
+nav .brand { font-weight: 700; font-size: 15px; letter-spacing: .01em; display: block;
+  color: var(--fg); text-decoration: none; margin-bottom: 4px; }
+nav .tag { color: var(--muted); font-size: 12.5px; margin-bottom: 22px; }
+nav h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .09em;
+  color: var(--muted); margin: 22px 0 8px; }
+nav ol { list-style: none; margin: 0; padding: 0; counter-reset: step; }
+nav li { margin: 1px 0; }
+nav a { display: block; padding: 5px 9px; border-radius: 6px; text-decoration: none;
+  color: var(--fg); font-size: 14px; }
+nav a:hover { background: var(--accent-soft); }
+nav a.here { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+nav ol.steps a::before { counter-increment: step; content: counter(step) ". ";
+  color: var(--muted); font-variant-numeric: tabular-nums; }
+main { flex: 1 1 auto; min-width: 0; padding: 40px 44px 96px; }
+h1, h2, h3, h4 { line-height: 1.25; margin: 1.9em 0 .55em; }
+h1 { font-size: 2.05rem; margin-top: 0; letter-spacing: -.015em; }
+h2 { font-size: 1.42rem; padding-bottom: .28em; border-bottom: 1px solid var(--rule); }
+h3 { font-size: 1.13rem; }
+h4 { font-size: 1rem; color: var(--muted); }
+p, ul, ol, table, pre, blockquote { margin: 0 0 1.05em; }
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+ul, ol { padding-left: 1.4em; }
+li { margin: .3em 0; }
+code {
+  font: 13.5px/1.5 ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  background: var(--code-bg); padding: .14em .38em; border-radius: 4px;
+}
+pre {
+  background: var(--code-bg); border: 1px solid var(--rule); border-radius: 8px;
+  padding: 13px 15px; overflow-x: auto;
+}
+pre code { background: none; padding: 0; font-size: 13px; line-height: 1.55; }
+blockquote {
+  margin-left: 0; padding: .7em 1em; background: var(--warn-bg);
+  border-left: 3px solid var(--warn-edge); border-radius: 0 6px 6px 0;
+}
+blockquote p { margin: 0; }
+.tablewrap { overflow-x: auto; margin-bottom: 1.05em; }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; padding: 7px 11px; border-bottom: 1px solid var(--rule);
+  vertical-align: top; }
+th { font-size: 12.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+hr { border: 0; border-top: 1px solid var(--rule); margin: 2.2em 0; }
+.pager { display: flex; justify-content: space-between; gap: 14px; margin-top: 56px;
+  padding-top: 20px; border-top: 1px solid var(--rule); font-size: 14.5px; }
+.pager a { display: block; padding: 11px 15px; border: 1px solid var(--rule);
+  border-radius: 8px; text-decoration: none; max-width: 47%; }
+.pager a:hover { border-color: var(--accent); }
+.pager span { display: block; color: var(--muted); font-size: 11.5px;
+  text-transform: uppercase; letter-spacing: .07em; }
+.menu { display: none; }
+@media (max-width: 860px) {
+  .wrap { display: block; }
+  nav { width: auto; max-height: none; position: static; border-right: 0;
+        border-bottom: 1px solid var(--rule); }
+  main { padding: 26px 20px 70px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav><a class="brand" href="index.html">Arduino UNO Q</a>
+<div class="tag">Hybrid MPU + MCU development, from scratch</div>
+<h3>Learning path</h3>
+<ol class="steps">
+<li><a href="start-here.html">Start here</a></li>
+<li><a href="two-computers.html">Two computers on one board</a></li>
+<li><a href="the-linux-side.html">The Linux side</a></li>
+<li><a href="the-microcontroller-side.html">The microcontroller side</a></li>
+<li><a href="how-they-talk.html" class="here">How they talk</a></li>
+<li><a href="from-source-to-chip.html">From source to a running chip</a></li>
+<li><a href="the-led-matrix.html">The LED matrix</a></li>
+<li><a href="updating-safely.html">Updating safely</a></li>
+<li><a href="one-cable-many-devices.html">One cable, many devices</a></li>
+<li><a href="debugging-without-a-screen.html">Debugging without a screen</a></li>
+<li><a href="make-it-yours.html">Make it yours</a></li>
+</ol>
+<h3>Reference</h3>
+<ol>
+<li><a href="clean-board-findings.html">What a clean board revealed</a></li>
+<li><a href="hardware.html">The hardware, honestly</a></li>
+<li><a href="mcu.html">MCU workflow</a></li>
+<li><a href="mpu.html">MPU workflow</a></li>
+<li><a href="troubleshooting.html">Troubleshooting</a></li>
+<li><a href="usb.html">IP over USB, and the fileshare</a></li>
+<li><a href="README.html">unoq-cpu-bars</a></li>
+<li><a href="THIRD-PARTY.html">Third-party material</a></li>
+</ol></nav>
+<main>
+<h1 id="how-they-talk">How they talk</h1>
+<p>Two computers, no shared memory. To cooperate they must send bytes down a wire. This page is about that wire, the two extra wires that make it usable, and why &quot;just send the data&quot; is harder than it sounds.</p>
+<h2 id="serial-from-the-bottom">Serial, from the bottom</h2>
+<p>The connection is a <strong>UART</strong> — a universal asynchronous receiver/transmitter. Strip the name and it is this: one wire for each direction, and a byte is sent by wiggling the voltage on it in a pattern both ends have agreed on.</p>
+<p>There is no clock wire. That is what &quot;asynchronous&quot; means, and it is the reason both ends must agree in advance on <strong>how fast</strong> to wiggle. That speed is the <strong>baud rate</strong>, and ours is 115200 — roughly 115,200 signal changes per second, about 11 KB/s of actual data.</p>
+<p>If the two ends disagree about the baud rate, you do not get an error. You get garbage: the receiver samples at the wrong moments and reconstructs bytes that were never sent. A screenful of <code>ÿ&lt;ÿ?ÿ</code> almost always means a baud mismatch, not a broken cable.</p>
+<p>On Linux the wire appears as a file:</p>
+<pre><code class="lang-bash">ls -l /dev/ttyHS1</code></pre>
+<p>Reading that file gives you bytes the microcontroller sent. Writing to it sends bytes back. That really is the whole interface.</p>
+<h2 id="the-two-wires-nobody-documents">The two wires nobody documents</h2>
+<p>Here is where this board bites people, and it is the reason <a href="hardware.html">hardware.md</a> exists.</p>
+<p>Two GPIO pins on the Linux side control the microcontroller. They are on <code>gpiochip1</code>, and they are documented nowhere official:</p>
+<div class="tablewrap"><table><thead><tr><th>Line</th><th>What it does</th><th>What you see when it is wrong</th></tr></thead><tbody><tr><td><strong>37</strong></td><td>MCU <strong>BOOT0</strong></td><td>Firmware flashes <em>and verifies</em>, but never runs</td></tr><tr><td><strong>70</strong></td><td>UART link enable</td><td>MCU transmits, <code>/dev/ttyHS1</code> reads nothing</td></tr></tbody></table></div>
+<p><strong>BOOT0</strong> decides <em>what the microcontroller runs when it starts</em>. High, and the chip boots a small program burned into it at the factory that waits for someone to send it new firmware. Low, and it runs your program. The pin is only sampled at reset, so it must be set <em>before</em> the chip restarts, not after.</p>
+<p>The failure this produces is nasty because everything reports success. Your firmware writes correctly. Verification passes. The chip is simply running a different program — the factory bootloader — which does not blink your LEDs.</p>
+<p><strong>The link enable</strong> turns on the path between the two chips. Without it the microcontroller happily transmits into a disconnected wire, and Linux reads an eternally empty file. Both sides are working. No error is available anywhere.</p>
+<p><code>unoq-link.service</code> sets both at boot:</p>
+<pre><code class="lang-bash">systemctl status unoq-link</code></pre>
+<blockquote><p><strong>This is the single most useful thing on this page.</strong> If the board ever looks dead — flashed fine, running nothing; or connected fine, saying nothing — suspect these two pins before anything else.</p></blockquote>
+<h2 id="bytes-are-not-messages">Bytes are not messages</h2>
+<p>You have a wire that carries bytes. You want to send a <em>value</em>. Those are not the same thing, and the gap is called <strong>framing</strong>.</p>
+<p>Say the microcontroller sends the number 1234. You read the file and get <code>12</code>. Is that the whole message? Is more coming? Has 34 been lost, or is it merely late? The wire cannot tell you — bytes arrive when they arrive, in any grouping.</p>
+<p>Every serial protocol solves this somehow:</p>
+<ul><li><strong>A terminator</strong>: send text and agree that a newline ends a message. Simple, human-readable, and what a shell does.</li><li><strong>A length prefix</strong>: say how many bytes are coming, then send exactly that many.</li><li><strong>Fixed size</strong>: agree every message is exactly 8 bytes.</li></ul>
+<p>This project uses the first. The microcontroller runs a <strong>shell</strong>, the same one you typed at on the previous page, and the &quot;protocol&quot; is: send a command line, read text back until the prompt returns.</p>
+<pre><code class="lang-c">/* mcu/app/include/app_proto.h - the format both sides agree on */
+#define APP_STATUS_FMT &quot;uptime_ms=%lld flip=%d sweeps=%u&quot;</code></pre>
+<p>The MCU prints that; Python parses it. It is not the fastest possible design, and that is a deliberate trade: you can debug it by hand with <code>tio</code>, which matters far more here than saving bytes.</p>
+<h2 id="why-the-python-side-is-more-complicated-than-you-would-expect">Why the Python side is more complicated than you would expect</h2>
+<p>Reading a reply sounds like <code>read()</code> and done. In practice <a href="https://github.com/jim-wyatt/unoq-cpu-bars/blob/main/python/unoq/mcu.py"><code>unoq/mcu.py</code></a> copes with all of this:</p>
+<ul><li><strong>The shell echoes your command back</strong>, so the first thing you read is what you just sent, not the answer.</li><li><strong>Output is wrapped in ANSI escape codes</strong> for colour, which must be stripped.</li><li><strong>Bytes dribble in.</strong> One <code>read()</code> rarely returns a whole reply; you must keep reading until you see the prompt.</li><li><strong>The reply might never come.</strong> If the MCU is reset, or held in the wrong boot mode, you wait forever unless you impose a timeout.</li></ul>
+<p>That last point is why the project&#x27;s tests <strong>fake the serial port deliberately badly</strong> — echoing commands, wrapping output in escape codes, dribbling bytes a few at a time. A fake that answers instantly and perfectly would let broken code pass.</p>
+<h2 id="try-it-watch-the-conversation">Try it: watch the conversation</h2>
+<p>Two windows, or two SSH sessions. In the first, watch the raw wire:</p>
+<pre><code class="lang-bash">sudo systemctl stop unoq-cpu-bars
+mcucon                     # raw bytes from /dev/ttyHS1</code></pre>
+<p>In the second, make something happen:</p>
+<pre><code class="lang-bash">cd ~/hybrid
+./.venv/bin/python -c &quot;
+from unoq import MCU
+with MCU() as mcu:
+    print(mcu.status())
+&quot;</code></pre>
+<p>Watch the first window. You will see the command arrive, the echo, and the reply — the actual bytes crossing between two computers. Then:</p>
+<pre><code class="lang-bash">sudo systemctl start unoq-cpu-bars</code></pre>
+<h2 id="the-other-direction">The other direction</h2>
+<p>So far Linux asks and the MCU answers. The demo works the other way: Linux computes bar heights and pushes them down, hundreds of times a minute, and the MCU never replies.</p>
+<p>That asymmetry is deliberate. Waiting for an acknowledgement to every frame would cap the frame rate at the round-trip time of the wire. For a display, a dropped frame is invisible — the next one is 200 ms away — so the cost of losing one is far lower than the cost of waiting for confirmation.</p>
+<p><strong>Choosing whether a message needs an answer is a real design decision</strong>, and &quot;always&quot; is usually the wrong one.</p>
+<h2 id="check-yourself">Check yourself</h2>
+<ol><li><code>/dev/ttyHS1</code> reads nothing at all, and the MCU is definitely running. Which of the two control pins do you suspect, and why?</li><li>Your terminal fills with <code>ÿ?ÿ&lt;</code>. What is wrong, and is it a hardware fault?</li><li>Why does the demo not wait for the MCU to confirm each frame? When would that be the wrong choice?</li></ol>
+<p>Next: turning source code into something the chip can run — and getting it there.</p>
+<div class="pager"><a href="the-microcontroller-side.html"><span>Previous</span>The microcontroller side</a><a href="from-source-to-chip.html"><span>Next</span>From source to a running chip</a></div>
+</main>
+</div>
+</body>
+</html>

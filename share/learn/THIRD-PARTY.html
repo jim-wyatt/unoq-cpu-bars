@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Third-party material - Arduino UNO Q</title>
+<style>
+:root {
+  --bg: #ffffff; --fg: #1c2024; --muted: #5b6570; --rule: #e3e8ee;
+  --accent: #0b6cbd; --accent-soft: #eaf3fb; --code-bg: #f6f8fa;
+  --side: #fbfcfd; --warn-bg: #fff8e6; --warn-edge: #e0a800;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14181c; --fg: #dde3ea; --muted: #93a1b0; --rule: #262d35;
+    --accent: #5aa9f0; --accent-soft: #17222d; --code-bg: #1b2127;
+    --side: #11151a; --warn-bg: #241f10; --warn-edge: #8a6d1a;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, sans-serif;
+}
+.wrap { display: flex; align-items: flex-start; max-width: 1180px; margin: 0 auto; }
+nav {
+  width: 250px; flex: 0 0 250px; padding: 28px 18px 60px; background: var(--side);
+  border-right: 1px solid var(--rule); position: sticky; top: 0; max-height: 100vh;
+  overflow-y: auto;
+}
+nav .brand { font-weight: 700; font-size: 15px; letter-spacing: .01em; display: block;
+  color: var(--fg); text-decoration: none; margin-bottom: 4px; }
+nav .tag { color: var(--muted); font-size: 12.5px; margin-bottom: 22px; }
+nav h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .09em;
+  color: var(--muted); margin: 22px 0 8px; }
+nav ol { list-style: none; margin: 0; padding: 0; counter-reset: step; }
+nav li { margin: 1px 0; }
+nav a { display: block; padding: 5px 9px; border-radius: 6px; text-decoration: none;
+  color: var(--fg); font-size: 14px; }
+nav a:hover { background: var(--accent-soft); }
+nav a.here { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+nav ol.steps a::before { counter-increment: step; content: counter(step) ". ";
+  color: var(--muted); font-variant-numeric: tabular-nums; }
+main { flex: 1 1 auto; min-width: 0; padding: 40px 44px 96px; }
+h1, h2, h3, h4 { line-height: 1.25; margin: 1.9em 0 .55em; }
+h1 { font-size: 2.05rem; margin-top: 0; letter-spacing: -.015em; }
+h2 { font-size: 1.42rem; padding-bottom: .28em; border-bottom: 1px solid var(--rule); }
+h3 { font-size: 1.13rem; }
+h4 { font-size: 1rem; color: var(--muted); }
+p, ul, ol, table, pre, blockquote { margin: 0 0 1.05em; }
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+ul, ol { padding-left: 1.4em; }
+li { margin: .3em 0; }
+code {
+  font: 13.5px/1.5 ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  background: var(--code-bg); padding: .14em .38em; border-radius: 4px;
+}
+pre {
+  background: var(--code-bg); border: 1px solid var(--rule); border-radius: 8px;
+  padding: 13px 15px; overflow-x: auto;
+}
+pre code { background: none; padding: 0; font-size: 13px; line-height: 1.55; }
+blockquote {
+  margin-left: 0; padding: .7em 1em; background: var(--warn-bg);
+  border-left: 3px solid var(--warn-edge); border-radius: 0 6px 6px 0;
+}
+blockquote p { margin: 0; }
+.tablewrap { overflow-x: auto; margin-bottom: 1.05em; }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; padding: 7px 11px; border-bottom: 1px solid var(--rule);
+  vertical-align: top; }
+th { font-size: 12.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+hr { border: 0; border-top: 1px solid var(--rule); margin: 2.2em 0; }
+.pager { display: flex; justify-content: space-between; gap: 14px; margin-top: 56px;
+  padding-top: 20px; border-top: 1px solid var(--rule); font-size: 14.5px; }
+.pager a { display: block; padding: 11px 15px; border: 1px solid var(--rule);
+  border-radius: 8px; text-decoration: none; max-width: 47%; }
+.pager a:hover { border-color: var(--accent); }
+.pager span { display: block; color: var(--muted); font-size: 11.5px;
+  text-transform: uppercase; letter-spacing: .07em; }
+.menu { display: none; }
+@media (max-width: 860px) {
+  .wrap { display: block; }
+  nav { width: auto; max-height: none; position: static; border-right: 0;
+        border-bottom: 1px solid var(--rule); }
+  main { padding: 26px 20px 70px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav><a class="brand" href="index.html">Arduino UNO Q</a>
+<div class="tag">Hybrid MPU + MCU development, from scratch</div>
+<h3>Learning path</h3>
+<ol class="steps">
+<li><a href="start-here.html">Start here</a></li>
+<li><a href="two-computers.html">Two computers on one board</a></li>
+<li><a href="the-linux-side.html">The Linux side</a></li>
+<li><a href="the-microcontroller-side.html">The microcontroller side</a></li>
+<li><a href="how-they-talk.html">How they talk</a></li>
+<li><a href="from-source-to-chip.html">From source to a running chip</a></li>
+<li><a href="the-led-matrix.html">The LED matrix</a></li>
+<li><a href="updating-safely.html">Updating safely</a></li>
+<li><a href="one-cable-many-devices.html">One cable, many devices</a></li>
+<li><a href="debugging-without-a-screen.html">Debugging without a screen</a></li>
+<li><a href="make-it-yours.html">Make it yours</a></li>
+</ol>
+<h3>Reference</h3>
+<ol>
+<li><a href="clean-board-findings.html">What a clean board revealed</a></li>
+<li><a href="hardware.html">The hardware, honestly</a></li>
+<li><a href="mcu.html">MCU workflow</a></li>
+<li><a href="mpu.html">MPU workflow</a></li>
+<li><a href="troubleshooting.html">Troubleshooting</a></li>
+<li><a href="usb.html">IP over USB, and the fileshare</a></li>
+<li><a href="README.html">unoq-cpu-bars</a></li>
+<li><a href="THIRD-PARTY.html" class="here">Third-party material</a></li>
+</ol></nav>
+<main>
+<h1 id="third-party-material">Third-party material</h1>
+<p>Everything in this repository is MIT-licensed (see <a href="https://github.com/jim-wyatt/unoq-cpu-bars/blob/main/LICENSE">LICENSE</a>) <strong>except</strong> the files listed here, which belong to other projects and keep their own terms. Each one carries its original licence header — do not replace those with this project&#x27;s.</p>
+<div class="tablewrap"><table><thead><tr><th>File</th><th>Owner</th><th>Licence</th></tr></thead><tbody><tr><td><code>.vscode/STM32U585.svd</code></td><td>STMicroelectronics</td><td>Apache-2.0</td></tr><tr><td><code>.clang-format</code></td><td>The Zephyr Project</td><td>Apache-2.0</td></tr></tbody></table></div>
+<h2 id="derived-work">Derived work</h2>
+<p><code>mcu/app/src/matrix.c</code> implements the 8×13 LED panel from scratch, but two facts in it were read out of Arduino&#x27;s own implementation (<a href="https://github.com/arduino/ArduinoCore-zephyr">ArduinoCore-zephyr</a>, <code>loader/matrix.inc</code>, Apache-2.0): which ordered pin pair lights which LED, and the 10 µs slot. That wiring is not described anywhere else — not in the UNO Q datasheet and not in Zephyr&#x27;s <code>arduino_uno_q</code> board definition, which does not mention the panel at all. The grayscale scheme, the refresh ISR and the register-level <code>MODER</code>/<code>BSRR</code> handling are this project&#x27;s.</p>
+<h2 id="build-time-dependencies">Build-time dependencies</h2>
+<p>Not redistributed here — you install them yourself, and they are listed for completeness because the firmware links against them:</p>
+<div class="tablewrap"><table><thead><tr><th></th><th>Licence</th></tr></thead><tbody><tr><td><a href="https://github.com/zephyrproject-rtos/zephyr">Zephyr RTOS</a> (+ MCUboot)</td><td>Apache-2.0</td></tr><tr><td><a href="https://openocd.org/">OpenOCD</a> — built by <code>tools/build-openocd.sh</code></td><td>GPL-2.0-or-later</td></tr><tr><td><code>pyserial</code>, <code>gpiod</code>, <code>smpclient</code></td><td>BSD-3-Clause / LGPL-2.1 / Apache-2.0</td></tr></tbody></table></div>
+<p>OpenOCD is GPL. <code>tools/build-openocd.sh</code> builds it from upstream source into <code>/opt/openocd</code>; no OpenOCD code is vendored into this repository.</p>
+<h2 id="downloaded-onto-your-board-never-redistributed">Downloaded onto your board, never redistributed</h2>
+<p><code>share/fetch-vscode.sh</code> downloads Microsoft&#x27;s official Visual Studio Code installers onto the board so it can hand them to a laptop that has no internet of its own — over the USB fileshare and over <code>unoq-learn</code>.</p>
+<div class="tablewrap"><table><thead><tr><th></th><th>Owner</th><th>Terms</th></tr></thead><tbody><tr><td>VS Code installers (<code>.exe</code>, <code>.zip</code>, <code>.deb</code>, <code>.tar.gz</code>)</td><td>Microsoft</td><td><a href="https://code.visualstudio.com/license">Microsoft Software Licence Terms</a></td></tr></tbody></table></div>
+<p>They are <strong>not</strong> in this repository and are not published by this project. They are fetched from <code>update.code.visualstudio.com</code> at the moment you run that script, onto your own hardware, and land inside <code>unoq-share.img</code> which is likewise not tracked here. Handing them on to other people is redistribution and is governed by Microsoft&#x27;s terms, not by this project&#x27;s MIT licence.</p>
+<p>Note that the official builds are not the MIT-licensed <code>vscode</code> source — they add Microsoft-proprietary components. If you would rather ship something freely redistributable, point the script at <a href="https://vscodium.com/">VSCodium</a> builds instead.</p>
+<h2 id="not-included">Not included</h2>
+<p>Earlier revisions of this project kept a <code>backup/</code> directory holding Arduino&#x27;s stock MCU firmware image, Arduino&#x27;s <code>remoteocd</code> helper binary, and OpenOCD target configuration files. Those are other people&#x27;s build artefacts and are not this project&#x27;s to redistribute, so they are not published here and have been removed from the git history.</p>
+<p>If you want the stock firmware back on your own board you need your own copy, taken <strong>before</strong> you purge the Arduino tree — see <a href="README.html#keep-your-own-copies">Keep your own copies</a> in the README for the commands. <code>mcu/restore-arduino-firmware.sh</code> uses it via <code>STOCK_FW</code>.</p>
+
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The microcontroller side - Arduino UNO Q</title>
+<style>
+:root {
+  --bg: #ffffff; --fg: #1c2024; --muted: #5b6570; --rule: #e3e8ee;
+  --accent: #0b6cbd; --accent-soft: #eaf3fb; --code-bg: #f6f8fa;
+  --side: #fbfcfd; --warn-bg: #fff8e6; --warn-edge: #e0a800;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14181c; --fg: #dde3ea; --muted: #93a1b0; --rule: #262d35;
+    --accent: #5aa9f0; --accent-soft: #17222d; --code-bg: #1b2127;
+    --side: #11151a; --warn-bg: #241f10; --warn-edge: #8a6d1a;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, sans-serif;
+}
+.wrap { display: flex; align-items: flex-start; max-width: 1180px; margin: 0 auto; }
+nav {
+  width: 250px; flex: 0 0 250px; padding: 28px 18px 60px; background: var(--side);
+  border-right: 1px solid var(--rule); position: sticky; top: 0; max-height: 100vh;
+  overflow-y: auto;
+}
+nav .brand { font-weight: 700; font-size: 15px; letter-spacing: .01em; display: block;
+  color: var(--fg); text-decoration: none; margin-bottom: 4px; }
+nav .tag { color: var(--muted); font-size: 12.5px; margin-bottom: 22px; }
+nav h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .09em;
+  color: var(--muted); margin: 22px 0 8px; }
+nav ol { list-style: none; margin: 0; padding: 0; counter-reset: step; }
+nav li { margin: 1px 0; }
+nav a { display: block; padding: 5px 9px; border-radius: 6px; text-decoration: none;
+  color: var(--fg); font-size: 14px; }
+nav a:hover { background: var(--accent-soft); }
+nav a.here { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+nav ol.steps a::before { counter-increment: step; content: counter(step) ". ";
+  color: var(--muted); font-variant-numeric: tabular-nums; }
+main { flex: 1 1 auto; min-width: 0; padding: 40px 44px 96px; }
+h1, h2, h3, h4 { line-height: 1.25; margin: 1.9em 0 .55em; }
+h1 { font-size: 2.05rem; margin-top: 0; letter-spacing: -.015em; }
+h2 { font-size: 1.42rem; padding-bottom: .28em; border-bottom: 1px solid var(--rule); }
+h3 { font-size: 1.13rem; }
+h4 { font-size: 1rem; color: var(--muted); }
+p, ul, ol, table, pre, blockquote { margin: 0 0 1.05em; }
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+ul, ol { padding-left: 1.4em; }
+li { margin: .3em 0; }
+code {
+  font: 13.5px/1.5 ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  background: var(--code-bg); padding: .14em .38em; border-radius: 4px;
+}
+pre {
+  background: var(--code-bg); border: 1px solid var(--rule); border-radius: 8px;
+  padding: 13px 15px; overflow-x: auto;
+}
+pre code { background: none; padding: 0; font-size: 13px; line-height: 1.55; }
+blockquote {
+  margin-left: 0; padding: .7em 1em; background: var(--warn-bg);
+  border-left: 3px solid var(--warn-edge); border-radius: 0 6px 6px 0;
+}
+blockquote p { margin: 0; }
+.tablewrap { overflow-x: auto; margin-bottom: 1.05em; }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; padding: 7px 11px; border-bottom: 1px solid var(--rule);
+  vertical-align: top; }
+th { font-size: 12.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+hr { border: 0; border-top: 1px solid var(--rule); margin: 2.2em 0; }
+.pager { display: flex; justify-content: space-between; gap: 14px; margin-top: 56px;
+  padding-top: 20px; border-top: 1px solid var(--rule); font-size: 14.5px; }
+.pager a { display: block; padding: 11px 15px; border: 1px solid var(--rule);
+  border-radius: 8px; text-decoration: none; max-width: 47%; }
+.pager a:hover { border-color: var(--accent); }
+.pager span { display: block; color: var(--muted); font-size: 11.5px;
+  text-transform: uppercase; letter-spacing: .07em; }
+.menu { display: none; }
+@media (max-width: 860px) {
+  .wrap { display: block; }
+  nav { width: auto; max-height: none; position: static; border-right: 0;
+        border-bottom: 1px solid var(--rule); }
+  main { padding: 26px 20px 70px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav><a class="brand" href="index.html">Arduino UNO Q</a>
+<div class="tag">Hybrid MPU + MCU development, from scratch</div>
+<h3>Learning path</h3>
+<ol class="steps">
+<li><a href="start-here.html">Start here</a></li>
+<li><a href="two-computers.html">Two computers on one board</a></li>
+<li><a href="the-linux-side.html">The Linux side</a></li>
+<li><a href="the-microcontroller-side.html" class="here">The microcontroller side</a></li>
+<li><a href="how-they-talk.html">How they talk</a></li>
+<li><a href="from-source-to-chip.html">From source to a running chip</a></li>
+<li><a href="the-led-matrix.html">The LED matrix</a></li>
+<li><a href="updating-safely.html">Updating safely</a></li>
+<li><a href="one-cable-many-devices.html">One cable, many devices</a></li>
+<li><a href="debugging-without-a-screen.html">Debugging without a screen</a></li>
+<li><a href="make-it-yours.html">Make it yours</a></li>
+</ol>
+<h3>Reference</h3>
+<ol>
+<li><a href="clean-board-findings.html">What a clean board revealed</a></li>
+<li><a href="hardware.html">The hardware, honestly</a></li>
+<li><a href="mcu.html">MCU workflow</a></li>
+<li><a href="mpu.html">MPU workflow</a></li>
+<li><a href="troubleshooting.html">Troubleshooting</a></li>
+<li><a href="usb.html">IP over USB, and the fileshare</a></li>
+<li><a href="README.html">unoq-cpu-bars</a></li>
+<li><a href="THIRD-PARTY.html">Third-party material</a></li>
+</ol></nav>
+<main>
+<h1 id="the-microcontroller-side">The microcontroller side</h1>
+<p>Now the other chip. An STM32U585: one core, 32-bit, 786 KB of RAM, 2 MB of flash. It is the computer with no screen, no filesystem, no users, and no <code>apt</code>.</p>
+<p>The mental adjustment is bigger than the numbers suggest, so this page is about what <em>goes away</em> when you cross to this side, and what you get in return.</p>
+<h2 id="what-is-not-there">What is not there</h2>
+<p><strong>No operating system in the sense you know.</strong> Nothing schedules your program against other people&#x27;s programs, because there are no other programs. Your code is the only code.</p>
+<p><strong>No processes.</strong> You cannot fork. There is nothing to fork into.</p>
+<p><strong>No filesystem.</strong> There is no <code>open(&quot;data.txt&quot;)</code>. If you want to store something across a reboot, you write it to flash yourself, in a region you set aside for it.</p>
+<p>**No <code>printf</code> to a screen.** There is no screen. <code>printf</code> exists, but what it does is push characters out a serial wire and hope somebody is listening.</p>
+<p><strong>No memory protection, usually.</strong> On Linux a bad pointer kills your process and the system carries on. Here, a bad pointer corrupts something and the board keeps running with a subtly wrong value, or reboots. There is no supervisor.</p>
+<p><strong>Nothing gets cleaned up.</strong> No garbage collector. Nothing frees your memory when you are done. Most microcontroller programs never call <code>malloc</code> at all, and allocate everything up front, because running out of memory at hour six is not a failure you want.</p>
+<h2 id="what-you-get-instead">What you get instead</h2>
+<p><strong>Your program starts at power-on and runs until power-off.</strong> Every time.</p>
+<p><strong>Timing you can rely on.</strong> Told to wait 100 microseconds, it waits 100 microseconds. Nothing pre-empts it, because there is nothing else.</p>
+<p><strong>Direct hardware access.</strong> A pin is a bit in a register at a fixed memory address. You write the bit; the voltage changes. There is no driver, no kernel call, no permission check — just an assignment.</p>
+<h2 id="zephyr-an-operating-system-that-admits-it-is-small">Zephyr: an operating system that admits it is small</h2>
+<p>Our microcontroller does run <em>something</em>: <strong>Zephyr</strong>, a real-time operating system (RTOS).</p>
+<p>&quot;Real-time&quot; does not mean fast. It means <strong>predictable</strong>: the system guarantees an upper bound on how long things take. A slow system that always responds within 1 ms is real-time; a fast one that usually responds in 10 μs but occasionally takes 50 ms is not.</p>
+<p>Zephyr gives you a few things worth having without giving up that property:</p>
+<ul><li><strong>Threads</strong>, so different jobs can be written separately, with priorities that are actually honoured.</li><li><strong>Drivers</strong> written to a common interface, so your code says &quot;give me the GPIO device&quot; instead of naming a memory address.</li><li><strong>A device tree</strong> describing what is wired to what, so the same code can build for a different board by changing a description rather than the code.</li><li>Optional extras this project uses: a <strong>shell</strong> over the serial port, a <strong>settings store</strong> in flash, and an <strong>update protocol</strong>.</li></ul>
+<p>It is not Linux. Zephyr compiles into <em>one binary containing your application and the OS together</em>. There is no kernel to boot separately, no init system, no packages. The whole thing on this board is under 85 KB.</p>
+<pre><code class="lang-bash">ls -l ~/zephyrproject/build/zephyr/zephyr.bin</code></pre>
+<pre><code>84752 bytes</code></pre>
+<p>Eighty-five kilobytes: operating system, drivers, LED matrix code, serial shell, update machinery, and the application. For comparison, the page you are reading is about a tenth of that.</p>
+<h2 id="where-the-program-lives">Where the program lives</h2>
+<p>Two kinds of memory, and the distinction matters constantly here in a way it never does on Linux:</p>
+<div class="tablewrap"><table><thead><tr><th></th><th>Flash (2 MB)</th><th>RAM (786 KB)</th></tr></thead><tbody><tr><td>Survives power off</td><td>yes</td><td>no</td></tr><tr><td>Holds</td><td>your program, constants, saved settings</td><td>variables, stack</td></tr><tr><td>Written</td><td>rarely, in blocks, slowly</td><td>constantly</td></tr></tbody></table></div>
+<p>Your program is <em>executed directly out of flash</em> — it is not copied into RAM first the way Linux loads an executable. That is why &quot;flashing&quot; the board means writing to the chip&#x27;s permanent storage, and why it takes a few seconds rather than being instant.</p>
+<p>Our application uses <strong>82 KB of 2048 KB</strong>. The chip is 96% empty.</p>
+<h2 id="the-shape-of-a-zephyr-program">The shape of a Zephyr program</h2>
+<pre><code class="lang-c">#include &lt;zephyr/kernel.h&gt;
+
+int main(void)
+{
+        setup_the_hardware();
+
+        while (1) {
+                do_the_work();
+                k_msleep(10);   /* let other threads run for 10 ms */
+        }
+        return 0;
+}</code></pre>
+<p>If you have used an Arduino, <code>setup()</code> and <code>loop()</code> are the same shape. The difference is that <code>k_msleep()</code> genuinely yields to other threads rather than spinning, and that there <em>are</em> other threads — the shell and the LED refresh are running alongside your <code>main</code>.</p>
+<h2 id="the-contract-between-the-two-chips">The contract between the two chips</h2>
+<p>Here is a problem that only exists because there are two computers: the LED matrix is 8 rows by 13 columns, and <strong>both sides need to know that</strong>.</p>
+<p>The C code needs it to drive the panel. The Python code needs it to work out how tall a bar should be. But C constants cannot be imported into Python.</p>
+<p>This project&#x27;s answer is to write the numbers once, in a header both sides treat as the source of truth:</p>
+<pre><code class="lang-c">/* mcu/app/include/app_proto.h */
+#define APP_MATRIX_ROWS      8
+#define APP_MATRIX_COLS      13
+#define APP_MATRIX_LEDS      (APP_MATRIX_ROWS * APP_MATRIX_COLS)
+#define APP_MATRIX_MAX_LEVEL 7</code></pre>
+<p>Python keeps its own copy — it has no choice — and a <strong>test parses the C header and fails if the two ever disagree</strong>. The duplication is unavoidable; the test is what makes it safe. That pattern, a duplicated constant with an automated argument about it, is worth stealing.</p>
+<p>Notice <code>APP_MATRIX_MAX_LEVEL 7</code>. The panel is monochrome blue, but each LED has <strong>8 brightness levels</strong> (0–7), which is why the bars can fade rather than just being on or off.</p>
+<h2 id="try-it-talk-to-it-directly">Try it: talk to it directly</h2>
+<p>The microcontroller runs a shell over the serial wire. You can type at it.</p>
+<pre><code class="lang-bash">sudo systemctl stop unoq-cpu-bars    # take the serial port back
+tio /dev/ttyHS1                      # or: mcucon</code></pre>
+<p>Press Enter and you get a prompt. Try:</p>
+<pre><code>help
+kernel version
+kernel uptime
+app status</code></pre>
+<p>You are typing into a computer with 786 KB of RAM that has no operating system in the sense you are used to, and it is answering. Leave with <code>Ctrl-t q</code>, then:</p>
+<pre><code class="lang-bash">sudo systemctl start unoq-cpu-bars</code></pre>
+<blockquote><p><strong>Go deeper.</strong> <a href="mcu.html">mcu.md</a> covers building, flashing, debugging, the shell and the firmware tests. <a href="hardware.html">hardware.md</a> has the flash layout and the pins.</p></blockquote>
+<h2 id="check-yourself">Check yourself</h2>
+<ol><li>Your MCU program calls <code>malloc()</code> in a loop and never frees. On Linux, what happens? Here, what happens?</li><li>Why is 85 KB enough for an operating system here but not on the other chip?</li><li>The LED matrix dimensions are written in a C header and again in Python. Why is that not simply a bug?</li></ol>
+<p>Next: the wire between them, and the two pins that make the whole thing work.</p>
+<div class="pager"><a href="the-linux-side.html"><span>Previous</span>The Linux side</a><a href="how-they-talk.html"><span>Next</span>How they talk</a></div>
+</main>
+</div>
+</body>
+</html>

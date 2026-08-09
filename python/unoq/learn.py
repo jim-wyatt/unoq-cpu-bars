@@ -3,7 +3,7 @@
 """
 Static web server for the on-board learning content.
 
-    unoq-learn                         # serve /var/lib/unoq-share on :8080
+    unoq-learn                         # serve /srv/unoq-share on :8080
     python -m unoq.learn --root ./share --port 9000
 
 The board is often the only computer in the room with the material on it - it
@@ -28,7 +28,15 @@ from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-DEFAULT_ROOT = "/var/lib/unoq-share"
+# The read-only mount of the FAT32 image, which is also what the USB drive
+# exports - so the web page and the drive can never disagree. NOT
+# /var/lib/unoq-share: that is the STAGING directory share/fetch-vscode.sh
+# writes into and share/build-image.sh builds the image from, and it does not
+# exist on a board that has only ever been provisioned. This default was that
+# staging path, which nothing noticed because unoq-learn.service passes --root
+# explicitly - so only someone running the server by hand ever saw it, and what
+# they saw was an empty directory or an error.
+DEFAULT_ROOT = "/srv/unoq-share"
 DEFAULT_PORT = 8080
 # Every interface: the point is to be reachable over the USB gadget link, whose
 # address the board does not know until a host is plugged in.

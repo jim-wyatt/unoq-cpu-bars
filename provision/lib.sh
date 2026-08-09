@@ -191,12 +191,78 @@ write_file() {
 # readable files. Rewriting them here is what lets the repo be cloned anywhere
 # and still produce units that point at the clone.
 install_unit() {
-  local src="$1" name
+  local src="$1" name rendered
   name="$(basename "$src")"
-  if sed -e "s#/home/arduino/hybrid#$PROJECT#g" \
-    -e "s#^User=arduino\$#User=$TARGET_USER#" \
-    -e "s#^Group=arduino\$#Group=$TARGET_USER#" \
-    "$src" | write_file 0644 "/etc/systemd/system/$name"; then
+  render_unit() {
+    sed -e "s#/home/arduino/hybrid#$PROJECT#g" \
+      -e "s#^User=arduino\$#User=$TARGET_USER#" \
+      -e "s#^Group=arduino\$#Group=$TARGET_USER#" \
+      "$src"
+  }
+  # Captured for the checks below only. Command substitution strips trailing
+  # newlines, so the WRITE re-runs the renderer and pipes it straight through -
+  # a unit file that did not end in exactly one newline would otherwise be
+  # rewritten on every run, turning the second run's `skip` into a `did` and
+  # quietly destroying the idempotence signal a re-provision depends on.
+  rendered="$(render_unit)"
+
+  # SHELL SYNTAX SYSTEMD DOES NOT EXPAND.
+  #
+  # Not a check that the substitution happened - that one cannot fail, because
+  # sed replaces the placeholder wherever it appears, and writing the test for
+  # it is what showed the check was vacuous.
+  #
+  # The failure that IS real is a unit written with the path spelled some other
+  # way. `~/hybrid` and `$HOME/hybrid` read as obviously equivalent to a human
+  # and are not substituted, and systemd expands neither: it passes them to
+  # execve() literally, so the unit fails at boot with 203/EXEC naming the unit
+  # but not the path, which reads like a permissions problem.
+  local shellism
+  # Single quotes are the point: these are patterns to find literally in the
+  # unit, not variables to expand here.
+  # shellcheck disable=SC2016
+  shellism="$(grep -nE '(^|=|:| )(~/|\$HOME|\$\{HOME)' <<<"$rendered" || true)"
+  if [ -n "$shellism" ]; then
+    fail "$name uses shell syntax systemd will not expand:
+  $shellism
+  systemd passes these to execve() literally. Write the path as
+  /home/arduino/hybrid/... and install_unit will substitute the real checkout."
+  fi
+
+  # Every program the unit runs must exist NOW. systemd reports a missing
+  # ExecStart as status=203/EXEC at boot, which names the unit but not the
+  # path, and looks identical to a permissions problem.
+  local line prog optional
+  while IFS= read -r line; do
+    prog="${line#*=}"
+    prog="${prog#"${prog%%[![:space:]]*}"}"
+    # `-` means "a failure of this command is not a failure of the unit", which
+    # includes the program not being there at all. Enforcing existence on those
+    # would be stricter than systemd and would fail installs that are correct.
+    optional=0
+    case "$prog" in -*) optional=1 ;; esac
+    # Strip systemd's prefix characters (-, @, :, +, !), which may be combined,
+    # then take the first word: the executable. Arguments are not our business.
+    while :; do
+      case "$prog" in
+        [-@:+!]*) prog="${prog#?}" ;;
+        *) break ;;
+      esac
+    done
+    prog="${prog%% *}"
+    # Only absolute paths: systemd resolves bare names against its own PATH,
+    # and second-guessing that here would produce false failures.
+    case "$prog" in /*) ;; *) continue ;; esac
+    [ "$optional" = 1 ] && continue
+    [ -x "$prog" ] && continue
+    fail "$name runs a program that is not there:
+  $prog
+  from: $line
+  Provisioning steps have an order - if this is a venv entry point, the venv
+  step has not run yet; if it is a script, check the path in $src."
+  done < <(grep -E '^(ExecStart|ExecStartPre|ExecStartPost|ExecStop|ExecReload)=' <<<"$rendered" || true)
+
+  if render_unit | write_file 0644 "/etc/systemd/system/$name"; then
     systemctl daemon-reload
   fi
 }

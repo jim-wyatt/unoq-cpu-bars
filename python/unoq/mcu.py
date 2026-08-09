@@ -74,7 +74,17 @@ def port_holders(port: str = PORT) -> list[tuple[int, str]]:
     means "nothing I am allowed to see", never "nothing".
     """
     found: list[tuple[int, str]] = []
-    for entry in os.listdir("/proc"):
+    try:
+        pids = os.listdir("/proc")
+    except OSError:
+        # No /proc, or no permission to read it. This function only ever runs
+        # while building the message for an ALREADY failed open, so raising
+        # here would replace a precise "the port is busy, here is who has it"
+        # with an unrelated errno about /proc - losing the diagnosis to the
+        # code that exists to provide it. An empty list is what the docstring
+        # already promises callers to expect.
+        return found
+    for entry in pids:
         if not entry.isdigit():
             continue
         pid = int(entry)
@@ -154,10 +164,20 @@ def open_port(port: str = PORT, baud: int = BAUD, timeout: float = 0.3) -> seria
     # unavoidable without opening the fd ourselves and handing it to pyserial.
     # It is microseconds, against a failure mode that lasts until reboot.
     #
-    # Not fatal if it fails: a tty that will not take TIOCEXCL still works, we
-    # just do not get to exclude tio. Better a working link than a refusal.
-    with contextlib.suppress(OSError):
+    # Tolerate ONLY "this device does not do TIOCEXCL" - a tty that will not
+    # take it still works, we just do not get to exclude tio, and refusing to
+    # talk to the MCU over that would be a bad trade.
+    #
+    # Everything else is re-raised deliberately. Suppressing all OSError here
+    # would mean an EBADF or EPERM silently downgraded us to advisory-only
+    # locking, which is EXACTLY the failure this function exists to end: a lock
+    # that does not lock, with nothing to say so.
+    try:
         fcntl.ioctl(s.fileno(), TIOCEXCL)
+    except OSError as exc:
+        if exc.errno not in (errno.ENOTTY, errno.EINVAL, errno.ENOSYS):
+            s.close()
+            raise
     return s
 
 

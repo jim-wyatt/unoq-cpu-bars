@@ -52,6 +52,9 @@ class _FakePort:
     def fileno(self) -> int:
         return 42
 
+    def close(self) -> None:
+        self.closed = True
+
 
 # --- the happy path --------------------------------------------------------
 
@@ -202,3 +205,48 @@ def test_port_holders_survives_a_process_exiting_mid_scan(
         holders = mcu.port_holders(str(target))
     assert holders
     assert holders[0][1] == "?"
+
+
+def test_an_unexpected_ioctl_error_is_not_swallowed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """EBADF from the TIOCEXCL ioctl means a bug, not an unusual tty. Ignoring
+    it would leave us holding an advisory-only lock believing it was enforced -
+    which is precisely the failure this whole module was changed to end."""
+    port = _FakePort()
+    monkeypatch.setattr(serial, "Serial", lambda *a, **k: port)
+
+    def boom(*a: Any) -> int:
+        raise OSError(errno.EBADF, "bad file descriptor")
+
+    monkeypatch.setattr("unoq.mcu.fcntl.ioctl", boom)
+    with pytest.raises(OSError, match="bad file descriptor"):
+        mcu.open_port("/dev/ttyfake", 115200, 0.3)
+    assert port.closed, "the port was left open after a failed exclusive claim"
+
+
+def test_port_holders_survives_an_unreadable_proc(monkeypatch: pytest.MonkeyPatch) -> None:
+    """This only ever runs while explaining an ALREADY failed open. Raising
+    here would replace "the port is busy, here is who has it" with an
+    unrelated errno about /proc - the diagnosis lost to the code meant to
+    produce it."""
+
+    def no_proc(path: str) -> list[str]:
+        raise PermissionError(errno.EACCES, "nope")
+
+    monkeypatch.setattr("unoq.mcu.os.listdir", no_proc)
+    assert mcu.port_holders("/dev/ttyHS1") == []
+
+
+def test_a_busy_message_is_still_produced_without_proc(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The end-to-end version of the above: a contended open must still raise
+    PortBusy with a usable message when /proc cannot be read at all."""
+
+    def refuse(*a: Any, **k: Any) -> None:
+        raise _serial_exc(errno.EBUSY)
+
+    def no_proc(path: str) -> list[str]:
+        raise PermissionError(errno.EACCES, "nope")
+
+    monkeypatch.setattr(serial, "Serial", refuse)
+    monkeypatch.setattr("unoq.mcu.os.listdir", no_proc)
+    with pytest.raises(mcu.PortBusy, match="flagged exclusive"):
+        mcu.open_port("/dev/ttyfake", 115200, 0.3)

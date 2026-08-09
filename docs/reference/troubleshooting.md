@@ -184,6 +184,41 @@ Something killed the daemon with SIGTERM instead of SIGINT, so the cleanup that
 blanks it never ran. `app matrix off`, or `hpy -c "from unoq import MCU;
 MCU().matrix_off()"`. The systemd unit sets `KillSignal=SIGINT` to avoid this.
 
+**A service fails with `status=203/EXEC` after you move the checkout.**
+A virtualenv is **not relocatable**. Its console scripts carry an absolute
+shebang, so after `mv ~/old-name ~/new-name` the file at the new path still
+begins `#!/home/you/old-name/.venv/bin/python`. systemd reports
+
+```
+Failed at step EXEC spawning .../.venv/bin/unoq-cpu-bars: No such file or directory
+status=203/EXEC
+```
+
+which names the *script*, not the interpreter that is actually missing. **Delete** the venv and
+rebuild it — do not try to repair it in place:
+
+```bash
+rm -rf ~/two-computers-one-board/.venv
+bash  ~/two-computers-one-board/provision/user/40-python-venv.sh
+bash  ~/two-computers-one-board/tools/install-dev-tools.sh    # dev extras
+sudo systemctl restart unoq-cpu-bars unoq-learn
+```
+
+The `rm -rf` is not belt-and-braces. Re-running the install over a moved venv
+fixes only the packages it reinstalls: `uv` sees everything else as already
+present and never rewrites those shebangs. That leaves a venv where `python`
+works and `mypy`, `clang-format` and `mkdocs` all fail with
+
+```
+cannot execute: required file not found
+```
+
+which is `execve` reporting the *interpreter* is missing, not the script.
+
+Re-running the provisioning scripts rewrites the units for the new path;
+`install_unit` now refuses to install a unit whose interpreter is missing, so
+this is caught at provisioning time rather than at the next boot.
+
 **`unoq-cpu-bars: command not found`.**
 The console script only appears after re-running the editable install.
 `python -m unoq.cpubars` works regardless.

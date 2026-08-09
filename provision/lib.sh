@@ -272,12 +272,46 @@ install_unit() {
     # and second-guessing that here would produce false failures.
     case "$prog" in /*) ;; *) continue ;; esac
     [ "$optional" = 1 ] && continue
-    [ -x "$prog" ] && continue
-    fail "$name runs a program that is not there:
+    if [ ! -x "$prog" ]; then
+      fail "$name runs a program that is not there:
   $prog
   from: $line
   Provisioning steps have an order - if this is a venv entry point, the venv
   step has not run yet; if it is a script, check the path in $src."
+    fi
+
+    # AND ITS INTERPRETER, which -x does not tell you about.
+    #
+    # This check was written to prevent 203/EXEC at boot and then failed to,
+    # for exactly this reason. Moving the checkout during the rename left the
+    # venv's console scripts in place - present, executable, and starting
+    # `#!/home/arduino/OLD-PATH/.venv/bin/python`, which no longer existed. The
+    # file passed -x, install_unit was happy, and systemd reported
+    #
+    #   Failed at step EXEC ...: No such file or directory
+    #   status=203/EXEC
+    #
+    # naming the script rather than the interpreter that was actually missing.
+    # A venv is not relocatable; its shebangs are absolute paths.
+    local shebang interp
+    read -r shebang <"$prog" 2>/dev/null || shebang=""
+    case "$shebang" in
+      '#!'*)
+        interp="${shebang#\#!}"
+        interp="${interp#"${interp%%[![:space:]]*}"}"
+        # First word only. `#!/usr/bin/env python3` runs /usr/bin/env, which
+        # resolves python3 from PATH itself - not ours to second-guess.
+        interp="${interp%% *}"
+        [ -x "$interp" ] || fail "$name runs a script whose interpreter is missing:
+  script:      $prog
+  interpreter: $interp
+  from: $line
+  This is what produces 203/EXEC while the script itself looks fine. If the
+  interpreter is under .venv, the checkout has probably moved - a virtualenv
+  is not relocatable, and its shebangs are absolute. Rebuild it:
+    bash $PROJECT/provision/user/40-python-venv.sh"
+        ;;
+    esac
   done < <(grep -E '^(ExecStart|ExecStartPre|ExecStartPost|ExecStop|ExecReload)=' <<<"$rendered" || true)
 
   # Documentation=file: targets, for the same reason as the Exec paths above -

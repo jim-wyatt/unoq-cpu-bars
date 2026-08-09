@@ -25,7 +25,7 @@ set -uo pipefail
 export PATH="$HOME/.local/bin:$PATH"
 
 WS="${ZEPHYR_WORKSPACE:-$HOME/zephyrproject}"
-ZEPHYR_VERSION="${ZEPHYR_VERSION:-v4.4.1}"
+ZEPHYR_VERSION="${ZEPHYR_VERSION:-v4.4.2}"
 PYTHON_VERSION="${WS_PYTHON:-3.13}"
 
 FILTER='-hal_.*,+hal_stm32,+hal_st,-lvgl,-cmsis-dsp,-cmsis-nn,-lora-basics-modem,-loramac-node,-acpica,-hostap,-openthread,-nrf_wifi,-trusted-firmware-m,-trusted-firmware-a,-tf-m-tests,-psa-arch-tests,-nrf_hw_models,-edtt,-net-tools'

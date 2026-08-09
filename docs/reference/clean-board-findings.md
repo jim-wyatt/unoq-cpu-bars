@@ -279,6 +279,34 @@ so stale documentation goes and the ~2 GB of downloads stay.
 Verified afterwards: 27 HTML files on the drive, matching the build exactly, and
 an old flat URL now returns 404.
 
+### 22. Zephyr 4.4.2 is a security release, and the upgrade was uneventful
+
+4.4.1 was superseded on 2026-08-07 by a bugfix release carrying more than ten
+CVEs. Most are in subsystems this firmware does not build - ext2, the HTTP
+server, Bluetooth, Xtensa, network sockets - so the practical exposure was low.
+"We do not think we are affected" is not a reason to stay on a superseded
+release when the upgrade is patch-level, so it was taken.
+
+One is worth noting for its shape rather than its impact: **CVE-2026-10642**, an
+unbounded TX busy-loop DoS in the **PL011** UART driver under CTS hardware flow
+control. This board uses STM32 LPUART, not PL011, so it does not apply - but the
+MPU link does run RTS/CTS, so it is the same class of bug one driver over.
+
+Validated end to end on the board rather than assumed:
+
+| | |
+|---|---|
+| Build | clean, 3m04 |
+| MCU suites | 26 of 26 cases, 2 of 2 configurations |
+| FOTA upload | 86,088 bytes staged |
+| Probation | booted with `confirmed: False`, old image intact in slot 1 |
+| Confirm | slot 0 active and confirmed, slot 1 released |
+| Demo | sweep counter advancing, `unoq-cpu-bars` back up, 0 failed units |
+
+The pin gate did its job in passing: `tools/check-zephyr-pin.sh` had to be
+satisfied in both `provision/user/30-zephyr-workspace.sh` and `west.yml` before
+anything would build.
+
 ## Decisions taken, for the refactor
 
 - **Keep the `10.55.0.0/24` server mode.** It is not legacy; it is what makes

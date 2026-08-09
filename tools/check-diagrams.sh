@@ -36,6 +36,8 @@ PORT="${UNOQ_DIAGRAM_PORT:-8099}"
 # instead of launching one per page, which is a dependency this gate does not
 # currently justify. It is excluded from --fast for that reason.
 BUDGET_MS="${UNOQ_DIAGRAM_BUDGET_MS:-8000}"
+# Wall-clock ceiling per page, so a browser that never exits cannot hang a job.
+PAGE_TIMEOUT="${UNOQ_DIAGRAM_PAGE_TIMEOUT:-45}"
 
 # GitHub's ubuntu runners ship google-chrome; this board has chromium. Try the
 # usual names rather than assuming either.
@@ -50,6 +52,18 @@ if [ -z "$BROWSER" ]; then
   echo "no chromium/chrome on PATH - cannot check whether the diagrams render" >&2
   echo "  install one, or skip this gate with: tools/check.sh python shell c" >&2
   exit 1
+fi
+
+# Build first rather than trusting whatever is on disk. share/learn is generated
+# and gitignored, so switching branches leaves the previous branch's site there -
+# and this gate then reports eleven confident failures about markup that is
+# perfectly fine on the branch you are actually on. Costs ~8s; worth it to make
+# the script mean the same thing standalone as it does inside check.sh.
+if [ -z "${UNOQ_SITE:-}" ]; then
+  "$PROJECT/tools/build-docs.sh" >/dev/null || {
+    echo "tools/build-docs.sh failed - fix that before checking the diagrams" >&2
+    exit 1
+  }
 fi
 
 if [ ! -d "$SITE" ]; then
@@ -82,11 +96,30 @@ while IFS= read -r page; do
   want="$(grep -c 'class="mermaid"' "$SITE/$page")"
   [ "$want" = 0 ] && continue
   checked=$((checked + 1))
-  got="$("$BROWSER" --headless --no-sandbox --disable-gpu \
+  # HARD TIMEOUT, non-negotiable. On a GitHub runner this hung on the very first
+  # page and took the whole job to its fifteen-minute limit with chrome still
+  # alive. A gate that can hang is worse than no gate: it turns an unrelated
+  # pull request into a fifteen-minute wait and a red tick, for no information.
+  #
+  # --headless=old because --dump-dom belongs to the OLD headless mode. Chrome's
+  # new headless (the default for plain --headless since 112) is the most likely
+  # reason it hung, and the board's older chromium is why it worked here.
+  #
+  # --disable-dev-shm-usage because CI containers give /dev/shm 64 MB, where
+  # chrome deadlocks rather than failing.
+  got="$(timeout "$PAGE_TIMEOUT" "$BROWSER" \
+    --headless=old --no-sandbox --disable-gpu --disable-dev-shm-usage \
+    --no-first-run --disable-extensions --disable-background-networking \
     --user-data-dir="$PROFILE" \
     --virtual-time-budget="$BUDGET_MS" \
     --dump-dom "http://127.0.0.1:$PORT/$page" 2>/dev/null |
     grep -c 'data-processed="true"')"
+  if [ -z "$got" ]; then
+    printf '  FAIL  %-46s the browser produced nothing (timed out after %ss?)\n' \
+      "$page" "$PAGE_TIMEOUT"
+    fail=1
+    continue
+  fi
   total=$((total + got))
   if [ "$got" != "$want" ]; then
     printf '  FAIL  %-46s %s of %s diagrams drew\n' "$page" "$got" "$want"

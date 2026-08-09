@@ -2,23 +2,27 @@
 # SPDX-License-Identifier: MIT
 [Unit]
 Description=Show the Arduino UNO Q link state on the board LEDs
-Documentation=file:/home/arduino/hybrid/usb/leds.sh
+Documentation=file:/home/arduino/hybrid/status/leds.sh
 
 # Ordering only, and deliberately weak. The whole point of these LEDs is to say
 # something useful when the rest of the stack has NOT come up, so this must not
 # wait for, or depend on, any of it.
+#
+# unoq-usb-gadget may not even be installed - the gadget is opt-in and the LEDs
+# are not. `After=` a unit that does not exist is not an error; it simply orders
+# against nothing, which is the correct behaviour here.
 After=unoq-usb-gadget.service
 
 [Service]
 Type=simple
 EnvironmentFile=-/etc/default/unoq-usb
-ExecStart=/home/arduino/hybrid/usb/leds.sh run
+ExecStart=/home/arduino/hybrid/status/leds.sh run
 
 # ExecStopPost rather than relying on the SIGTERM trap alone: a service killed
 # with SIGKILL never runs its trap, and a board left glowing "link up" after the
 # thing that checks the link has died is exactly the confidently-wrong state
 # these LEDs exist to avoid.
-ExecStopPost=/home/arduino/hybrid/usb/leds.sh off
+ExecStopPost=/home/arduino/hybrid/status/leds.sh off
 
 # It reads sysfs and pings; if it dies, it should come back rather than leave
 # the board with no status at all.

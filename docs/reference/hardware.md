@@ -201,7 +201,7 @@ you must sample `/sys/block/mmcblk0/stat` yourself - that counter does move.
 
 ### What this project shows on them
 
-`usb/leds.sh` (Linux) and `mcu/app/src/status_leds.c` (firmware):
+`status/leds.sh` (Linux) and `mcu/app/src/status_leds.c` (firmware):
 
 | | LED 1 | LED 2 | LED 3 | LED 4 |
 |---|---|---|---|---|
@@ -216,7 +216,7 @@ twice a second forever and mean nothing. The tick stopping is the news, and it
 is news Linux cannot deliver, because a host that has stopped talking cannot
 report that it stopped.
 
-`~/hybrid/usb/leds.sh explain` prints the current scheme; `... test` cycles the
+`~/hybrid/status/leds.sh explain` prints the current scheme; `... test` cycles the
 colours so you can learn which physical LED is which.
 
 ## How the MPU flashes the MCU

@@ -139,7 +139,7 @@ trigger that fires. `/sys/block/mmcblk0/stat` does move, and is checkable.
 **17.** The firmware called `boot_is_img_confirmed()` once, in `main()`.
 Confirming happens over SMP long afterwards, so LED 3 stayed yellow through a
 successful confirm — showing something that *had* been true. This is exactly the
-failure `usb/leds.sh` was written to avoid ("a stale LED is worse than a dark
+failure `status/leds.sh` was written to avoid ("a stale LED is worse than a dark
 one, because it is confidently wrong"), reintroduced in C two files away. Having
 the principle written down did not stop it; **watching the board did.**
 

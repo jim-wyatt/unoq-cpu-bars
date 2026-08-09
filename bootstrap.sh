@@ -153,6 +153,9 @@ run_step "u50 shell env + git hook" user "$PROJECT/provision/user/50-shell-env.s
 
 # 30 needs the venv from u40 to verify the GPIO lines, so it runs after it.
 run_step "30  MCU link GPIOs (root)" sudo "$PROJECT/provision/30-mcu-link.sh"
+# Unconditional, deliberately: these are the board's only output when the
+# network is down and nobody can log in, so they must not depend on an extra.
+run_step "35  status LEDs (root)" sudo "$PROJECT/provision/35-status-leds.sh"
 
 [ "$WITH_PURGE" = 1 ] &&
   run_step "40  purge Arduino packages (root)" sudo "$PROJECT/provision/40-purge-arduino.sh"

@@ -168,13 +168,13 @@ correct themselves instead of remembering something that stopped being true.
 What the colours mean, from the board itself:
 
 ```bash
-~/hybrid/usb/leds.sh explain
+~/hybrid/status/leds.sh explain
 ```
 
 Learn them by watching them cycle:
 
 ```bash
-sudo ~/hybrid/usb/leds.sh test
+sudo ~/hybrid/status/leds.sh test
 ```
 
 Now make LED 2 tell the truth about a real failure. Break something on purpose:
@@ -198,7 +198,7 @@ talking to the MCU for five seconds and watch it go red, then come back.
 > LED table and which package each sysfs entry belongs to. The kernel's
 > [LED class documentation](https://docs.kernel.org/leds/leds-class.html)
 > explains what a *trigger* is and what those three inert ones were supposed to
-> do. `usb/leds.sh` and `mcu/app/src/status_leds.c` are both commented with the
+> do. `status/leds.sh` and `mcu/app/src/status_leds.c` are both commented with the
 > reasoning above.
 
 ## Check yourself

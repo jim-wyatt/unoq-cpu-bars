@@ -23,11 +23,15 @@ class FakeMCU:
 
     def __init__(self) -> None:
         self.frames: list[list[int]] = []
+        self.io_calls: list[bool] = []
         self.off = 0
         self.closed = False
 
     def bars(self, pct: Any) -> None:
         self.frames.append(list(pct))
+
+    def io(self, busy: bool) -> None:
+        self.io_calls.append(busy)
 
     def matrix_off(self) -> None:
         self.off += 1
@@ -197,3 +201,37 @@ def test_main_says_so_when_there_are_more_cores_than_bars(
 
 def main_with(wired: dict[str, Any], argv: list[str]) -> int:
     return cpubars.main([*argv, "--stat", wired["stat"]])
+
+
+# --- disk activity forwarding ------------------------------------------------
+
+
+class FakeIo:
+    """Returns a scripted busy/idle sequence, then repeats the last value."""
+
+    def __init__(self, seq: list[bool]) -> None:
+        self._seq = list(seq)
+        self._last = False
+
+    def busy(self) -> bool:
+        if self._seq:
+            self._last = self._seq.pop(0)
+        return self._last
+
+
+def test_io_is_sent_only_when_it_changes() -> None:
+    # The MCU holds the last value, so re-sending it every frame would be
+    # hundreds of pointless commands a minute down a deliberately quiet link.
+    mcu = FakeMCU()
+    io = FakeIo([False, True, True, True, False])
+    cpubars.run(mcu, FakeSampler([[1]] * 5), interval=0, count=5, sleep=lambda _s: None, io=io)
+    # The leading False is deliberate, not an off-by-one: the runner does not
+    # know what the MCU currently shows, so the first sample is always sent to
+    # establish it. After that, only changes.
+    assert mcu.io_calls == [False, True, False]
+
+
+def test_io_absent_sends_nothing() -> None:
+    mcu = FakeMCU()
+    cpubars.run(mcu, FakeSampler([[1]] * 3), interval=0, count=3, sleep=lambda _s: None)
+    assert mcu.io_calls == []

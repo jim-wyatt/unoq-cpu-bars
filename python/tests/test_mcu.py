@@ -230,3 +230,12 @@ def test_cmd_reassembles_a_reply_that_arrives_in_pieces(mcu_factory: Any) -> Non
 def test_cmd_handles_a_shell_that_does_not_echo(mcu_factory: Any) -> None:
     mcu = mcu_factory({"app status": ["uptime_ms=7"]}, echo=False)
     assert mcu.cmd("app status") == ["uptime_ms=7"]
+
+
+def test_io_sends_the_flag_as_one_or_zero(mcu_factory: Any) -> None:
+    # LED 4 lives on the MCU because Linux cannot show eMMC activity itself -
+    # the kernel's disk triggers are offered on this board and never fire.
+    mcu = mcu_factory({"app io 1": ["ok io=1"], "app io 0": ["ok io=0"]})
+    mcu.io(True)
+    mcu.io(False)
+    assert mcu._s.written == ["app io 1", "app io 0"]

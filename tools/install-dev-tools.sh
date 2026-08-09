@@ -122,21 +122,25 @@ if [ "$have" = "$BATS_VERSION" ]; then
 else
   [ -n "$have" ] &&
     echo "  found $have on PATH, installing $BATS_VERSION over it (CI and local must match)"
-  tmp="$(mktemp -d)"
-  if curl -fsSL "https://github.com/bats-core/bats-core/archive/refs/tags/v${BATS_VERSION}.tar.gz" |
-    tar -xz -C "$tmp" 2>/dev/null; then
-    # install.sh lays out bin/ and libexec/ under the prefix; $BIN is
-    # $prefix/bin, so hand it the parent.
-    "$tmp/bats-core-${BATS_VERSION}/install.sh" "$(dirname "$BIN")" >/dev/null || {
-      echo "  could not install bats v$BATS_VERSION" >&2
-      rm -rf "$tmp"
-      exit 1
-    }
-  else
-    echo "  could not download bats v$BATS_VERSION" >&2
+  tmp=$(mktemp -d)
+  # tar's stderr is NOT silenced, deliberately and like the shellcheck block
+  # above: a truncated or corrupt download fails inside tar, and hiding that
+  # message leaves "could not download bats" as the only clue to an extraction
+  # problem. -f on curl so an HTTP error page is an error rather than something
+  # tar is asked to unpack.
+  curl -fsSL "https://github.com/bats-core/bats-core/archive/refs/tags/v${BATS_VERSION}.tar.gz" |
+    tar -xz -C "$tmp" || {
     rm -rf "$tmp"
+    echo "  could not download or unpack bats v$BATS_VERSION" >&2
     exit 1
-  fi
+  }
+  # install.sh lays out bin/ and libexec/ under the prefix; $BIN is $prefix/bin,
+  # so hand it the parent.
+  "$tmp/bats-core-${BATS_VERSION}/install.sh" "$(dirname "$BIN")" >/dev/null || {
+    rm -rf "$tmp"
+    echo "  could not install bats v$BATS_VERSION into $(dirname "$BIN")" >&2
+    exit 1
+  }
   rm -rf "$tmp"
   echo "  installed $("$BIN/bats" --version)"
 fi

@@ -12,6 +12,28 @@ The UNO Q is two computers sharing a board.
 Most Arduino-header GPIO is wired to the **MCU**, not the MPU. The MPU has its
 own separate GPIO / I²C / SPI — that is what [`unoq`](mpu.md) talks to.
 
+```mermaid
+flowchart TB
+  subgraph MPU["QRB2210 — Debian Linux"]
+    U["USB-C<br/><small>device only</small>"]
+    W["wifi / BT"]
+    E["eMMC 29 GB"]
+    L12["LED 1 · LED 2<br/><small>/sys/class/leds</small>"]
+  end
+  subgraph MCU["STM32U585 — Zephyr"]
+    M["8×13 LED matrix<br/><small>PF0..PF10</small>"]
+    L34["LED 3 · LED 4"]
+    H["Arduino headers<br/><small>GPIO, I²C, SPI</small>"]
+  end
+  MPU ---|"lpuart1 → /dev/ttyHS1<br/><small>115200</small>"| MCU
+  MPU ---|"gpio 37 BOOT0 · gpio 38 NRST"| MCU
+  MPU ---|"gpio 25/26 SWD"| MCU
+```
+
+Every line between the two boxes is one this project drives, and getting any of
+them wrong makes a working board look broken. They are the subject of the next
+section.
+
 ---
 
 ## The two GPIOs nobody documents
@@ -229,6 +251,11 @@ predates the libgpiod v2 support this board needs.
 0x08078000  slot1           416K   staged update
 0x080e0000  storage         128K   NVS (settings, boot counter)
 ```
+
+Two 416K slots out of 2 MB of flash, which is why
+[the MCU is 96% empty](https://github.com/jim-wyatt/unoq-cpu-bars/issues/12) is
+an open question rather than a boast — the part has two banks and this layout
+uses one.
 
 Images link at `0x08010000` and must be **signed** — MCUboot refuses a raw
 image. See [mcu.md](mcu.md).

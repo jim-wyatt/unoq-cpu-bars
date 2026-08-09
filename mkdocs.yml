@@ -220,6 +220,9 @@ nav:
           - learn/from-factory-to-this.md
           - learn/make-it-yours.md
   - Reference:
+      # navigation.indexes makes this the Reference tab's own landing page
+      # rather than an entry in its list.
+      - reference/index.md
       - reference/hardware.md
       - reference/mpu.md
       - reference/mcu.md

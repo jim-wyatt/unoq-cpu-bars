@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 # The Zephyr workspace (~3.3 GB). Runs as YOU, not root. This is the long one.
 #
-#   bash ~/hybrid/provision/user/30-zephyr-workspace.sh
+#   bash ~/two-computers-one-board/provision/user/30-zephyr-workspace.sh
 #
 # Idempotent: an existing workspace at the right version is left alone.
 #

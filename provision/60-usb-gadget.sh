@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 # IP over USB, plus the fileshare drive, when the board is plugged into a PC.
 #
-#   sudo bash ~/hybrid/provision/60-usb-gadget.sh
+#   sudo bash ~/two-computers-one-board/provision/60-usb-gadget.sh
 #
 # Idempotent, and safe to run over SSH: it does NOT change the USB role. On
 # this board it cannot - dwc3 is dr_mode="otg" with no writable role switch,

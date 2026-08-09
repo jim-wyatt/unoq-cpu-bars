@@ -142,7 +142,7 @@ Stop the service, and run the same program by hand so you can see its output:
 
 ```bash
 sudo systemctl stop unoq-cpu-bars
-cd ~/hybrid
+cd ~/two-computers-one-board
 ./.venv/bin/unoq-cpu-bars --count 20 --interval 0.2
 sudo systemctl start unoq-cpu-bars
 ```

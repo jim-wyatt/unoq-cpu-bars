@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: MIT
 # Rebuild the OpenOCD that flashes this board's MCU, from source.
 #
-#   sudo bash ~/hybrid/tools/build-openocd.sh              # build + self-test
-#   sudo bash ~/hybrid/tools/build-openocd.sh --promote    # ...and replace /opt/openocd
+#   sudo bash ~/two-computers-one-board/tools/build-openocd.sh              # build + self-test
+#   sudo bash ~/two-computers-one-board/tools/build-openocd.sh --promote    # ...and replace /opt/openocd
 #
 # WHY
 # ---
@@ -93,7 +93,7 @@ echo "== 6/6 self-test: can it reach the MCU over SWD? =="
 # BOOT0 / link-enable must be sane first, or this proves nothing. Derived from
 # $HERE and $SUDO_USER rather than hardcoded: this runs under sudo, so
 # SUDO_USER is the invoking account - the one that is in the `gpiod` group.
-# Hardcoding both meant a checkout anywhere but /home/arduino/hybrid silently
+# Hardcoding both meant a checkout anywhere but /home/arduino/two-computers-one-board silently
 # self-tested with BOOT0 unset (the `|| true` hides it) and failed confusingly.
 LINK_UP="$HERE/../mcu/link-up.sh"
 sudo -u "${SUDO_USER:-$(stat -c %U "$HERE")}" "$LINK_UP" || true
@@ -116,7 +116,7 @@ if [ "$PROMOTE" = "1" ]; then
   [ -d /opt/openocd ] && mv /opt/openocd "/opt/openocd.$STAMP"
   cp -a "$PREFIX" /opt/openocd
   echo "done. Previous install kept at /opt/openocd.$STAMP"
-  echo "Verify:  ~/hybrid/mcu/flash.sh ~/zephyrproject/build/zephyr/zephyr.signed.hex"
+  echo "Verify:  ~/two-computers-one-board/mcu/flash.sh ~/zephyrproject/build/zephyr/zephyr.signed.hex"
 else
   echo "Built and verified at $PREFIX (nothing replaced)."
   echo "To use it in place of the unpackaged one:"

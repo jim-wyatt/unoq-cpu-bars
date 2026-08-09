@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 # The whole USB gadget picture, in one command.
 #
-#   ~/hybrid/usb/status.sh
+#   ~/two-computers-one-board/usb/status.sh
 #
 # WHY THIS EXISTS
 # ---------------

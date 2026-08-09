@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 [Unit]
 Description=Bind the Arduino UNO Q USB gadget to the controller that just appeared
-Documentation=file:/home/arduino/hybrid/docs/usb.md
+Documentation=file:/home/arduino/two-computers-one-board/docs/reference/usb.md
 
 # Started by udev (99-unoq-usb-gadget.rules) when a UDC or a gadget netdev
 # appears - that is, when someone plugs the board into a computer.
@@ -38,10 +38,10 @@ EnvironmentFile=-/etc/default/unoq-usb
 # Refuses once the board has tried and failed to survive a bind several times
 # over, which is the only thing that stops a brownout loop being permanent.
 # See bind-guard.sh for why that loop has no ssh window in it.
-ExecStartPre=/home/arduino/hybrid/usb/bind-guard.sh check
+ExecStartPre=/home/arduino/two-computers-one-board/usb/bind-guard.sh check
 
-ExecStart=/home/arduino/hybrid/usb/gadget-up.sh
-ExecStart=/home/arduino/hybrid/usb/usb-net-up.sh
+ExecStart=/home/arduino/two-computers-one-board/usb/gadget-up.sh
+ExecStart=/home/arduino/two-computers-one-board/usb/usb-net-up.sh
 
 # No ExecStop: unbinding is unoq-usb-gadget.service's job, so that pulling the
 # cable (which removes the UDC and stops this unit) does not tear down the

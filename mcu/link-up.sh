@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 # Bring up the MPU <-> MCU hardware link on the Arduino UNO Q.
 #
-#   ~/hybrid/mcu/link-up.sh
+#   ~/two-computers-one-board/mcu/link-up.sh
 #
 # WHY THIS EXISTS
 # ---------------

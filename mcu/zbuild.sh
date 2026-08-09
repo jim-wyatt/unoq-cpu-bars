@@ -4,7 +4,7 @@
 # Build a Zephyr application for the Arduino UNO Q (STM32U585) with west.
 #
 #   ./zbuild.sh samples/hello_world             # build a Zephyr sample
-#   ./zbuild.sh ~/hybrid/mcu/app                # build your own app
+#   ./zbuild.sh ~/two-computers-one-board/mcu/app                # build your own app
 #   ./zbuild.sh samples/hello_world -p          # pristine rebuild
 #
 # Afterwards:
@@ -98,12 +98,12 @@ if [ -f "$BUILD/zephyr/zephyr.signed.hex" ]; then
   # but has no image header, so the bootloader will refuse to boot it.
   ls -la "$BUILD/zephyr/zephyr.signed.hex" "$BUILD/zephyr/zephyr.signed.bin" 2>/dev/null || true
   echo
-  echo "flash over SWD :  ~/hybrid/mcu/flash.sh $BUILD/zephyr/zephyr.signed.hex"
+  echo "flash over SWD :  ~/two-computers-one-board/mcu/flash.sh $BUILD/zephyr/zephyr.signed.hex"
   echo "update over UART:  python -c \"from unoq import fota; \\"
   echo "                     fota.upload('$BUILD/zephyr/zephyr.signed.bin'); \\"
   echo "                     fota.test(); fota.reset()\"   # then fota.confirm()"
 else
   ls -la "$BUILD/zephyr/zephyr.hex" "$BUILD/zephyr/zephyr.bin" 2>/dev/null || true
   echo
-  echo "flash it:  ~/hybrid/mcu/flash.sh $BUILD/zephyr/zephyr.hex"
+  echo "flash it:  ~/two-computers-one-board/mcu/flash.sh $BUILD/zephyr/zephyr.hex"
 fi

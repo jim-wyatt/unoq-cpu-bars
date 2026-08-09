@@ -3,11 +3,11 @@
 # SPDX-License-Identifier: MIT
 # Drive the two RGB LEDs Linux owns: connectivity, and whether anything failed.
 #
-#   sudo ~/hybrid/status/leds.sh once     # sample, set, exit
-#   sudo ~/hybrid/status/leds.sh run      # loop forever - what the service runs
-#   sudo ~/hybrid/status/leds.sh off      # dark, kernel triggers handed back
-#   sudo ~/hybrid/status/leds.sh test     # cycle the colours, to learn them
-#   ~/hybrid/status/leds.sh explain       # what the colours mean, no root needed
+#   sudo ~/two-computers-one-board/status/leds.sh once     # sample, set, exit
+#   sudo ~/two-computers-one-board/status/leds.sh run      # loop forever - what the service runs
+#   sudo ~/two-computers-one-board/status/leds.sh off      # dark, kernel triggers handed back
+#   sudo ~/two-computers-one-board/status/leds.sh test     # cycle the colours, to learn them
+#   ~/two-computers-one-board/status/leds.sh explain       # what the colours mean, no root needed
 #
 # WHY
 # ---

@@ -3,10 +3,10 @@
 # SPDX-License-Identifier: MIT
 # Run every quality gate in the project. This is what CI runs.
 #
-#   ~/hybrid/tools/check.sh              # everything
-#   ~/hybrid/tools/check.sh --fix        # reformat in place, then check
-#   ~/hybrid/tools/check.sh --fast       # skip the slow ones (MCU build, diagrams)
-#   ~/hybrid/tools/check.sh python       # one area: python | shell | c | docs | diagrams | mcu
+#   ~/two-computers-one-board/tools/check.sh              # everything
+#   ~/two-computers-one-board/tools/check.sh --fix        # reformat in place, then check
+#   ~/two-computers-one-board/tools/check.sh --fast       # skip the slow ones (MCU build, diagrams)
+#   ~/two-computers-one-board/tools/check.sh python       # one area: python | shell | c | docs | diagrams | mcu
 #
 # Every gate runs even if an earlier one fails, so one pass shows you all the
 # work rather than the first thing to break. Exit status is non-zero if any

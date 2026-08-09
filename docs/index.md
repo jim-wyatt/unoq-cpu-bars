@@ -16,7 +16,7 @@ This is a course in making them cooperate — written for someone who can progra
 and has never done embedded development.
 
 [Start the course](learn/start-here.md){ .md-button .md-button--primary }
-[Set up a board](https://github.com/jim-wyatt/unoq-cpu-bars#readme){ .md-button }
+[Set up a board](https://github.com/jim-wyatt/two-computers-one-board#readme){ .md-button }
 [Browse the reference](reference/hardware.md){ .md-button }
 
 </div>
@@ -161,7 +161,7 @@ that were wrong the first time.
     Every script, sketch and test, MIT licensed. The provisioning is the
     project: you should be able to reproduce this board from a factory reset.
 
-    [:octicons-arrow-right-24: On GitHub](https://github.com/jim-wyatt/unoq-cpu-bars)
+    [:octicons-arrow-right-24: On GitHub](https://github.com/jim-wyatt/two-computers-one-board)
 
 </div>
 

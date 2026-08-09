@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Jim Wyatt
 // SPDX-License-Identifier: MIT
 {
-  // Workspace settings for ~/hybrid. Machine-scoped settings in
+  // Workspace settings for ~/two-computers-one-board. Machine-scoped settings in
   // ~/.vscode-server/data/Machine/settings.json cover the board-wide tuning;
   // these are the bits specific to this project.
 

@@ -96,7 +96,7 @@ Now ask the *other* one. This talks over a wire to the microcontroller and asks
 it how it is doing:
 
 ```bash
-cd ~/hybrid
+cd ~/two-computers-one-board
 ./.venv/bin/python -c "
 from unoq import MCU
 with MCU() as mcu:

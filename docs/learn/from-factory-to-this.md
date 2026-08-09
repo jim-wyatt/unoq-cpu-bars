@@ -60,7 +60,7 @@ fi
 ```
 
 That shape is everywhere, which is why the shared primitives in
-[`provision/lib.sh`](https://github.com/jim-wyatt/unoq-cpu-bars/blob/main/provision/lib.sh)
+[`provision/lib.sh`](https://github.com/jim-wyatt/two-computers-one-board/blob/main/provision/lib.sh)
 exist — `write_file`, `install_unit`, `disable_unit`, `apt_install`,
 `ensure_group` — each of which is the idempotent version of something the shell
 does not offer idempotently.
@@ -180,7 +180,7 @@ You almost certainly do not want to re-provision a working board right now. Read
 one instead — they are written to be read:
 
 ```bash
-less ~/hybrid/provision/60-usb-gadget.sh
+less ~/two-computers-one-board/provision/60-usb-gadget.sh
 ```
 
 Look for four things: the `REVERT:` line at the top, the `step` headings, an
@@ -190,7 +190,7 @@ than restating the code.
 Then see what a second run looks like on something small and safe:
 
 ```bash
-sudo bash ~/hybrid/provision/30-mcu-link.sh
+sudo bash ~/two-computers-one-board/provision/30-mcu-link.sh
 ```
 
 It should be almost entirely `skip`. That wall of "already correct" is

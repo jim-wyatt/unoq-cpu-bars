@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 # Audit every toolchain dependency against what is currently released.
 #
-#   ~/hybrid/tools/check-versions.sh
+#   ~/two-computers-one-board/tools/check-versions.sh
 #
 # Extension auto-update is deliberately OFF on this board (it caused background
 # churn on 3.6 GiB of RAM), so nothing here updates itself. Run this now and
@@ -24,6 +24,13 @@
 #                     bump reports "not found", that build has no linux-arm64
 #                     package and you already have the newest usable one.
 set -uo pipefail
+
+# Derived from this file's location, like every other script here. It used to
+# name $HOME/hybrid literally in two places, which only ever worked because a
+# ~/hybrid symlink happened to exist on the board it was written on - the exact
+# bug recorded as finding 6 in docs/reference/clean-board-findings.md, fixed in
+# env.sh at the time and missed here.
+PROJECT="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)"
 export PATH="$HOME/.local/bin:$PATH"
 
 gh_latest() { curl -sL "https://api.github.com/repos/$1/releases/latest" 2>/dev/null |
@@ -55,8 +62,8 @@ for p in uv cmake ninja west; do
   printf '  %-8s %-14s latest %s%s\n' "$p" "${cur:-?}" "${new:-?}" "$flag"
 done
 
-echo "=== MPU python (~/hybrid/.venv) ==="
-uv pip list --python "$HOME/hybrid/.venv/bin/python" --outdated 2>/dev/null | tail -n +3 |
+echo "=== MPU python ($PROJECT/.venv) ==="
+uv pip list --python "$PROJECT/.venv/bin/python" --outdated 2>/dev/null | tail -n +3 |
   sed 's/^/  /' || true
 echo "  (cbor2 / pydantic-core here are PINNED - see header, do not upgrade)"
 
@@ -119,7 +126,7 @@ PY
 
 echo "=== OpenOCD ==="
 printf '  installed  %s\n' "$(/opt/openocd/bin/openocd --version 2>&1 | head -1 | cut -d' ' -f1-4)"
-printf '  pinned in build-openocd.sh: %s\n' "$(grep -oP 'OPENOCD_COMMIT:-\K[0-9a-f]+' "$HOME/hybrid/tools/build-openocd.sh" 2>/dev/null)"
+printf '  pinned in build-openocd.sh: %s\n' "$(grep -oP 'OPENOCD_COMMIT:-\K[0-9a-f]+' "$PROJECT/tools/build-openocd.sh" 2>/dev/null)"
 printf '  upstream master head:       %s\n' \
   "$(curl -sL https://api.github.com/repos/openocd-org/openocd/commits/master 2>/dev/null |
     python3 -c "import json,sys;d=json.load(sys.stdin);print(d['sha'][:12], d['commit']['committer']['date'][:10])" 2>/dev/null)"

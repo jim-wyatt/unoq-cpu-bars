@@ -5,7 +5,7 @@
 # after a reboot: BOOT0 floats and the STM32 runs its ROM bootloader instead of
 # your firmware.
 #
-#   sudo bash ~/hybrid/provision/30-mcu-link.sh
+#   sudo bash ~/two-computers-one-board/provision/30-mcu-link.sh
 #
 # Idempotent.
 set -uo pipefail

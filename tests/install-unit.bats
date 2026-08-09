@@ -10,8 +10,8 @@
 # could not run, and reads the same as a permissions problem. Two ways to get
 # there:
 #
-#   1. The path spelled some way sed does not know. `~/hybrid` and
-#      `$HOME/hybrid` look equivalent to /home/arduino/hybrid and are not:
+#   1. The path spelled some way sed does not know. `~/two-computers-one-board` and
+#      `$HOME/two-computers-one-board` look equivalent to /home/arduino/two-computers-one-board and are not:
 #      systemd expands neither, and passes them to execve() literally.
 #
 #   2. A path that is simply not there yet, because provisioning steps have an
@@ -23,6 +23,12 @@
 # asserted "no placeholder remains after substitution", which sounds sensible
 # and is impossible - sed replaces it wherever it appears. Test 6 is what is
 # left of that: it pins the actual behaviour instead.
+
+# The literal that provision/lib.sh substitutes. These must agree: when the
+# repository was renamed, this file was (deliberately) left out of the sweep
+# and three tests failed immediately - which is the suite doing its job, but
+# the next person should not have to rediscover why.
+PLACEHOLDER="/home/arduino/two-computers-one-board"
 
 setup() {
   load helpers/stub
@@ -104,18 +110,18 @@ unit() {
 
 @test "the project path is substituted into ExecStart" {
   load_lib "$BATS_TEST_TMPDIR"
-  src="$(unit ok "[Service]" "ExecStart=/home/arduino/hybrid/bin/thing")"
+  src="$(unit ok "[Service]" "ExecStart=/home/arduino/two-computers-one-board/bin/thing")"
   run install_unit "$src"
   [ "$status" -eq 0 ]
   run cat "$ETC/etc/systemd/system/ok.service"
   [[ "$output" == *"ExecStart=$BATS_TEST_TMPDIR/bin/thing"* ]]
-  [[ "$output" != *"/home/arduino/hybrid"* ]]
+  [[ "$output" != *"/home/arduino/two-computers-one-board"* ]]
 }
 
 @test "User and Group are substituted" {
   load_lib "$BATS_TEST_TMPDIR" "operator"
   src="$(unit u "[Service]" "User=arduino" "Group=arduino" \
-    "ExecStart=/home/arduino/hybrid/bin/thing")"
+    "ExecStart=/home/arduino/two-computers-one-board/bin/thing")"
   run install_unit "$src"
   [ "$status" -eq 0 ]
   run cat "$ETC/etc/systemd/system/u.service"
@@ -126,11 +132,11 @@ unit() {
 # --- the placeholder that looks real ---------------------------------------
 
 @test "a tilde path is rejected, because systemd will not expand it" {
-  # ~/hybrid reads as equivalent to /home/arduino/hybrid and is not: sed does
+  # ~/two-computers-one-board reads as equivalent to /home/arduino/two-computers-one-board and is not: sed does
   # not know that spelling, and systemd passes it to execve() literally. The
   # unit then fails at boot with 203/EXEC, naming the unit but not the path.
   load_lib "$BATS_TEST_TMPDIR"
-  src="$(unit tilde "[Service]" "ExecStart=~/hybrid/bin/thing")"
+  src="$(unit tilde "[Service]" "ExecStart=~/two-computers-one-board/bin/thing")"
   run install_unit "$src"
   [ "$status" -ne 0 ]
   [[ "$output" == *"will not expand"* ]]
@@ -139,7 +145,7 @@ unit() {
 @test "\$HOME is rejected for the same reason" {
   load_lib "$BATS_TEST_TMPDIR"
   src="$(unit home "[Service]" "ExecStart=$BIN/thing" \
-    "Environment=EXTRA=\$HOME/hybrid/share")"
+    "Environment=EXTRA=\$HOME/two-computers-one-board/share")"
   run install_unit "$src"
   [ "$status" -ne 0 ]
   [[ "$output" == *"will not expand"* ]]
@@ -147,7 +153,7 @@ unit() {
 
 @test "nothing is written when a unit is rejected" {
   load_lib "$BATS_TEST_TMPDIR"
-  src="$(unit nowrite "[Service]" "ExecStart=~/hybrid/nope")"
+  src="$(unit nowrite "[Service]" "ExecStart=~/two-computers-one-board/nope")"
   run install_unit "$src"
   [ "$status" -ne 0 ]
   [ ! -f "$ETC/etc/systemd/system/nowrite.service" ]
@@ -159,7 +165,7 @@ unit() {
   # writing this test is what showed it was dead code.
   load_lib "$BATS_TEST_TMPDIR"
   src="$(unit env "[Service]" "ExecStart=$BIN/thing" \
-    "Environment=EXTRA=/home/arduino/hybrid/share")"
+    "Environment=EXTRA=/home/arduino/two-computers-one-board/share")"
   run install_unit "$src"
   [ "$status" -eq 0 ]
   run cat "$ETC/etc/systemd/system/env.service"
@@ -317,4 +323,40 @@ unit() {
   run install_unit "$src"
   [ "$status" -ne 0 ]
   [[ "$output" == *"no [Section] header"* ]]
+}
+
+# --- Documentation= ---------------------------------------------------------
+
+@test "a Documentation=file: target that does not exist is caught" {
+  # These fail SILENTLY in production: nothing reads them until a person runs
+  # `systemctl status` and follows the link. Two units shipped for weeks
+  # pointing at docs/usb.md and docs/mpu.md after the docs moved under
+  # reference/, and nothing anywhere noticed.
+  load_lib "$BATS_TEST_TMPDIR"
+  src="$(unit doc "[Unit]" "Documentation=file:$BATS_TEST_TMPDIR/gone.md" \
+    "[Service]" "ExecStart=$BIN/thing")"
+  run install_unit "$src"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"documents itself with a file that is not there"* ]]
+}
+
+@test "http and man Documentation entries are left alone" {
+  # Not ours to verify, and checking them would make provisioning need the
+  # network - which is the one thing this board's whole design avoids.
+  load_lib "$BATS_TEST_TMPDIR"
+  src="$(unit docurl "[Unit]" \
+    "Documentation=https://example.invalid/x man:systemd(1)" \
+    "[Service]" "ExecStart=$BIN/thing")"
+  run install_unit "$src"
+  [ "$status" -eq 0 ]
+}
+
+@test "several Documentation entries on one line are all checked" {
+  load_lib "$BATS_TEST_TMPDIR"
+  src="$(unit docmulti "[Unit]" \
+    "Documentation=file:$BIN/thing file:$BATS_TEST_TMPDIR/gone.md" \
+    "[Service]" "ExecStart=$BIN/thing")"
+  run install_unit "$src"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"gone.md"* ]]
 }

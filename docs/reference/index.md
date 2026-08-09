@@ -72,16 +72,16 @@ are where you come back to check a number.
 
 ## The commands that matter
 
-Everything below assumes `source ~/hybrid/env.sh`, which `~/.bashrc` already
+Everything below assumes `source ~/two-computers-one-board/env.sh`, which `~/.bashrc` already
 does.
 
 ### Firmware
 
 ```bash
-zbuild ~/hybrid/mcu/app                  # build + auto-sign for MCUboot
+zbuild ~/two-computers-one-board/mcu/app                  # build + auto-sign for MCUboot
 zflash ~/zephyrproject/build/zephyr/zephyr.signed.hex
 mcucon                                   # watch the MCU console (Ctrl-t q to leave)
-~/hybrid/mcu/ztest.sh                    # firmware tests, on the host
+~/two-computers-one-board/mcu/ztest.sh                    # firmware tests, on the host
 ```
 
 ### Talking to the MCU from Python
@@ -101,8 +101,8 @@ with MCU() as mcu:
 ### The board's own state
 
 ```bash
-~/hybrid/usb/status.sh                   # the whole USB picture in one read
-~/hybrid/status/leds.sh explain             # what the LED colours mean
+~/two-computers-one-board/usb/status.sh                   # the whole USB picture in one read
+~/two-computers-one-board/status/leds.sh explain             # what the LED colours mean
 systemctl --failed                       # what needs a human
 journalctl -u unoq-cpu-bars -n 50        # or any other unit
 ```

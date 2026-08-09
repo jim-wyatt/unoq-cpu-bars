@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 # The Zephyr SDK (arm-zephyr-eabi toolchain). Runs as YOU, not root.
 #
-#   bash ~/hybrid/provision/user/20-zephyr-sdk.sh
+#   bash ~/two-computers-one-board/provision/user/20-zephyr-sdk.sh
 #
 # Idempotent, and resumable: the download is ~1 GB and lands in a temp file
 # that is only moved into place once it has been verified, so an interrupted

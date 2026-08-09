@@ -10,9 +10,9 @@ Firmware for the STM32U585, built with stock Zephyr + west. No Arduino tooling.
 ## Build
 
 ```bash
-zbuild ~/hybrid/mcu/app                      # this project's app
+zbuild ~/two-computers-one-board/mcu/app                      # this project's app
 zbuild samples/hello_world                   # any upstream Zephyr sample
-zbuild ~/hybrid/mcu/app -p always            # pristine rebuild
+zbuild ~/two-computers-one-board/mcu/app -p always            # pristine rebuild
 ```
 
 (`zbuild` / `zflash` are aliases from [`env.sh`](../../env.sh); the scripts are
@@ -27,7 +27,7 @@ clangd works in either.
 `launch.json`. Anything else builds into `~/zephyrproject/build-<name>`:
 
 ```bash
-zbuild ~/hybrid/mcu/app        # -> ~/zephyrproject/build
+zbuild ~/two-computers-one-board/mcu/app        # -> ~/zephyrproject/build
 zbuild samples/hello_world     # -> ~/zephyrproject/build-hello_world
 ```
 
@@ -49,7 +49,7 @@ zflash ~/zephyrproject/build/zephyr/zephyr.signed.hex
 Full recovery — bootloader + app together:
 
 ```bash
-~/hybrid/mcu/flash-all.sh
+~/two-computers-one-board/mcu/flash-all.sh
 ```
 
 Every flash prints two harmless errors first:
@@ -129,8 +129,8 @@ peripheral registers decoded from `.vscode/STM32U585.svd` (202 peripherals).
 ## Tests
 
 ```bash
-~/hybrid/mcu/ztest.sh                    # native_sim - runs on the MPU, no flashing
-~/hybrid/mcu/ztest.sh -p arduino_uno_q   # cross-compile for the board
+~/two-computers-one-board/mcu/ztest.sh                    # native_sim - runs on the MPU, no flashing
+~/two-computers-one-board/mcu/ztest.sh -p arduino_uno_q   # cross-compile for the board
 ```
 
 Use `native_sim/native/64`; plain `native_sim` is 32-bit and fails on aarch64
@@ -178,7 +178,7 @@ After a version bump, re-copy the OpenOCD board support that Zephyr's runner
 needs and that is not upstream:
 
 ```bash
-cp -r ~/hybrid/mcu/board-support/support ~/zephyrproject/zephyr/boards/arduino/uno_q/
+cp -r ~/two-computers-one-board/mcu/board-support/support ~/zephyrproject/zephyr/boards/arduino/uno_q/
 ```
 
 Also check the SDK requirement — Zephyr's `SDK_VERSION` file states it
@@ -188,8 +188,8 @@ The C style is Zephyr's, copied into this repo the same way, so re-copy it too
 and re-run the gate — upstream does change it between releases:
 
 ```bash
-cp ~/zephyrproject/zephyr/.clang-format ~/hybrid/.clang-format
-~/hybrid/tools/check.sh c
+cp ~/zephyrproject/zephyr/.clang-format ~/two-computers-one-board/.clang-format
+~/two-computers-one-board/tools/check.sh c
 ```
 
 ## Gotchas

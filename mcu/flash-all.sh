@@ -48,7 +48,7 @@ fi
 
 [ -f "$APP_HEX" ] || {
   echo "no signed app image at $APP_HEX" >&2
-  echo "build it with: ~/hybrid/mcu/zbuild.sh ~/hybrid/mcu/app" >&2
+  echo "build it with: ~/two-computers-one-board/mcu/zbuild.sh ~/two-computers-one-board/mcu/app" >&2
   exit 1
 }
 

@@ -138,7 +138,7 @@ and watch the error:
 
 ```bash
 sudo systemctl start unoq-cpu-bars      # the service grabs /dev/ttyHS1
-cd ~/hybrid
+cd ~/two-computers-one-board
 ./.venv/bin/python -c "
 from unoq import MCU
 with MCU() as mcu: print(mcu.status())

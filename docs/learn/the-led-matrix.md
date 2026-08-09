@@ -58,7 +58,7 @@ and that is the whole requirement.
 
 ```bash
 sudo systemctl stop unoq-cpu-bars
-cd ~/hybrid
+cd ~/two-computers-one-board
 ./.venv/bin/python -c "
 from unoq import MCU
 import time
@@ -142,7 +142,7 @@ lit — lives in `mcu/app/src/bars.c`. It is **pure arithmetic with no hardware 
 it at all**, which is why it can be tested on your laptop:
 
 ```bash
-~/hybrid/mcu/ztest.sh        # 26 test cases, no board required
+~/two-computers-one-board/mcu/ztest.sh        # 26 test cases, no board required
 ```
 
 Those tests build for `native_sim` — a fake Zephyr "board" that is really just a
@@ -170,7 +170,7 @@ Stop the demo and put your own pattern up:
 
 ```bash
 sudo systemctl stop unoq-cpu-bars
-cd ~/hybrid
+cd ~/two-computers-one-board
 ./.venv/bin/python -c "
 from unoq import MCU
 with MCU() as mcu:

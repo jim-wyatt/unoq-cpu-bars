@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 # Root-level steps for the west-based dev environment.
 #
-#   sudo bash ~/hybrid/provision/20-dev-tools.sh
+#   sudo bash ~/two-computers-one-board/provision/20-dev-tools.sh
 #
 # Idempotent. Every change has its revert in the comment above it.
 #

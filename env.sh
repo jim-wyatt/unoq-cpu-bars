@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 # Development environment for the Arduino UNO Q (MPU + STM32U585 MCU).
 #
-#   source ~/hybrid/env.sh
+#   source ~/two-computers-one-board/env.sh
 #
 # Add that line to ~/.bashrc to have it always available.
 #
@@ -10,15 +10,25 @@
 # below is what tells shellcheck which shell to assume.
 # shellcheck shell=bash
 
-# Where this file lives. The helpers below used to name $HOME/hybrid literally,
-# which is only right if you cloned to exactly that path - and nothing in this
-# repo creates that symlink. A `git clone` with no destination, or VS Code's
-# clone, gives you ~/unoq-cpu-bars, and then zbuild, zflash, hpy and mcucon all
-# point at a directory that does not exist, while everything else keeps working.
-# 50-shell-env.sh already points ~/.bashrc at the real checkout; this makes the
-# rest of the file agree with it.
-UNOQ_PROJECT="$(cd "$(dirname "${BASH_SOURCE[0]:-$HOME/hybrid/env.sh}")" && pwd)"
-export UNOQ_PROJECT
+# Where this file lives. The helpers below used to name a fixed path literally,
+# which is only right if you cloned to exactly that path. A `git clone` with no
+# destination puts the checkout wherever the repository is named, and then
+# zbuild, zflash, hpy and mcucon all point at a directory that does not exist,
+# while everything else keeps working. 50-shell-env.sh already points ~/.bashrc
+# at the real checkout; this makes the rest of the file agree with it.
+#
+# NO FALLBACK PATH. There used to be one - `${BASH_SOURCE[0]:-$HOME/<repo>/env.sh}`
+# - and it quietly reintroduced the exact assumption the paragraph above says
+# was removed: sourced from a shell that does not set BASH_SOURCE, it would
+# guess a path, be wrong, and every helper would point somewhere that does not
+# exist with nothing to say why. Refusing is the honest answer, because there
+# is no way to work out where this file is without the shell's help.
+if [ -z "${BASH_SOURCE[0]:-}" ]; then
+  echo "env.sh: source me from bash - I cannot find myself otherwise" >&2
+else
+  UNOQ_PROJECT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  export UNOQ_PROJECT
+fi
 
 # uv, west, cmake, ninja (installed as uv tools) + on-board OpenOCD
 export PATH="$HOME/.local/bin:/opt/openocd/bin:$PATH"

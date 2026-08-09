@@ -141,7 +141,7 @@ mcucon                     # raw bytes from /dev/ttyHS1
 In the second, make something happen:
 
 ```bash
-cd ~/hybrid
+cd ~/two-computers-one-board
 ./.venv/bin/python -c "
 from unoq import MCU
 with MCU() as mcu:

@@ -3,9 +3,9 @@
 # SPDX-License-Identifier: MIT
 # Turn the board's wifi radio off, once the USB link can carry the traffic.
 #
-#   ~/hybrid/usb/wifi.sh status      # what is on, and what would be left
-#   sudo ~/hybrid/usb/wifi.sh off    # checks the USB link first, then off
-#   sudo ~/hybrid/usb/wifi.sh on     # back on, whatever state anything is in
+#   ~/two-computers-one-board/usb/wifi.sh status      # what is on, and what would be left
+#   sudo ~/two-computers-one-board/usb/wifi.sh off    # checks the USB link first, then off
+#   sudo ~/two-computers-one-board/usb/wifi.sh on     # back on, whatever state anything is in
 #
 # WHY
 # ---

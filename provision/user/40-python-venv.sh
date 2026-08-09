@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 # The MPU-side Python venv and the `unoq` package. Runs as YOU, not root.
 #
-#   bash ~/hybrid/provision/user/40-python-venv.sh
+#   bash ~/two-computers-one-board/provision/user/40-python-venv.sh
 #
 # Idempotent.
 #

@@ -11,7 +11,7 @@
 # /opt/openocd is owned by NO Debian package - it was dropped in by an install
 # script. `apt install openocd` will not substitute for it: Debian ships 0.12.0
 # (2023), which predates the libgpiod v2 support this board needs. Rebuild from
-# upstream OpenOCD master with ~/hybrid/tools/build-openocd.sh.
+# upstream OpenOCD master with ~/two-computers-one-board/tools/build-openocd.sh.
 #
 # SWD wiring, per /opt/openocd/openocd_gpiod.cfg - all on /dev/gpiochip1:
 #   swclk = 26   swdio = 25   srst/trst = 38

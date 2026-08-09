@@ -4,7 +4,7 @@ The Linux side: direct hardware access, the `unoq` package for talking to the
 MCU, and the CPU-bars demo that uses both halves of the board at once.
 
 ```bash
-hpy your_script.py          # alias for ~/hybrid/.venv/bin/python
+hpy your_script.py          # alias for ~/two-computers-one-board/.venv/bin/python
 ```
 
 ## Direct hardware
@@ -28,7 +28,7 @@ Group membership and the udev rule are set up by
 
 ## The `unoq` package
 
-Installed editable from `~/hybrid/python` into `~/hybrid/.venv`.
+Installed editable from `~/two-computers-one-board/python` into `~/two-computers-one-board/.venv`.
 
 ```python
 from unoq import MCU, fota, link_up, link_state
@@ -97,7 +97,7 @@ power-on; keep one `CpuSampler` alive and take differences.
 ## At every boot
 
 ```bash
-sudo bash ~/hybrid/provision/50-cpu-bars.sh      # install + enable
+sudo bash ~/two-computers-one-board/provision/50-cpu-bars.sh      # install + enable
 journalctl -u unoq-cpu-bars -f
 ```
 

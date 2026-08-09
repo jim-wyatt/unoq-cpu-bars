@@ -79,7 +79,7 @@ The board keeps its slot table where you can read it.
 
 ```bash
 sudo systemctl stop unoq-cpu-bars
-cd ~/hybrid
+cd ~/two-computers-one-board
 ./.venv/bin/python -c "
 from unoq import fota
 for s in fota.images():

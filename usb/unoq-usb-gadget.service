@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 [Unit]
 Description=Arduino UNO Q composite USB gadget (network + fileshare)
-Documentation=file:/home/arduino/hybrid/usb/gadget-up.sh
+Documentation=file:/home/arduino/two-computers-one-board/usb/gadget-up.sh
 
 # The fileshare image lives on /home/arduino, a separate partition that mounts
 # around 13s. Binding the gadget before it is there gives the host an empty
@@ -32,10 +32,10 @@ EnvironmentFile=-/etc/default/unoq-usb
 # actually appears. It has to be a separate unit because this one is
 # RemainAfterExit=yes: systemd will not re-run a oneshot it still considers
 # active, so a udev trigger aimed here would do nothing at all.
-ExecStart=/home/arduino/hybrid/usb/gadget-up.sh --build
-ExecStart=/home/arduino/hybrid/usb/usb-net-up.sh
+ExecStart=/home/arduino/two-computers-one-board/usb/gadget-up.sh --build
+ExecStart=/home/arduino/two-computers-one-board/usb/usb-net-up.sh
 
-ExecStop=/home/arduino/hybrid/usb/gadget-down.sh
+ExecStop=/home/arduino/two-computers-one-board/usb/gadget-down.sh
 
 [Install]
 WantedBy=multi-user.target

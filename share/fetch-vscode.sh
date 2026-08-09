@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 # Fetch the VS Code installers that the board hands out over USB.
 #
-#   sudo bash ~/hybrid/share/fetch-vscode.sh
+#   sudo bash ~/two-computers-one-board/share/fetch-vscode.sh
 #
 # Idempotent: an installer already present with a non-zero size is left alone.
 # Re-run it to pick up a newer VS Code release (use --refresh to force).

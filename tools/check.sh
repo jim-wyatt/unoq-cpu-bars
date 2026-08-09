@@ -5,8 +5,8 @@
 #
 #   ~/hybrid/tools/check.sh              # everything
 #   ~/hybrid/tools/check.sh --fix        # reformat in place, then check
-#   ~/hybrid/tools/check.sh --fast       # skip the MCU suite (~70s of build)
-#   ~/hybrid/tools/check.sh python       # one area: python | shell | c | docs | mcu
+#   ~/hybrid/tools/check.sh --fast       # skip the slow ones (MCU build, diagrams)
+#   ~/hybrid/tools/check.sh python       # one area: python | shell | c | docs | diagrams | mcu
 #
 # Every gate runs even if an earlier one fails, so one pass shows you all the
 # work rather than the first thing to break. Exit status is non-zero if any
@@ -31,14 +31,14 @@ for arg in "$@"; do
       sed -n '2,14p' "$0"
       exit 0
       ;;
-    python | shell | c | mcu | docs) AREAS+=("$arg") ;;
+    python | shell | c | mcu | docs | diagrams) AREAS+=("$arg") ;;
     *)
       echo "unknown argument: $arg (try --help)" >&2
       exit 2
       ;;
   esac
 done
-[ ${#AREAS[@]} -eq 0 ] && AREAS=(python shell c docs mcu)
+[ ${#AREAS[@]} -eq 0 ] && AREAS=(python shell c docs diagrams mcu)
 
 if [ -t 1 ]; then
   RED=$'\033[31m' GREEN=$'\033[32m' DIM=$'\033[2m' BOLD=$'\033[1m' OFF=$'\033[0m'
@@ -169,8 +169,34 @@ if wanted docs; then
   cd "$PROJECT" || exit 1
   # --strict, so a link to a page that moved fails here instead of 404ing for
   # a reader. This gate is the reason the docs tree can be reorganised at all.
-  have mkdocs "docs (mkdocs --strict)" &&
+  if have mkdocs "docs (mkdocs --strict)"; then
     run "docs (mkdocs --strict)" "$PROJECT/tools/build-docs.sh"
+    # Deliberately not chained onto the build with &&: `run` always succeeds
+    # (it records the failure rather than propagating it), so a && here would
+    # look like a dependency and enforce nothing. If the build failed there is
+    # no site to inspect and this reports that, which is a second failure line
+    # for one root cause - noisy, but never silently skipped.
+    #
+    # A tenth of a second, no browser, and it guards the constraint the whole
+    # site is designed around: the diagram library is on disk rather than at a
+    # CDN, and every page that needs the init script loads it. The browser gate
+    # below proves diagrams DRAW; this proves they COULD without a network.
+    run "diagram assets (offline)" "$PROJECT/tools/check-diagram-assets.sh"
+  fi
+fi
+
+# --- diagrams ---------------------------------------------------------------
+
+if wanted diagrams; then
+  cd "$PROJECT" || exit 1
+  if [ "$FAST" = 1 ]; then
+    printf '%s>>> diagrams (skipped: --fast)%s\n\n' "$DIM" "$OFF"
+  else
+    # The only gate that opens a browser, and the only one that can catch a
+    # diagram silently coming out as grey text - which is exactly what twelve of
+    # them did, through a clean --strict build, for hours. ~60s.
+    run "diagrams (headless render)" "$PROJECT/tools/check-diagrams.sh"
+  fi
 fi
 
 # --- mcu -------------------------------------------------------------------

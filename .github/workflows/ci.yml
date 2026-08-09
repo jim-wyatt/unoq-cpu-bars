@@ -3,14 +3,24 @@
 name: checks
 
 # Runs the same gates as tools/check.sh, so a green CI means the same thing as
-# a clean local run. Two jobs:
+# a clean local run. Four jobs:
 #
+#   changes    seconds. Decides which of the expensive two below run at all.
 #   checks     lint, format, types, tests, coverage, docs. Thirty seconds.
-#   firmware   compiles for the real Cortex-M33 and runs the MCU suites.
-#              Slower, because it needs a Zephyr workspace and the SDK.
+#   diagrams   opens a real browser on every page that has one. ~2 minutes.
+#   firmware   compiles for the real Cortex-M33 and runs the MCU suites. ~5
+#              minutes, because it needs a Zephyr workspace and the SDK.
 #
-# They are split so a missing comma still fails fast, rather than behind a
-# toolchain download.
+# THE SHAPE HERE IS DELIBERATE. `checks` is the one that runs on everything, so
+# it is kept to the gates that are fast and cannot hang. The two slow ones are
+# each gated on `changes`, and both run in PARALLEL with `checks` rather than
+# behind it - a documentation pull request should not wait on a Zephyr download
+# to find out its links are fine.
+#
+# The cost of getting this wrong is not hypothetical: the browser gate was
+# briefly inside `checks`, which took every pull request in the repository from
+# thirty seconds to five and a half minutes, including ones that touched no
+# documentation at all.
 #
 # The runner is x86_64 while the board is aarch64. That is fine for `checks`:
 # gpiod ships manylinux wheels for both, and the tests use fakes rather than
@@ -59,6 +69,43 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH"
           tools/check.sh python shell c docs
 
+  # THE BROWSER GATE IS NOT HERE, AND THAT IS DELIBERATE.
+  #
+  # tools/check-diagrams.sh opens a real browser on every page that has a
+  # diagram. It is the only thing that can prove one actually draws, it runs on
+  # the board as part of `tools/check.sh`, and it passes there - 12 diagrams
+  # across 11 pages, every time.
+  #
+  # On a GitHub runner it has never once worked. Three attempts:
+  #
+  #   1. hung, and took an unrelated pull request to the 15-minute job timeout
+  #      with chrome still alive
+  #   2. reported "0 of 1 drew" on all 11 pages of a build that renders
+  #      perfectly here - a shared --user-data-dir serialising the launches
+  #   3. chromium 150 never exits from --dump-dom at all. Killed by the
+  #      per-page timeout, exit 124, with the fixture (200, 238 bytes) and the
+  #      library (200, 3566058 bytes) both confirmed served. Nothing wrong
+  #      with the site; --virtual-time-budget simply does not end the process.
+  #
+  # Three rounds, three infrastructure failures, zero true findings. A gate
+  # with that record is not protecting the site, it is taxing every pull
+  # request and training us to ignore a red tick.
+  #
+  # WHAT STILL GUARDS THE INVARIANT: `checks` above runs `diagram assets`,
+  # which asserts in 0.26s and with no browser that the library is vendored
+  # rather than fetched, that the theme bundle references it relatively, that
+  # mermaid-init.js shipped, and that every page carrying a diagram loads it.
+  # That is the entire regression class that has ever actually bitten us, and
+  # it is checked on every pull request. What is left uncovered is narrow:
+  # mermaid.run() throwing once called. The board checks that before each push.
+  #
+  # TO BRING IT BACK, one of:
+  #   - pin chrome-headless-shell (the supported --dump-dom path) rather than
+  #     using whatever chromium the runner image ships
+  #   - drive one long-lived browser over the DevTools protocol instead of
+  #     launching one per page, which also makes it ~10x faster
+  # Tracked as an issue; do not re-add it by simply uncommenting a job.
+
   # Does this change touch anything the firmware is built from?
   #
   # Seconds, and it decides whether the five-minute job below runs at all. Most
@@ -89,6 +136,7 @@ jobs:
           files=$(gh api --paginate \
             "repos/${{ github.repository }}/pulls/${{ github.event.number }}/files" \
             --jq '.[].filename')
+
           # west.yml and this workflow are in the list because both change what
           # gets built, without any C file moving.
           if grep -qE '^(mcu/|west\.yml|\.github/workflows/ci\.yml)' <<<"$files"; then
@@ -98,6 +146,7 @@ jobs:
             echo "firmware=false" >>"$GITHUB_OUTPUT"
             echo "nothing under mcu/ changed - skipping the firmware build"
           fi
+
 
   # The MCU half. Split into its own job because it needs a Zephyr workspace and
   # the SDK, which the gates above do not - so a formatting mistake still fails

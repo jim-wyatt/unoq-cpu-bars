@@ -49,7 +49,11 @@ and is served over the network, so it is redistribution and belongs here.
 | `assets/external/unpkg.com/mermaid@11/` | The Mermaid authors | MIT |
 | Icons (inlined as SVG) | Material Design Icons / FontAwesome / Octicons | Apache-2.0 / CC-BY-4.0 / MIT |
 
-The `privacy` plugin is what puts the last two there: it downloads at build
+`assets/javascripts/mermaid-init.js` sits beside those and is ours, not
+third-party - it is the few lines that actually call `mermaid.run()`, which the
+theme does not.
+
+The `privacy` plugin is what puts the mermaid and lunr copies there: it downloads at build
 time anything the theme would otherwise fetch from a CDN while the page is
 loading, so that a reader with no network still gets a complete site. The
 consequence is that the copies travel with the drive, which is the point, and

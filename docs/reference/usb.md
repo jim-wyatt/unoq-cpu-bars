@@ -11,8 +11,8 @@ learning content on it.
 ```
 your computer                          UNO Q
 ─────────────                          ─────
-10.55.0.10-.100  ◄── USB-C cable ──►   10.55.0.1
-   (by DHCP)                           http://10.55.0.1:8080/
+its own address  ◄── USB-C cable ──►   <hostname>.local
+(it runs DHCP)       the board asks    http://<hostname>.local:8080/
                                        "UNO-Q" drive, read-only
 ```
 
@@ -68,7 +68,7 @@ plug into a computer
    → udev fires SYSTEMD_WANTS=unoq-usb-bind.service
    → that binds the gadget to the UDC
    → usb0/usb1 appear → udev fires the bind unit again
-   → they join br-usb; dnsmasq answers the computer's DHCP
+   → they join br-usb; udhcpc asks the computer for an address
 ```
 
 **Why two units.** The obvious design is one unit that udev restarts. It does
@@ -83,129 +83,154 @@ exits. That is not a failure — there is simply nothing to bind to yet.
 
 ## What the computer sees
 
-The gadget offers two configurations. A host enumerates configuration 1 and
-stops, so `c.1` is what almost every computer actually uses:
+The gadget offers **one** configuration, holding both functions:
 
 | Config | Functions | Used by |
 |---|---|---|
 | `c.1` | **NCM** + mass storage | Windows 10 ≥1903, Windows 11, macOS ≥Catalina, Linux |
-| `c.2` | RNDIS + mass storage | fallback, selected by hand, for genuinely old Windows |
 
 **NCM first, not RNDIS** — the opposite of most USB-gadget recipes, which
-predate two changes at Microsoft's end:
-
-- Windows has shipped a native NCM class driver (`UsbNcm.sys`) since Windows 10
-  version 1903, so NCM needs no driver and no INF.
-- RNDIS is deprecated and its driver has been **removed from recent Windows 11
-  builds**. A Windows 11 host offered RNDIS in `c.1` binds nothing for
-  networking: you get the drive, no IP, and no obvious error anywhere.
-
-Override for a pre-1903 Windows host:
+predate Windows 10 version 1903 shipping a native NCM class driver
+(`UsbNcm.sys`). NCM now needs no driver and no INF on Windows, macOS has had it
+since Catalina, and Linux has always had it. RNDIS is deprecated at Microsoft's
+end. Override for a host with no NCM driver:
 
 ```bash
 sudo UNOQ_GADGET_PRIMARY=rndis ~/two-computers-one-board/usb/gadget-up.sh
 ```
 
-Two configurations rather than two network functions in one: a host must not
-bind two network interfaces to the same device. The drive is in both, so it is
-there whichever way the negotiation goes.
+That rebuilds the *same single configuration* with RNDIS in it. The choice is
+made here, at build time, rather than offered to the host to pick from.
 
-On the board, both `rndis.usb0` and `ncm.usb0` register a netdev. Rather than
-racing to work out which one the host chose, both are enslaved to a bridge
-(`br-usb`) which carries the address. Only the active one ever passes a frame.
+### Why not two configurations
+
+It used to be two — NCM in `c.1`, RNDIS in `c.2` — on the reasoning that a host
+enumerates configuration 1 and stops, so each OS could take the one it
+supported. Both halves of that were wrong, and together they cost us the drive
+on Windows entirely.
+
+Windows generates the `USB\COMPOSITE` compatible id — the thing that makes it
+load `usbccgp.sys`, which is what gives each function its own driver — only
+when [all three of these hold][mscomposite]:
+
+- `bDeviceClass` is 0, or class/subclass/protocol are `0xEF`/`0x02`/`0x01`
+- the device has multiple interfaces
+- **the device has a single configuration**
+
+Two configurations failed the third. No composite id, no generic parent driver,
+so exactly one driver bound to the whole device: networking worked and the mass
+storage interface was **never enumerated at all** — not hidden, not
+unmountable, absent. Windows' only escape is an INF naming the configuration
+for `usbccgp` in the registry, which means shipping a signed driver package for
+a device using the Linux Foundation's ids.
+
+And the host never chose `c.1` anyway. The Microsoft OS descriptors carrying the
+RNDIS compatible id were linked to whichever config held RNDIS, on the
+assumption that Windows would not ask about a configuration it was not using.
+Windows always asks: it follows `b_vendor_code` during enumeration, and the
+`USB\MS_COMP_RNDIS` id it got back came in at the **top** of the board's
+compatible id list. It went straight to the configuration filed as the fallback
+nobody would pick.
+
+So the OS descriptors are now published only when RNDIS is what was actually
+built. On an NCM gadget they are worse than useless: they point Windows at a
+driver for a function that is not there.
+
+The device also now declares `bDeviceClass`/`SubClass`/`Protocol` as
+`0xEF`/`0x02`/`0x01` — Interface Association Descriptor — rather than all
+zeroes. A network function is two interfaces by itself, and with zeroes Windows
+read interface 0 as the whole device, reporting this board as
+`USB\Class_02&SubClass_02&Prot_FF`: the RNDIS control interface.
+
+[mscomposite]: https://learn.microsoft.com/en-us/windows-hardware/drivers/usbcon/enumeration-of-the-composite-parent-device
+
+On the board, the chosen function registers a netdev, which is enslaved to a
+bridge (`br-usb`) that carries the address.
 
 ## Addressing
 
-There are two modes, and which one you want depends on whether the computer is
-sharing its internet. The mode lives in `/etc/default/unoq-usb`, which
-`60-usb-gadget.sh` writes once and never rewrites, so an edit survives
-re-provisioning:
-
-```bash
-UNOQ_USB_MODE=server     # default
-UNOQ_USB_MODE=client     # for a host that shares its connection
-sudo systemctl restart unoq-usb-gadget
-```
-
-| | `server` (default) | `client` |
-|---|---|---|
-| Board | `10.55.0.1/24` static | `10.55.0.1` **and** whatever the host leases |
-| Computer | `10.55.0.10`–`.100` by DHCP from us | its own fixed address, its own DHCP server |
-| Runs DHCP | `dnsmasq`, ours | the host's |
-| Right when | the computer is something you reach the board *from* | the computer is sharing its internet *with* the board |
-
-### Server mode
+**The board is always the DHCP client on this link, and the fixed thing you
+type is a name.**
 
 | | |
 |---|---|
-| Board | `10.55.0.1/24`, static, on `br-usb` |
-| Computer | `10.55.0.10`–`10.55.0.100`, by DHCP |
-| Gateway / DNS | **deliberately not offered** |
+| Board | whatever the computer leases it, on `br-usb` |
+| If nothing serves DHCP | IPv4 link-local, `169.254.x.y` (RFC 3927) |
+| Reachable as | `<hostname>.local`, over mDNS |
+| Runs DHCP | the computer, never us |
 
-`10.55.0.0/24` is deliberately obscure. A board handing out `192.168.0.x` or
-`10.0.0.x` on a cable would collide with the network the laptop is already on.
+```bash
+~/two-computers-one-board/usb/status.sh
+```
 
-No default route is offered either, for the same class of reason: the board is
-the thing you are connecting *to*, and a device that silently becomes a
-laptop's default gateway breaks its internet in a way that takes an afternoon
-to diagnose.
+```
+  dhcp                   udhcpc is asking the host for an address
+  leased address         192.168.137.210/24
+  gateway                192.168.137.1
+  reachable as           quentin.local
+```
 
-To set the computer's address by hand instead: `10.55.0.2/24`, no gateway, no
-DNS.
-
-### Client mode, and why Windows forces it
+### Why the board cannot choose its own address
 
 Turn on Internet Connection Sharing in Windows and it stops negotiating: it
 pins the shared adapter to **`192.168.137.1/24`** and runs its own DHCP server
 there. It will never take a lease from us. macOS Internet Sharing does the same
 thing at `192.168.2.1`.
 
-So a board sitting at `10.55.0.1` in front of a host at `192.168.137.1` is two
-`/24`s on one wire with no route between them. Both ends look configured, the
-cable looks dead, and nothing logs an error — there is nothing wrong with
-either end in isolation.
+So any board that insisted on its own numbering would be on a different `/24`
+from the host on the same wire, with no route between them. Both ends look
+configured, the cable looks dead, and nothing logs an error — there is nothing
+wrong with either end in isolation.
 
-In client mode the board asks instead of answering:
-
-```bash
-sudo systemctl restart unoq-usb-gadget    # with UNOQ_USB_MODE=client set
-~/two-computers-one-board/usb/status.sh
-```
-
-```
-  dhcp mode              client - udhcpc is asking the host for an address
-  leased address         192.168.137.210/24
-  gateway                192.168.137.1
-```
-
-Nothing is hardcoded to Microsoft's numbering — the same code works for macOS,
-for a Linux host running its own dnsmasq, and for whatever ICS gets changed to.
+A board that wants internet over the cable therefore has to accept the host's
+numbering, which means the numeric address is not ours to fix. Nothing here is
+hardcoded to Microsoft's, though: the same code works for macOS, for a Linux
+host running its own dnsmasq, and for whatever ICS gets changed to next.
 `busybox udhcpc` is the client, because this image ships no other one and
 busybox is already here.
 
-Three things worth knowing:
+### When nothing is serving DHCP
 
-- **`10.55.0.1` stays on the bridge in client mode too.** It is the address the
-  board still answers on when the host's DHCP server is not running. With wifi
-  off that is the difference between a fixable board and a serial console — from
-  the host, `route add 10.55.0.0 mask 255.255.255.0 192.168.137.1` (elevated)
-  gets you back to it.
-- **The address is sticky.** The last lease is remembered in
-  `/var/lib/unoq/usb-dhcp-last` and re-requested next time, so "what do I ssh
-  to" has an answer you can write down. ICS honours the request in practice.
-- **Use the leased IP, not the `.local` name.** avahi does publish on `br-usb`,
-  and Windows 11 and macOS both resolve `.local` natively — but avahi advertises
-  *every* address on that bridge, and in client mode there are two:
+The cable is in a computer that is not sharing anything, ICS is off, or the
+host is still booting. `udhcpc` reports `leasefail`, and the board claims an
+IPv4 link-local address instead, via `avahi-autoipd`.
 
-  ```
-  Registering new address record for 10.55.0.1 on br-usb.IPv4
-  Registering new address record for 192.168.137.210 on br-usb.IPv4
-  ```
+That is the same thing Windows, macOS and Linux each do when their own DHCP
+finds nothing, so **both ends land on `169.254.0.0/16` by themselves** and can
+talk with no configuration at either. `avahi-autoipd` rather than picking an
+address ourselves because RFC 3927 is more than choosing one — it ARP-probes
+before claiming, defends the claim, and re-picks on a conflict, which matters
+precisely because the host is self-assigning from the same range at the same
+moment on the same wire.
 
-  A host querying over the cable gets both A records back and picks one. Half
-  the time that is `10.55.0.1`, which is the address it has no route to. The
-  name is therefore a coin flip and the address is not, which is the other
-  reason the lease is made sticky rather than left to chance.
+The moment a real lease arrives, `bound` takes the link-local address back
+down. Never both at once — see below for why that is not merely tidiness.
+
+### Why the name works now, and did not before
+
+There must be **exactly one address** on `br-usb`, because avahi advertises
+every address an interface has. The board used to carry two — a static
+`10.55.0.1` alongside the lease — and a host querying over the cable got two A
+records back:
+
+```
+Registering new address record for 10.55.0.1 on br-usb.IPv4
+Registering new address record for 192.168.137.210 on br-usb.IPv4
+```
+
+It picked one, and half the time picked the one it had no route to. The name
+was a coin flip, so the docs told you to use the numeric address instead. That
+is the constraint the single-address design removes, and it is why
+`usb-dhcp.sh` stops link-local *before* it puts a lease on, and why
+`status.sh` warns if it ever finds more than one address here.
+
+`10.55.0.1` was never really zero-configuration anyway: reaching it from a
+Windows host meant an elevated `route add 10.55.0.0 mask 255.255.255.0
+192.168.137.1`. Link-local needs nothing at the far end.
+
+The address is still sticky, for anyone who prefers typing numbers: the last
+lease is remembered in `/var/lib/unoq/usb-dhcp-last` and re-requested next
+time, and ICS honours the request in practice.
 
 ---
 
@@ -228,15 +253,14 @@ sudo ~/two-computers-one-board/usb/wifi.sh on
   gadget bound, and 192.168.137.1 answers on br-usb
   the host is NAT-ing: the board keeps its internet over USB
 
-  RECONNECT ON:  arduino@192.168.137.210   (or quentin.local)
+  RECONNECT ON:  arduino@quentin.local   (or arduino@192.168.137.210)
 ```
 
 This is not a wrapper around `nmcli radio wifi off` for the sake of it. You are
 almost certainly typing that command over the wifi it is about to turn off, and
 if the USB link is not actually carrying traffic — gadget did not bind, cable is
-charge-only, host is not sharing, board is in server mode in front of an ICS
-host — then the moment the radio drops there is no path to the board at all.
-Not slow: absent.
+charge-only, host is not sharing — then the moment the radio drops there is no
+path to the board at all. Not slow: absent.
 
 The reachability check is ARP, not ping. **Windows blocks ICMP to its ICS
 adapter by default**, so the gateway that is routing your traffic perfectly well
@@ -288,8 +312,8 @@ The moment either is needed is the moment nobody can enable it.
 ### The board's own route out
 
 The board does not offer the computer a gateway, but it does take one *from*
-it. When dnsmasq leases the host an address, `usb-route.sh` points the board's
-default route at that address, metric **700** — so a board with no other uplink
+it. When the host's lease arrives with a router in it, `usb-route.sh` points the
+board's default route at that address, metric **700** — so a board with no other uplink
 can reach the internet through the computer, provided the computer is NAT-ing
 (Internet Connection Sharing, or `New-NetNat`, on Windows).
 
@@ -321,21 +345,27 @@ Check which route actually won, with the cable plugged in:
 ip route show default        # lowest metric is the one in use
 ```
 
-### The DHCP server does not leak onto your LAN
+### There is no DHCP server on this board
 
-`dnsmasq` runs with `--interface=br-usb --bind-dynamic`, so it answers DHCP
-only on the gadget bridge. It still *binds* `0.0.0.0:67` — that is inherent to
-DHCP, whose clients broadcast from `0.0.0.0` — so the socket listing is not
-the thing that makes it safe; the interface filter is.
+There used to be. `dnsmasq` ran on `br-usb` to lease the computer an address,
+and it came with a standing worry worth recording: this board normally also
+sits on a real network, and a DHCP server that answered on the wrong interface
+is a rogue DHCP server on someone's home or office LAN. It was contained with
+`--interface=br-usb --bind-dynamic`, which binds per-interface rather than to
+`0.0.0.0`, and the socket listing was never the reassuring part — DHCP clients
+broadcast from `0.0.0.0`, so `0.0.0.0:67` in `ss` output was expected and the
+interface filter was the only thing making it safe.
 
-Verify it on a board that is also on a real network:
+Dropping server mode deletes that risk rather than containing it. If you are
+looking at a board provisioned before the change and want to be sure:
 
 ```bash
-sudo ss -ulnp | grep :67          # will show 0.0.0.0:67 - this is expected
+sudo ss -ulnp | grep :67          # expect nothing
 ```
 
-and confirm no `10.55.0.x` offer appears when a DHCP request goes out on your
-LAN interface.
+`usb-net-up.sh` also kills any instance it finds left over on `br-usb`, because
+a stale one would be a second DHCP server on the same wire as the host's, with
+the board taking whichever reply arrived first.
 
 ## The fileshare
 
@@ -376,7 +406,7 @@ disables `adbd` for that reason.
 adb over TCP still works once the link is up:
 
 ```bash
-adb connect 10.55.0.1:5555
+adb connect quentin.local:5555
 ```
 
 To go back to adb over USB: `sudo systemctl disable --now unoq-usb-gadget &&
@@ -416,18 +446,38 @@ cat /sys/kernel/config/usb_gadget/unoq/UDC
 journalctl -u unoq-usb-gadget -n 40
 ```
 
-**The drive is there but the network is not** (or the reverse). The host bound
-a configuration whose network function it does not support, or NetworkManager
-grabbed the gadget interface. `ip -br addr show br-usb` should show
-`10.55.0.1/24`, and `bridge link` should list a `usb*` port.
-
-**Windows shows an unknown device.** It picked `c.1` but did not apply the
-RNDIS driver. Check the MS OS descriptors survived:
+**The network is there but the drive is not, on Windows.** The classic symptom
+of the gadget having more than one configuration — see [Why not two
+configurations](#why-not-two-configurations). Check:
 
 ```bash
-cat /sys/kernel/config/usb_gadget/unoq/os_desc/use          # 1
-cat /sys/kernel/config/usb_gadget/unoq/functions/rndis.usb0/os_desc/interface.rndis/compatible_id
+ls /sys/kernel/config/usb_gadget/unoq/configs/     # must be exactly c.1
+cat /sys/kernel/config/usb_gadget/unoq/bDeviceClass # 0xEF (or 0x00)
+~/two-computers-one-board/usb/status.sh            # warns on both
 ```
+
+On the Windows side, the compatible id list is the proof. `USB\COMPOSITE`
+present means the parent driver loaded and each function got its own driver;
+absent means it did not, and only one function is visible:
+
+```powershell
+Get-PnpDevice -PresentOnly | Where-Object InstanceId -like '*VID_1D6B*' |
+  ForEach-Object { Get-PnpDeviceProperty -InstanceId $_.InstanceId `
+    -KeyName DEVPKEY_Device_CompatibleIds | Select-Object -ExpandProperty Data }
+```
+
+**The drive is there but the network is not.** The host has no driver for the
+function the gadget was built with, or NetworkManager grabbed the gadget
+interface. `ip -br addr show br-usb` should show one address — leased or
+`169.254.x.y` — and `bridge link` should list a `usb*` port. If the host is an
+old Windows with no NCM driver, rebuild with
+`sudo UNOQ_GADGET_PRIMARY=rndis usb/gadget-up.sh`.
+
+**`<hostname>.local` resolves to something unreachable.** There is more than
+one address on `br-usb`; avahi advertises all of them. `usb/status.sh` warns
+about this explicitly. It should not happen by design any more — the static
+`10.55.0.1` that used to cause it is gone, and link-local is torn down when a
+lease arrives.
 
 **Powering the board from the computer.** As a device the board is a power
 sink. A laptop USB-C port that only supplies 0.5 A will brown it out under

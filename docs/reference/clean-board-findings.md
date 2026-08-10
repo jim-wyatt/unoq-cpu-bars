@@ -309,11 +309,21 @@ anything would build.
 
 ## Decisions taken, for the refactor
 
-- **Keep the `10.55.0.0/24` server mode.** It is not legacy; it is what makes
-  the board work with a host that is not sharing its internet. `UNOQ_USB_MODE`
-  already makes the unused half inert at runtime, which is the cleanup.
-- **Keep `10.55.0.1` on the bridge in client mode.** It is the one address that
-  survives ICS being switched off, one `route add` from the host away.
-- **`docs/usb.md` should lead with client mode.** For a dev board plugged into a
-  laptop that shares its connection, client is the common case; server mode is
-  currently the default and client reads as the exception. Not yet done.
+- ~~**Keep the `10.55.0.0/24` server mode.**~~ **Reversed.** The reasoning was
+  that server mode is what makes the board work with a host that is not sharing
+  its internet, and that `UNOQ_USB_MODE` made the unused half inert anyway. The
+  first half was right about the *requirement* and wrong about the *only way to
+  meet it*: IPv4 link-local covers a host that serves no DHCP, and covers it
+  better, because both ends reach `169.254/16` on their own and no static route
+  has to be typed at the far end. The second half undervalued the cost — inert
+  at runtime still meant two DHCP daemons, two route paths, two answers to
+  "what do I ssh to", and a mode setting that could be wrong.
+- ~~**Keep `10.55.0.1` on the bridge in client mode.**~~ **Reversed**, and this
+  is the one that mattered. Finding 4 in this document — avahi advertising both
+  addresses, so `<host>.local` resolved to the unreachable one half the time —
+  was recorded as "fixed" by having `wifi.sh` print the numeric address instead.
+  That treated the symptom. The second address *was* the bug, and removing it is
+  what makes the mDNS name a reliable answer, which is now the whole addressing
+  story.
+- ~~**`docs/usb.md` should lead with client mode.**~~ **Done, by deletion.**
+  There is only one mode to lead with.

@@ -143,7 +143,7 @@ at [Start here](docs/learn/start-here.md).
 │   └── tests/              pytest suite, all against fakes — no hardware
 ├── usb/                    the composite USB gadget: network + fileshare
 │   ├── gadget-up.sh        build the configfs gadget, bind when a UDC appears
-│   ├── usb-net-up.sh       br-usb, 10.55.0.1, and DHCP in either direction
+│   ├── usb-net-up.sh       br-usb, and asking the computer for an address
 │   ├── usb-dhcp.sh         client mode: take an address from a sharing host
 │   ├── bind-guard.sh       stop a brownout loop becoming permanent
 │   ├── uplink-fallback.sh  wifi back on if USB gives no internet after boot

@@ -27,8 +27,32 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 
-# Same file the prepare unit reads - both run usb-net-up.sh, so both have to
-# agree about which end runs DHCP.
+# usb-net-up.sh leaves two long-lived daemons behind it - udhcpc, and
+# avahi-autoipd when no DHCP server answers - and with the default
+# KillMode=control-group systemd kills both the instant this oneshot finishes.
+# They are children in its cgroup, and a oneshot without RemainAfterExit goes
+# inactive the moment ExecStart returns, which tears that cgroup down:
+#
+#   avahi-autoipd(br-usb): Starting with address 169.254.13.209
+#   avahi-autoipd(br-usb): Got SIGTERM, quitting.
+#   unoq-usb-bind.service: Deactivated successfully.
+#
+# So the board came out of every hot re-plug with no DHCP client running at all.
+# That went unnoticed for as long as it did because the bridge also carried a
+# static 10.55.0.1: the board stayed reachable whether or not udhcpc lived, and
+# nothing pointed at the unit. Deleting that address is what made it visible.
+#
+# Note this never affected boot, only re-plugs. At boot it is
+# unoq-usb-gadget.service that runs usb-net-up.sh, and that one IS
+# RemainAfterExit=yes - it stays active, so its cgroup survives and so do its
+# children. Same script, opposite outcome, decided entirely by which unit
+# happened to invoke it.
+#
+# KillMode=process kills only the main ExecStart process and leaves the rest,
+# which is what a unit whose job is to *start* things needs. Tearing the daemons
+# down is gadget-down.sh's job, from unoq-usb-gadget.service's ExecStop.
+KillMode=process
+
 EnvironmentFile=-/etc/default/unoq-usb
 
 # Deliberately NOT RemainAfterExit. This unit has to be able to run again on

@@ -52,17 +52,33 @@ val "gadget bound to" "$(cat "$G/UDC" 2>/dev/null)"
 
 hdr "gadget definition"
 if [ -d "$G" ]; then
+  nconfigs=0
   for c in "$G"/configs/*/; do
     [ -d "$c" ] || continue
+    nconfigs=$((nconfigs + 1))
     fns=""
     for l in "$c"*; do
       [ -L "$l" ] && fns="$fns $(basename "$l")"
     done
-    # c.1 is what almost every host actually enumerates, and it must contain
-    # ncm - a Windows 11 host offered rndis here binds no network at all.
     val "$(basename "$c")" "${fns# }"
   done
   val "drive backing file" "$(cat "$G/functions/mass_storage.0/lun.0/file" 2>/dev/null)"
+  # There must be exactly one configuration. Windows only treats a device as
+  # composite - and so only loads the parent driver that gives mass storage its
+  # own driver - when the device has a SINGLE configuration. With two, the drive
+  # is not hidden or unmountable, it is never enumerated, while the network goes
+  # on working perfectly. That is a silent, one-sided failure nobody would think
+  # to look for here, which is exactly why it is worth a line of output.
+  if [ "$nconfigs" -gt 1 ]; then
+    val "WARNING" "$nconfigs configurations - Windows will not show the drive"
+  fi
+  # Lowercased before matching: configfs echoes this back as 0xef whatever case
+  # it was written in, so a literal 0xEF comparison warns on a correct gadget.
+  devclass="$(tr 'A-F' 'a-f' <"$G/bDeviceClass" 2>/dev/null)"
+  case "$devclass" in
+    0xef | 0x00) ;;
+    *) val "WARNING" "bDeviceClass $devclass is neither 0xEF nor 0x00 - not composite to Windows" ;;
+  esac
 else
   val "definition" "<not built - is unoq-usb-gadget.service running?>"
 fi
@@ -76,10 +92,6 @@ for i in /sys/class/net/*/master; do
     ports="$ports $(basename "$(dirname "$i")")"
 done
 val "bridge ports" "${ports# }"
-# Which end runs DHCP is the first thing to establish when the two sides cannot
-# see each other: a board in server mode in front of a host that pins its own
-# address (Windows ICS, macOS Internet Sharing) is two /24s on one wire, which
-# looks exactly like a dead cable. See usb-net-up.sh.
 # Liveness from /proc, not `kill -0`: this script is meant to run without root,
 # and kill -0 against a root-owned daemon fails with EPERM for a normal user -
 # it would report every one of these as stopped. The comm check also stops a
@@ -96,20 +108,34 @@ pid_is() {
   return 1
 }
 if pid_is /run/unoq-usb-udhcpc.pid busybox udhcpc; then
-  val "dhcp mode" "client - udhcpc is asking the host for an address"
+  val "dhcp" "udhcpc is asking the host for an address"
   val "leased address" "$(awk '{print $1}' /run/unoq-usb-dhcp.state 2>/dev/null)"
   val "gateway" "$(awk '{print $2}' /run/unoq-usb-dhcp.state 2>/dev/null)"
-elif pid_is /run/unoq-usb-dnsmasq.pid dnsmasq; then
-  val "dhcp mode" "server - dnsmasq is leasing the host an address"
-  val "host lease" "$(awk '{print $3, $4}' /run/unoq-usb-dnsmasq.leases 2>/dev/null | tr '\n' ' ')"
 else
-  val "dhcp mode" "<neither dnsmasq nor udhcpc is running>"
+  val "dhcp" "<udhcpc is not running>"
+fi
+# Link-local is not a fault, it is the documented answer to "no DHCP server on
+# the other end". It IS worth saying out loud, because it is also the state
+# where the board is reachable from that one computer and from nowhere else.
+AUTOIPD="${UNOQ_AUTOIPD:-/usr/sbin/avahi-autoipd}"
+if [ -x "$AUTOIPD" ] && "$AUTOIPD" --check "$BRIDGE" 2>/dev/null; then
+  val "link-local" "active - no DHCP server on the other end"
+fi
+val "reachable as" "$(hostname).local"
+# Exactly one address, and that is load-bearing rather than tidy: avahi
+# advertises every address an interface has, so a second one makes
+# <hostname>.local resolve to two A records with the host free to pick the one
+# it cannot route to. That was the old static 10.55.0.1, and the reason the name
+# could not be trusted.
+naddr="$(ip -4 -o addr show dev "$BRIDGE" 2>/dev/null | wc -l)"
+if [ "$naddr" -gt 1 ]; then
+  val "WARNING" "$naddr addresses on $BRIDGE - $(hostname).local will be a coin flip"
 fi
 val "nameservers" "$(sed -n 's/^nameserver //p' /etc/resolv.conf 2>/dev/null | tr '\n' ' ')"
 val "wifi radio" "$(nmcli radio wifi 2>/dev/null)"
 
 hdr "default routes (lowest metric wins)"
-# The gadget route must LOSE to any real uplink. If a 10.55.0.x route is top of
+# The gadget route must LOSE to any real uplink. If the br-usb route is top of
 # this list and the host is not NAT-ing, the board has no internet and the
 # symptom will not look like USB.
 ip route show default | sed 's/^/  /' || echo "  <none>"

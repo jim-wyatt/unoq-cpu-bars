@@ -10,6 +10,22 @@ Documentation=file:/home/arduino/two-computers-one-board/python/unoq/learn.py
 # directory, and serves 404s for as long as it stays up.
 RequiresMountsFor=/srv/unoq-share
 
+# Ordering only, and a secondary improvement rather than the fix - the loopback
+# URL was the AF_NETLINK restriction below, not this. But this unit was ordered
+# against nothing and started a second before unoq-usb-gadget created br-usb,
+# so the addresses it prints are a snapshot taken before there was anything to
+# see. Ordering makes the snapshot worth taking.
+#
+# After= without Wants=/Requires= on purpose: the USB gadget is an OPTIONAL
+# feature (provision/60-usb-gadget.sh), and the learning site has to serve on a
+# board that never installed it. If the unit is absent or disabled this is a
+# no-op, which is exactly what is wanted - it must not pull the gadget in.
+#
+# It still does not cover the general case: the link gets its address when a
+# host is plugged in, which can be hours later. learn.py handles that by saying
+# so rather than inventing an address.
+After=unoq-usb-gadget.service
+
 [Service]
 Type=simple
 User=arduino
@@ -24,7 +40,22 @@ ProtectHome=read-only
 PrivateTmp=yes
 PrivateDevices=yes
 NoNewPrivileges=yes
-RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+# AF_NETLINK IS NOT DECORATION. Without it this unit printed a loopback URL as
+# the address to browse to, on a board whose USB link was up and answering on
+# two addresses. nss-myhostname resolves the local hostname by asking the
+# kernel for local addresses over a NETLINK socket; blocked, it falls back to
+# 127.0.0.2 - documented behaviour, and indistinguishable from "no network".
+#
+# Reproduced with systemd-run, same command, three sandboxes:
+#   unrestricted                      -> 10.55.0.1, 192.168.137.210
+#   AF_INET AF_INET6 AF_UNIX          -> 127.0.0.2        <- this unit
+#   ... plus AF_NETLINK               -> 10.55.0.1, 192.168.137.210
+#
+# It is a real widening: netlink is how you enumerate the host's network
+# configuration. Judged worth it because this is a read-only static file server
+# whose startup line exists to tell you where to point a browser, and the
+# alternative was a line that confidently said the wrong thing.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
 SystemCallFilter=@system-service
 MemoryMax=128M
 

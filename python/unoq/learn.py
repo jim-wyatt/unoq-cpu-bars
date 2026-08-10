@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import ipaddress
 import socket
 import sys
 from collections.abc import Callable
@@ -91,11 +92,33 @@ def addresses(port: int) -> list[str]:
 
     Purely informational - it is printed at startup so you can read the address
     off the console instead of guessing what the USB link came up as.
+
+    LOOPBACK IS FILTERED, because the resolver has a documented way of handing
+    back 127.0.0.2 that looks exactly like a real answer. nss-myhostname
+    resolves the local hostname by asking the kernel over a netlink socket; if
+    it cannot - no addresses configured, or the caller is sandboxed away from
+    AF_NETLINK, which is what bit unoq-learn.service - it answers 127.0.0.2.
+
+    A loopback URL is worse than no URL: it is the line someone reads to find
+    out where to point a browser, and it looks like it worked. Filtering here
+    is the belt to the unit's braces; neither alone is enough, because the unit
+    fixes only this caller and the filter cannot invent an address.
+
+    Resolving the hostname is kept deliberately. It is tempting to enumerate
+    interfaces instead, but SIOCGIFADDR returns only an interface's PRIMARY
+    address: on this board br-usb holds both 10.55.0.1 and the address the host
+    leases over ICS, and that ioctl silently drops the leased one - which is
+    the address a Windows user actually needs. getaddrinfo returns both.
     """
     urls = []
     with contextlib.suppress(OSError):  # no network at all is not an error here
         for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
             addr = info[4][0]
+            # Link-local goes too: 169.254.x is what you get when DHCP failed,
+            # so it is a symptom rather than somewhere to point a browser.
+            parsed = ipaddress.ip_address(addr)
+            if parsed.is_loopback or parsed.is_link_local:
+                continue
             url = f"http://{addr}:{port}/"
             if url not in urls:
                 urls.append(url)
@@ -125,8 +148,13 @@ def main(argv: list[str] | None = None) -> int:
 
     bound = server.server_address[1]
     print(f"serving {args.root} on port {bound}", flush=True)
-    for url in addresses(bound):
+    found = addresses(bound)
+    for url in found:
         print(f"  {url}", flush=True)
+    if not found:
+        # Say why, rather than nothing. An empty list is normal on a board with
+        # nothing plugged in, and silence reads as "it did not bother to look".
+        print("  no external address found - serving anyway", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

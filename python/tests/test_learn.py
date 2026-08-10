@@ -111,6 +111,51 @@ def test_addresses_survives_a_host_with_no_resolvable_name(
     assert learn.addresses(8080) == []
 
 
+def _resolving_to(*addrs: str) -> Any:
+    """A getaddrinfo stub returning `addrs`, in getaddrinfo's 5-tuple shape."""
+
+    def fake(*_a: object, **_k: object) -> list[tuple[Any, ...]]:
+        return [(2, 1, 6, "", (a, 0)) for a in addrs]
+
+    return fake
+
+
+def test_addresses_drops_the_loopback_answer(monkeypatch: pytest.MonkeyPatch) -> None:
+    # THE bug this filter exists for. With no external address configured,
+    # nss-myhostname answers the local hostname with 127.0.0.2 - documented
+    # behaviour - and it used to be printed as the address to browse to.
+    monkeypatch.setattr("unoq.learn.socket.getaddrinfo", _resolving_to("127.0.0.2"))
+    assert learn.addresses(8080) == []
+
+
+def test_addresses_drops_link_local(monkeypatch: pytest.MonkeyPatch) -> None:
+    # 169.254.x means DHCP failed. That is a symptom, not somewhere to browse.
+    monkeypatch.setattr("unoq.learn.socket.getaddrinfo", _resolving_to("169.254.3.4"))
+    assert learn.addresses(8080) == []
+
+
+def test_addresses_keeps_every_real_address(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Both of the board's, as seen in USB gadget mode: the static one and the
+    # address the host leases over ICS. Enumerating interfaces with SIOCGIFADDR
+    # would have returned only the first - it reports an interface's PRIMARY
+    # address - which is why resolving the hostname is kept.
+    monkeypatch.setattr(
+        "unoq.learn.socket.getaddrinfo",
+        _resolving_to("127.0.0.2", "10.55.0.1", "192.168.137.210"),
+    )
+    assert learn.addresses(8080) == [
+        "http://10.55.0.1:8080/",
+        "http://192.168.137.210:8080/",
+    ]
+
+
+def test_addresses_does_not_repeat_itself(monkeypatch: pytest.MonkeyPatch) -> None:
+    # getaddrinfo returns one row per socket type, so the same address arrives
+    # three times. The real board's resolution does exactly this.
+    monkeypatch.setattr("unoq.learn.socket.getaddrinfo", _resolving_to("10.55.0.1", "10.55.0.1"))
+    assert learn.addresses(8080) == ["http://10.55.0.1:8080/"]
+
+
 # -- main -------------------------------------------------------------------
 
 
@@ -153,6 +198,33 @@ def test_main_serves_then_exits_cleanly_on_interrupt(
     assert learn.main(["--root", str(tmp_path)]) == 0
     assert closed == [True]
     assert "serving" in capsys.readouterr().out
+
+
+def test_main_says_so_when_it_has_no_address_to_offer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """An empty list is normal, and silence would read as "it did not look".
+
+    The USB link gets its address when a host is plugged in, which can be long
+    after this starts. Saying nothing is better than a loopback URL, but worse
+    than saying why there is nothing.
+    """
+
+    class FakeServer:
+        server_address = ("0.0.0.0", 8080)
+
+        def serve_forever(self) -> None:
+            raise KeyboardInterrupt
+
+        def server_close(self) -> None:
+            pass
+
+    monkeypatch.setattr(learn, "make_server", lambda *_a, **_k: FakeServer())
+    monkeypatch.setattr(learn, "addresses", lambda _p: [])
+    assert learn.main(["--root", str(tmp_path)]) == 0
+    out = capsys.readouterr().out
+    assert "no external address found" in out
+    assert "http://127." not in out
 
 
 def test_default_root_is_the_mount_not_the_staging_directory() -> None:

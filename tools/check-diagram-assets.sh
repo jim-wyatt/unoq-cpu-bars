@@ -77,7 +77,7 @@ init="$SITE/assets/javascripts/mermaid-init.js"
 pages=0
 missing=0
 while IFS= read -r page; do
-  grep -q 'class="mermaid"' "$page" || continue
+  grep -q 'class="unoq-mermaid"' "$page" || continue
   pages=$((pages + 1))
   if ! grep -q 'mermaid-init\.js' "$page"; then
     note "${page#"$SITE"/} has a diagram but never loads mermaid-init.js"

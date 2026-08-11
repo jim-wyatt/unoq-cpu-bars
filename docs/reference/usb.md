@@ -96,11 +96,17 @@ since Catalina, and Linux has always had it. RNDIS is deprecated at Microsoft's
 end. Override for a host with no NCM driver:
 
 ```bash
+sudo ~/two-computers-one-board/usb/gadget-down.sh --purge      # required
 sudo UNOQ_GADGET_PRIMARY=rndis ~/two-computers-one-board/usb/gadget-up.sh
 ```
 
+**The purge is not optional.** `gadget-up.sh` is idempotent and never rebuilds a
+definition that already exists in configfs, so setting the variable on its own
+changes nothing — the gadget you get is the one that was already there. The
+script warns when the built gadget does not contain the function you asked for.
+
 That rebuilds the *same single configuration* with RNDIS in it. The choice is
-made here, at build time, rather than offered to the host to pick from.
+made at build time rather than offered to the host to pick from.
 
 ### Why not two configurations
 

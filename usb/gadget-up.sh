@@ -69,6 +69,21 @@ modprobe libcomposite 2>/dev/null
 
 if [ -d "$G" ]; then
   log "gadget already defined at $G"
+  # Say so when UNOQ_GADGET_PRIMARY asks for something the built gadget is not.
+  #
+  # Being idempotent means an existing definition is left alone, which is right
+  # - but it also means setting the variable and re-running this script looks
+  # like it should switch NCM<->RNDIS and does absolutely nothing. Silently
+  # ignoring the one setting somebody reaches for while troubleshooting a host
+  # that will not bind is the worst possible time to be quiet about it.
+  want_fn="ncm.usb0"
+  [ "${UNOQ_GADGET_PRIMARY:-ncm}" = rndis ] && want_fn="rndis.usb0"
+  if [ ! -d "$G/functions/$want_fn" ]; then
+    log "WARNING: this gadget has no $want_fn, and an existing definition is"
+    log "  never rebuilt. To actually switch, purge it first:"
+    log "    sudo $(dirname "$0")/gadget-down.sh --purge"
+    log "    sudo UNOQ_GADGET_PRIMARY=${UNOQ_GADGET_PRIMARY:-ncm} $0"
+  fi
 else
   mkdir -p "$G" || die "could not create $G"
 

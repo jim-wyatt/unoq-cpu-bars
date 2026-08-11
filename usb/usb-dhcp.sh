@@ -57,9 +57,10 @@ RESOLV="${UNOQ_RESOLV_CONF:-/etc/resolv.conf}"
 # link-local helpers below are reached on the path where udhcpc is least happy.
 interface="${interface:-${UNOQ_USB_BRIDGE:-br-usb}}"
 # An absolute path, not `command -v`. avahi-autoipd installs to /usr/sbin, which
-# is not on an ordinary user's PATH - and this script is also read by status.sh,
-# which is meant to run without root. A `command -v` here would report the daemon
-# missing on a board where it is installed and working.
+# is not on an ordinary user's PATH, so `command -v avahi-autoipd` reports it
+# missing on a board where it is installed and working. status.sh keeps its own
+# copy of this line for the same reason, and it is the one that matters most:
+# that script is meant to run without root, where /usr/sbin is absent from PATH.
 AUTOIPD="${UNOQ_AUTOIPD:-/usr/sbin/avahi-autoipd}"
 
 log() {

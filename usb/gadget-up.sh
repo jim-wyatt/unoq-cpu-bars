@@ -44,6 +44,16 @@
 # So the network function is chosen here at BUILD time rather than by the host
 # at enumeration time - UNOQ_GADGET_PRIMARY decides what goes in the single
 # config. That trades host autodetection for a drive that actually appears.
+#
+# BUILD time means exactly that: this script leaves an existing gadget alone, so
+# setting UNOQ_GADGET_PRIMARY and re-running it does NOTHING on a board that
+# already has one. Switching function means purging first:
+#
+#   sudo usb/gadget-down.sh --purge
+#   sudo UNOQ_GADGET_PRIMARY=rndis usb/gadget-up.sh
+#
+# It says so at runtime too, rather than leaving that to be discovered - see the
+# warning where the existing-gadget case is handled below.
 set -uo pipefail
 
 CONFIGFS=/sys/kernel/config/usb_gadget

@@ -21,10 +21,9 @@
 #
 # You are almost certainly typing it over the wifi it is about to turn off. If
 # the USB link is not carrying traffic - the gadget did not bind, the cable is
-# charge-only, the host is not sharing its connection, the board is in server
-# mode in front of a host that pins its own address - then the moment the radio
-# goes down there is no path to the board at all. Not slow: absent. The next
-# step is a serial console or a factory restore.
+# charge-only, the host is not sharing its connection - then the moment the
+# radio goes down there is no path to the board at all. Not slow: absent. The
+# next step is a serial console or a factory restore.
 #
 # So `off` refuses unless it can see the link actually working, and says which
 # check failed. --force skips the checks for when you know better (a serial
@@ -44,7 +43,6 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 BRIDGE="${UNOQ_USB_BRIDGE:-br-usb}"
 METRIC="${UNOQ_USB_ROUTE_METRIC:-700}"
 UDHCPC_PID=/run/unoq-usb-udhcpc.pid
-DNSMASQ_PID=/run/unoq-usb-dnsmasq.pid
 G="${UNOQ_GADGET_DIR:-/sys/kernel/config/usb_gadget/unoq}"
 
 # pid_is <pidfile> <acceptable comm>... - is that daemon actually running?
@@ -95,15 +93,19 @@ need_root() { [ "$(id -u)" = 0 ] || die "run this with sudo"; }
 command -v nmcli >/dev/null 2>&1 || die "nmcli not found - this board is not on NetworkManager"
 
 # The default route via the bridge is the single best proof that the USB link is
-# not merely up but usable: usb-route.sh only installs it from a real lease, in
-# either mode, and only when there is a gateway on the other end.
+# not merely up but usable: usb-route.sh only installs it from a real lease, and
+# only when there is a gateway on the other end.
 usb_gateway() {
   ip -4 route show default dev "$BRIDGE" 2>/dev/null |
     sed -n 's/^default via \([0-9.]*\).*/\1/p' | head -1
 }
 
-# In server mode there is no gateway at all - the board offers the host none -
-# so the thing to prove is simply that a host took a lease and is still there.
+# A gateway is the good case. A link-local address is the other one worth
+# knowing about: it means the cable found a computer but nothing is serving
+# DHCP, so there is a peer to reach the board from and no route past it. Falling
+# back to the neighbour table rather than refusing outright keeps `off` usable
+# for the "reach the board from this one machine" case, which is a legitimate
+# thing to want - preflight still warns that nothing else is reachable.
 usb_peer() {
   local gw
   gw="$(usb_gateway)"
@@ -111,7 +113,8 @@ usb_peer() {
     echo "$gw"
     return 0
   fi
-  awk '{print $3}' /run/unoq-usb-dnsmasq.leases 2>/dev/null | head -1
+  ip -4 neigh show dev "$BRIDGE" 2>/dev/null |
+    awk '$0 ~ /lladdr/ {print $1; exit}'
 }
 
 # Whether the computer on the other end is actually there.
@@ -161,9 +164,10 @@ preflight() {
     die "$BRIDGE does not exist - run usb/usb-net-up.sh first."
   peer="$(usb_peer)"
   [ -n "$peer" ] ||
-    die "no computer on $BRIDGE: no gateway in client mode, and no DHCP lease
-       in server mode. Plug the cable in, check usb/status.sh, and if the
-       host is sharing its connection make sure the mode is client."
+    die "no computer on $BRIDGE: no gateway, and no neighbour answering either.
+       Plug the cable in and check usb/status.sh. If the host is meant to be
+       sharing its connection, that is the thing to turn on - on Windows,
+       Internet Connection Sharing on the adapter the board appears as."
   peer_reachable "$peer" ||
     die "$peer is on the routing table but does not answer on $BRIDGE - the
        link is configured and not working, which is the one state where
@@ -190,31 +194,35 @@ preflight() {
 
 # What to ssh to afterwards.
 #
-# The leased address, and deliberately not the mDNS name. avahi advertises every
-# address on this bridge, which in client mode is both the leased one and
-# 10.55.0.1 - so a host resolving <hostname>.local gets two A records and picks
-# one, and half the time it picks the address it has no route to. Printing a
-# name that works half the time, at the moment the radio is about to go off, is
-# worse than printing nothing.
+# Both the name and the address, which this used to refuse to do. The old
+# comment here said the mDNS name was unprintable because avahi advertises every
+# address on the bridge, and there were always two - the leased one and the
+# static 10.55.0.1 - so <hostname>.local resolved to two A records and the host
+# picked one, half the time the one it had no route to.
+#
+# There is one address on this bridge now, which is what makes the name a
+# reliable answer rather than a coin flip. The numeric address is still printed
+# beside it, because this is the line you read thirty seconds later when the
+# radio is already off and nothing is going to help you look it up.
 reconnect_address() {
-  local leased
-  leased="$(ip -4 -br addr show "$BRIDGE" 2>/dev/null |
-    tr ' ' '\n' | grep -v '^10\.55\.0\.1/' | grep '/' | head -1)"
-  leased="${leased%%/*}"
-  if [ -n "$leased" ]; then
-    printf '%s@%s' "${SUDO_USER:-$USER}" "$leased"
+  local addr
+  addr="$(ip -4 -br addr show "$BRIDGE" 2>/dev/null |
+    tr ' ' '\n' | grep '/' | head -1)"
+  addr="${addr%%/*}"
+  if [ -n "$addr" ]; then
+    printf '%s@%s.local   (or %s@%s)' \
+      "${SUDO_USER:-$USER}" "$(hostname)" "${SUDO_USER:-$USER}" "$addr"
   else
-    printf '%s@10.55.0.1  - server mode, the host reaches the board here' "${SUDO_USER:-$USER}"
+    printf '%s@%s.local   - no address on %s yet' \
+      "${SUDO_USER:-$USER}" "$(hostname)" "$BRIDGE"
   fi
 }
 
 pid_mode() {
   if pid_is "$UDHCPC_PID" busybox udhcpc; then
-    echo "client (udhcpc, the host leases us an address)"
-  elif pid_is "$DNSMASQ_PID" dnsmasq; then
-    echo "server (dnsmasq, we lease the host an address)"
+    echo "udhcpc - asking the host for an address"
   else
-    echo "<neither running>"
+    echo "<udhcpc not running>"
   fi
 }
 

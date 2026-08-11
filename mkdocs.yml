@@ -198,10 +198,23 @@ markdown_extensions:
   # GitHub renders mermaid natively, so the same fence is a picture in the
   # repository AND on the site. The library itself is vendored by the `privacy`
   # plugin above, so no page ever fetches it.
+  #
+  # The class is `unoq-mermaid`, NOT `mermaid`, and that is the whole point of
+  # it. Material's own bundle renders anything classed `mermaid`, and it got
+  # there first: it handed the parser the fence including its <code> wrapper,
+  # drew mermaid's "Syntax error in text" graphic, and left the temp container
+  # (`<div id="d__mermaid_0">`) behind at the end of every page. Two renderers
+  # raced on every diagram and the losing one's wreckage stayed in the DOM.
+  #
+  # Renaming the class takes Material out of it entirely, so assets/javascripts/
+  # mermaid-init.js is the only thing that draws these - which is already the
+  # arrangement that file exists to create, for the vendored-library path
+  # reasons documented in it. GitHub is unaffected: it renders the ```mermaid
+  # fence natively and never sees this class.
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
-          class: mermaid
+          class: unoq-mermaid
           format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true

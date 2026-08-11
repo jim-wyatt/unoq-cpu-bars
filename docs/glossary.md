@@ -169,8 +169,9 @@ the idea gets explained, this is where you come to be reminded.
 
 **NCM / RNDIS**
 :   Two USB standards for pretending to be a network adapter. NCM is the modern
-    one; RNDIS is Microsoft's older one, offered as well because some Windows
-    setups want it.
+    one and what the gadget is built with; RNDIS is Microsoft's older one, kept
+    as a build-time alternative for a host with no NCM driver. Only one of them
+    is ever offered — see [IP over USB](reference/usb.md).
 
 ## O
 

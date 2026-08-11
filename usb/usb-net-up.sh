@@ -1,7 +1,7 @@
 #!/bin/bash
 # Copyright (c) 2026 Jim Wyatt
 # SPDX-License-Identifier: MIT
-# Give the USB gadget link an address, and hand one to the host over DHCP.
+# Put the USB gadget link on the bridge and get it an address.
 #
 #   sudo ~/two-computers-one-board/usb/usb-net-up.sh
 #
@@ -9,62 +9,67 @@
 #
 # ADDRESSING
 # ----------
-#   board   10.55.0.1        always, static
-#   host    10.55.0.10-.100  by DHCP, automatically
+#   the board    asks the computer for an address by DHCP
+#   if nobody    answers, IPv4 link-local instead - 169.254.x.y, RFC 3927
+#   either way   the board answers to <hostname>.local over mDNS
 #
-# The host needs NO configuration: every desktop OS asks for DHCP on a new
-# wired interface by default. 10.55.0.0/24 is deliberately obscure - a board
-# handing out 192.168.0.x or 10.0.0.x on a cable would collide with the
-# network the laptop is already on and break its real connection.
+# ONE DIRECTION, NOT TWO
+# ----------------------
+# The board is always the DHCP client here. It used to be switchable - a server
+# mode where the board sat at a static 10.55.0.1 and ran dnsmasq to lease the
+# computer an address, and a client mode for when the computer was the one
+# sharing its internet. Both existed at once, the mode was a file in /etc, and
+# 10.55.0.1 stayed on the bridge in both.
 #
-# WHICH END RUNS DHCP
-# -------------------
-# The above is UNOQ_USB_MODE=server, the default, and it is right whenever the
-# computer is simply something you want to reach the board from.
+# That was two of everything: two DHCP daemons to keep from fighting over one
+# wire, two sets of route and DNS handling, two answers to "what do I ssh to",
+# and a second address on the bridge whose only job was to be there when the
+# other one was not.
 #
-# UNOQ_USB_MODE=client turns it around: no dnsmasq, and the board asks the
-# computer for an address instead. That is the mode for a host that is sharing
-# its internet, which is what you want once the board's wifi is off to save the
-# power budget. Windows ICS and macOS Internet Sharing both pin their shared
-# adapter to a fixed address and run their own DHCP server on it; they will
-# never take a lease from us, so a board sitting at 10.55.0.1 in front of a host
-# at 192.168.137.1 is two addresses on one wire with no route between them.
+# Client-only is what makes a single address possible, because the two hosts we
+# do not control are not negotiable. Windows Internet Connection Sharing pins
+# its adapter to 192.168.137.1/24 and macOS Internet Sharing to 192.168.2.1,
+# each runs its own DHCP server, and neither will ever take a lease from us. A
+# board that wants internet over the cable has to accept their numbering. So it
+# accepts it, and the fixed thing you type is a NAME rather than an address.
 #
-#   UNOQ_USB_MODE=server   board 10.55.0.1 -> leases the host an address
-#   UNOQ_USB_MODE=client   board asks the host -> takes address, gateway, DNS
+# WHEN NOBODY IS SERVING DHCP
+# ---------------------------
+# The cable is plugged into a computer that is not sharing anything, or ICS is
+# off, or the host is still booting. This is the case the old static 10.55.0.1
+# existed for, and link-local does the same job properly.
 #
-# 10.55.0.1 stays on the bridge in BOTH modes. In client mode it is the address
-# the board still answers on when the host's DHCP server is not running, which
-# with wifi off is the difference between a fixable board and a serial console.
-# See usb-dhcp.sh.
+# Every desktop OS self-assigns 169.254.x.y when its own DHCP finds nothing, so
+# a board doing the same lands on the same /16 as the computer automatically -
+# no host configuration, no elevated `route add`, on Windows, macOS and Linux
+# alike. That is the part 10.55.0.1 could never do: a board on a private /24 of
+# its own needed a static route added by hand at the other end before anything
+# could reach it.
 #
-# Set it in the unit's environment (see 60-usb-gadget.sh) or for one run:
-#
-#   sudo UNOQ_USB_MODE=client ~/two-computers-one-board/usb/usb-net-up.sh
+# avahi is what turns that into something typeable. It publishes <hostname>.local
+# on every interface, so the name resolves to whichever address this link ended
+# up with - leased or link-local - and Windows 10+, macOS and Linux all resolve
+# it with nothing installed.
 #
 # WHY A BRIDGE
 # ------------
-# The gadget offers two configurations, RNDIS and NCM, and the host picks one.
-# Each has its own netdev on this side, and we cannot know in advance which
-# one carries traffic. Bridging both onto br-usb puts the address in one place
-# regardless of which the host chose, instead of racing to detect it.
+# Historically: the gadget offered two configurations, RNDIS and NCM, each with
+# its own netdev on this side, and we could not know which the host would pick.
 #
-# This deliberately does NOT provide a default route or NAT. The board is the
-# thing you are connecting TO; silently becoming a laptop's default gateway is
-# how you break its internet and spend an afternoon finding out why.
+# That is no longer the reason - gadget-up.sh now builds one configuration with
+# one network function. br-usb is kept because it is the interface name the
+# units, uplink-fallback.sh, wifi.sh and every ssh instruction in the docs refer
+# to, and because it survives the netdev disappearing on unplug where an address
+# on usb0 would not. It is a stable name doing the work now, not a bridge.
+#
+# This deliberately does NOT set a default route or NAT. Routing is usb-route.sh's
+# business, from a lease event, at a metric that loses to every real link.
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 BRIDGE="${UNOQ_USB_BRIDGE:-br-usb}"
-ADDR="${UNOQ_USB_ADDR:-10.55.0.1}"
-PREFIX="${UNOQ_USB_PREFIX:-24}"
-RANGE_LO="${UNOQ_USB_RANGE_LO:-10.55.0.10}"
-RANGE_HI="${UNOQ_USB_RANGE_HI:-10.55.0.100}"
-LEASE="${UNOQ_USB_LEASE:-12h}"
-MODE="${UNOQ_USB_MODE:-server}"
-PIDFILE=/run/unoq-usb-dnsmasq.pid
-LEASEFILE=/run/unoq-usb-dnsmasq.leases
 UDHCPC_PID=/run/unoq-usb-udhcpc.pid
+DNSMASQ_PID=/run/unoq-usb-dnsmasq.pid
 
 log() { echo "unoq-usb-net: $*"; }
 die() {
@@ -74,43 +79,21 @@ die() {
 
 [ "$(id -u)" = 0 ] || die "must run as root"
 
-case "$MODE" in
-  server | client) ;;
-  *) die "UNOQ_USB_MODE must be 'server' or 'client', not '$MODE'" ;;
-esac
-
-# --- one DHCP daemon at a time ---------------------------------------------
-#
-# Switching modes has to stop the other one, and not merely decline to start
-# it. Both would otherwise sit on the same bridge: our dnsmasq answering the
-# board's own udhcpc with a 10.55.0.x lease while the host's server offers a
-# real one, and the board taking whichever reply arrives first. That failure
-# comes and goes with timing, which is the worst kind to be left with.
 pid_alive() { [ -f "$1" ] && kill -0 "$(cat "$1")" 2>/dev/null; }
 
-stop_dnsmasq() {
-  pid_alive "$PIDFILE" || {
-    rm -f "$PIDFILE"
-    return 0
-  }
-  kill "$(cat "$PIDFILE")" 2>/dev/null
-  rm -f "$PIDFILE"
-  log "stopped dnsmasq (mode is $MODE)"
-}
-
-stop_udhcpc() {
-  pid_alive "$UDHCPC_PID" || {
-    rm -f "$UDHCPC_PID"
-    return 0
-  }
-  kill "$(cat "$UDHCPC_PID")" 2>/dev/null
-  rm -f "$UDHCPC_PID"
-  # udhcpc does not run its script on SIGTERM, so the leased address and the
-  # route it installed would outlive it. Run the teardown by hand, which also
-  # hands /etc/resolv.conf back to NetworkManager.
-  interface="$BRIDGE" "$HERE/usb-dhcp.sh" deconfig >/dev/null 2>&1
-  log "stopped udhcpc (mode is $MODE)"
-}
+# --- migration: no dnsmasq on this link any more ----------------------------
+#
+# Not tidiness. A board updated in place from the two-mode design still has our
+# dnsmasq running from the previous boot, and it would go on answering DHCP on
+# this bridge - a second DHCP server on the same wire as the host's, with the
+# board taking whichever reply arrives first. Left alone that is an intermittent
+# fault, and on a host that is NOT sharing its connection it is a rogue DHCP
+# server handing out leases on a subnet that no longer exists.
+if pid_alive "$DNSMASQ_PID"; then
+  kill "$(cat "$DNSMASQ_PID")" 2>/dev/null
+  rm -f "$DNSMASQ_PID"
+  log "stopped the dnsmasq left over from server mode - this link is client-only now"
+fi
 
 # --- bridge ----------------------------------------------------------------
 
@@ -125,14 +108,28 @@ else
   log "created $BRIDGE"
 fi
 
-ip addr show dev "$BRIDGE" | grep -q "inet $ADDR/$PREFIX" ||
-  ip addr replace "$ADDR/$PREFIX" dev "$BRIDGE"
 ip link set "$BRIDGE" up
+
+# A 10.55.0.1 left over from server mode has to go, and for a sharper reason
+# than neatness: avahi advertises every address on an interface, so a second one
+# here means <hostname>.local resolves to two A records and the host picks one -
+# half the time the one it has no route to. The whole point of this design is
+# that the name is a reliable answer, so there must be exactly one address for
+# it to give.
+while read -r stale; do
+  [ -n "$stale" ] || continue
+  ip addr del "$stale" dev "$BRIDGE" 2>/dev/null &&
+    log "removed $stale (left over from server mode)"
+done < <(ip -4 -o addr show dev "$BRIDGE" 2>/dev/null |
+  awk '$4 ~ /^10\.55\.0\./ {print $4}')
 
 # --- enslave whatever the gadget created -----------------------------------
 
-# usb0/usb1 are what rndis.usb0 and ncm.usb0 register as. Both are enslaved;
-# only the one in the configuration the host selected will ever pass a frame.
+# usb0 is what the gadget's single network function registers as. The loop still
+# enslaves every usb* it finds rather than naming one, because a gadget built
+# with the other function, or an older one still bound from before a rebuild,
+# numbers them differently - and enslaving a netdev that never passes a frame
+# costs nothing.
 enslaved=0
 for iface in /sys/class/net/usb*; do
   [ -e "$iface" ] || continue
@@ -158,109 +155,54 @@ if [ "$enslaved" = 0 ]; then
   log "no gadget interfaces yet - the bridge is up and waiting"
 fi
 
-# --- DHCP, in whichever direction this board is configured for -------------
+# --- ask the computer for an address ---------------------------------------
 
-if [ "$MODE" = client ]; then
-  stop_dnsmasq
+# busybox rather than a package: this image ships no dhclient, dhcpcd or
+# standalone udhcpc, and busybox is already here. It is also about the right
+# size of tool for the job - one interface, one lease, a handler script.
+command -v busybox >/dev/null 2>&1 || die "busybox not installed (needed for udhcpc)"
 
-  # busybox rather than a package: this image ships no dhclient, dhcpcd or
-  # standalone udhcpc, and busybox is already here. It is also about the right
-  # size of tool for the job - one interface, one lease, a handler script.
-  command -v busybox >/dev/null 2>&1 || die "busybox not installed (needed for udhcpc)"
-
-  if pid_alive "$UDHCPC_PID"; then
-    log "udhcpc already running (pid $(cat "$UDHCPC_PID"))"
-  else
-    rm -f "$UDHCPC_PID"
-    # Ask for the address we had last time. A DHCP server is free to refuse,
-    # and this changes nothing if it does - but Windows ICS and macOS both
-    # honour it in practice, which turns "ssh to whatever it got this time"
-    # into an address you can write down. It matters more here than it would
-    # elsewhere: with wifi off there is no second way in to go and look.
-    REQUEST=()
-    LAST="${UNOQ_STATE_DIR:-/var/lib/unoq}/usb-dhcp-last"
-    if [ -r "$LAST" ]; then
-      read -r last_ip <"$LAST"
-      case "$last_ip" in
-        '' | *[!0-9.]*) ;;
-        *.*.*.*)
-          REQUEST=(--request="$last_ip")
-          log "asking for $last_ip again (last address on this link)"
-          ;;
-      esac
-    fi
-    # -b: go to the background and keep trying rather than exiting, because at
-    #     boot the host's shared adapter is usually not up yet. There is no
-    #     failure here worth giving up on - the cable is either plugged in now
-    #     or it will be.
-    # -R: release the lease on a clean exit, so the host does not hold an
-    #     address for a board that has gone away.
-    # -t/-T: five tries three seconds apart before backing off, which keeps a
-    #     normal plug-in feeling immediate without hammering a host that is
-    #     not sharing anything.
-    if busybox udhcpc \
-      --interface="$BRIDGE" \
-      --script="$HERE/usb-dhcp.sh" \
-      --pidfile="$UDHCPC_PID" \
-      -x "hostname:$(hostname)" \
-      "${REQUEST[@]+"${REQUEST[@]}"}" \
-      --background --release \
-      --retries=5 --timeout=3 >/dev/null 2>&1; then
-      log "udhcpc asking for an address on $BRIDGE (host is the DHCP server)"
-    else
-      die "udhcpc failed to start on $BRIDGE"
-    fi
-  fi
-
-  log "board reachable at $ADDR, and at whatever the host leases it"
-  exit 0
-fi
-
-stop_udhcpc
-
-command -v dnsmasq >/dev/null 2>&1 || die "dnsmasq not installed"
-
-if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
-  log "dnsmasq already running (pid $(cat "$PIDFILE"))"
+if pid_alive "$UDHCPC_PID"; then
+  log "udhcpc already running (pid $(cat "$UDHCPC_PID"))"
 else
-  rm -f "$PIDFILE"
-  # Our own instance, on this interface only. --bind-dynamic rather than
-  # --bind-interfaces, for two reasons that both matter here:
-  #
-  #   1. SAFETY. This board normally also sits on a real network. A DHCP
-  #      server that answered on that interface would be a rogue DHCP server
-  #      on someone's home or office LAN, handing out addresses on a subnet
-  #      that does not exist. --bind-dynamic binds per-interface rather than
-  #      to 0.0.0.0, so it physically cannot reply on the wrong one.
-  #   2. It copes with br-usb appearing, disappearing and regaining carrier as
-  #      cables are plugged and unplugged, which --bind-interfaces does not:
-  #      that one resolves interfaces once, at startup.
-  #
-  # --port=0 disables the DNS half entirely; this exists to answer one DHCP
-  # request and nothing else. dhcp-option 3 and 6 are deliberately empty - no
-  # router, no DNS - so the board never becomes the laptop's default gateway.
-  # --dhcp-script runs usb-route.sh on every lease event, which is where the
-  # board's default route out through the host gets set: the host's address is
-  # whatever we just leased it, and the lease is the only moment that is
-  # authoritative. dnsmasq also replays existing leases as `old` at startup, so
-  # restarting it re-asserts the route rather than waiting for a renewal.
-  dnsmasq \
-    --conf-file=/dev/null \
-    --pid-file="$PIDFILE" \
-    --dhcp-leasefile="$LEASEFILE" \
-    --dhcp-script="$HERE/usb-route.sh" \
+  rm -f "$UDHCPC_PID"
+  # Ask for the address we had last time. A DHCP server is free to refuse, and
+  # this changes nothing if it does - but Windows ICS and macOS both honour it
+  # in practice, which keeps the numeric address stable across reboots for
+  # anyone who prefers typing it to typing the name.
+  REQUEST=()
+  LAST="${UNOQ_STATE_DIR:-/var/lib/unoq}/usb-dhcp-last"
+  if [ -r "$LAST" ]; then
+    read -r last_ip <"$LAST"
+    case "$last_ip" in
+      '' | *[!0-9.]*) ;;
+      *.*.*.*)
+        REQUEST=(--request="$last_ip")
+        log "asking for $last_ip again (last address on this link)"
+        ;;
+    esac
+  fi
+  # -b: go to the background and keep trying rather than exiting, because at
+  #     boot the host's shared adapter is usually not up yet. There is no
+  #     failure here worth giving up on - the cable is either plugged in now
+  #     or it will be.
+  # -R: release the lease on a clean exit, so the host does not hold an
+  #     address for a board that has gone away.
+  # -t/-T: five tries three seconds apart before backing off, which keeps a
+  #     normal plug-in feeling immediate without hammering a host that is
+  #     not sharing anything. usb-dhcp.sh brings link-local up on the way past.
+  if busybox udhcpc \
     --interface="$BRIDGE" \
-    --bind-dynamic \
-    --except-interface=lo \
-    --no-resolv \
-    --no-hosts \
-    --port=0 \
-    --dhcp-range="$RANGE_LO,$RANGE_HI,$LEASE" \
-    --dhcp-option=3 \
-    --dhcp-option=6 \
-    --dhcp-authoritative ||
-    die "dnsmasq failed to start"
-  log "dnsmasq serving $RANGE_LO-$RANGE_HI on $BRIDGE"
+    --script="$HERE/usb-dhcp.sh" \
+    --pidfile="$UDHCPC_PID" \
+    -x "hostname:$(hostname)" \
+    "${REQUEST[@]+"${REQUEST[@]}"}" \
+    --background --release \
+    --retries=5 --timeout=3 >/dev/null 2>&1; then
+    log "udhcpc asking for an address on $BRIDGE"
+  else
+    die "udhcpc failed to start on $BRIDGE"
+  fi
 fi
 
-log "board reachable at $ADDR (ssh, and http://$ADDR:8080/)"
+log "board reachable at $(hostname).local, and at whatever address this link gets"

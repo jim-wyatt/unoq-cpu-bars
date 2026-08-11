@@ -233,7 +233,18 @@ if [ -d "$PROJECT/share/learn" ]; then
   # --exclude protects the installers, which are on the drive and are NOT in
   # share/learn: rsync does not delete excluded paths, so this deletes stale
   # documentation without touching the ~2 GB that took an hour to download.
-  rsync -a --delete --exclude '/vscode/' "$PROJECT/share/learn/" "$MOUNT/" 2>/dev/null ||
+  #
+  # -rlt, NOT -a. The target is FAT32, which has no owners, no groups and no
+  # permission bits, and -a implies -o -g -p. Every chown fails with EPERM even
+  # as root - there is nothing on the filesystem to write them to - so rsync
+  # exits non-zero and this step reported FAILED while having copied every byte
+  # correctly:
+  #
+  #   rsync: [generator] chown "/srv/unoq-share/." failed: Operation not permitted
+  #
+  # Ownership and permissions on this mount come from the fmask/dmask/umask
+  # mount options instead, which is the only place FAT can express them.
+  rsync -rlt --delete --exclude '/vscode/' "$PROJECT/share/learn/" "$MOUNT/" ||
     fail "could not sync the documentation onto $MOUNT"
   did "learning content synced from share/learn/ (stale pages removed)"
 else

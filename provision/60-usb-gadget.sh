@@ -13,10 +13,16 @@
 #
 # WHAT YOU GET, once plugged into a computer
 # ------------------------------------------
-#   board          10.55.0.1        static
-#   your computer  10.55.0.10-.100  by DHCP, no configuration needed
+#   the board      reachable as <hostname>.local, over mDNS
+#   its address    leased by the computer, or link-local if nothing serves DHCP
 #   a USB drive    "UNO-Q", read-only, with the VS Code installers on it
-#   the web page   http://10.55.0.1:8080/
+#   the web page   http://<hostname>.local:8080/
+#
+# The board is always the DHCP client on this link. Windows Internet Connection
+# Sharing and macOS Internet Sharing both pin their own address and run their
+# own DHCP server, and neither will take a lease from us - so a board that wants
+# internet over the cable has to accept their numbering. The fixed thing you
+# type is the NAME, not an address. See usb/usb-net-up.sh.
 #
 # WHAT YOU GIVE UP
 # ----------------
@@ -52,41 +58,65 @@ MODS
   skip "modules will load at boot"
 fi
 
-step "DHCP server"
-apt_install dnsmasq-base
-# The packaged dnsmasq service is not used: usb-net-up.sh runs its own
-# instance bound to br-usb only, so it cannot interfere with anything else on
-# the box - or be interfered with.
-if unit_exists dnsmasq.service; then
-  disable_unit dnsmasq.service
+step "addressing"
+# avahi-autoipd is what the board falls back to when no DHCP server answers on
+# the cable - RFC 3927 link-local, the same 169.254/16 every desktop OS
+# self-assigns in the same situation, so both ends meet with no configuration at
+# either. It replaces a static 10.55.0.1 that needed a route added by hand on
+# the host before anything could reach it.
+# REVERT: apt-get purge avahi-autoipd
+apt_install avahi-autoipd
+# The packaged per-interface hooks are not used: usb-dhcp.sh starts and stops
+# the daemon on br-usb from the lease events, which is the only place that knows
+# whether a real lease has superseded it.
+if unit_exists avahi-autoipd.service; then
+  disable_unit avahi-autoipd.service
 else
-  skip "no packaged dnsmasq service to disable"
+  skip "no packaged avahi-autoipd service to disable"
 fi
+
+step "mDNS"
+# The board's name is the whole addressing story now, so the daemon publishing
+# it is a dependency rather than a nicety. Windows 10+, macOS and Linux all
+# resolve <hostname>.local with nothing installed at their end.
+apt_install avahi-daemon
+enable_unit avahi-daemon.service
+
+# dnsmasq is no longer installed for this: the board does not serve DHCP on the
+# USB link any more. A board provisioned before that change still has the
+# package, which is harmless - usb-net-up.sh kills any instance left running on
+# br-usb, and the packaged service was disabled here when it was installed.
 
 step "link configuration"
 # Written once and then left alone, unlike everything else here. It is the one
 # file on this board a person is expected to edit, and a provisioning run that
-# reset the mode every time would undo the change on the next bootstrap - most
-# likely while the board is running on the very link the setting controls.
-# REVERT: rm /etc/default/unoq-usb  (the scripts default to server mode anyway)
+# reset it every time would undo the change on the next bootstrap - most likely
+# while the board is running on the very link the settings control.
+# REVERT: rm /etc/default/unoq-usb  (every setting in it has a working default)
 if [ -f /etc/default/unoq-usb ]; then
-  skip "/etc/default/unoq-usb exists (mode: $(sed -n 's/^UNOQ_USB_MODE=//p' /etc/default/unoq-usb | tail -1))"
+  skip "/etc/default/unoq-usb exists"
+  # UNOQ_USB_MODE is gone: the board is always the DHCP client on this link.
+  # Left in place it does nothing, which is worse than saying so - the file
+  # would go on describing a server mode that no longer exists.
+  if grep -q '^UNOQ_USB_MODE=' /etc/default/unoq-usb 2>/dev/null; then
+    warn "/etc/default/unoq-usb still sets UNOQ_USB_MODE, which no longer does"
+    warn "  anything - the board is always the DHCP client now. Safe to delete"
+    warn "  that line: sudo sed -i '/^UNOQ_USB_MODE=/d' /etc/default/unoq-usb"
+  fi
 else
   write_file 0644 /etc/default/unoq-usb <<'CONF'
-# Which end of the USB link runs DHCP.
-# Read by unoq-usb-gadget.service and unoq-usb-bind.service.
+# Settings for the USB link. Read by unoq-usb-gadget.service and
+# unoq-usb-bind.service. Every one of them has a working default; this file
+# exists so they can be found and changed in one place.
 #
-#   server   the board is 10.55.0.1 and leases the computer an address.
-#            Right when the computer is just something you reach the board from.
-#
-#   client   the board asks the computer for an address instead. Use this when
-#            the computer is SHARING ITS INTERNET: Windows ICS pins its shared
-#            adapter to 192.168.137.1 and runs its own DHCP server, and will
-#            never take a lease from us. Also right for macOS Internet Sharing.
-#            10.55.0.1 stays on the bridge either way.
+# The board is always the DHCP CLIENT on this link - it asks the computer for an
+# address, and falls back to link-local (169.254.x.y) if nothing answers. Either
+# way it is reachable as <hostname>.local. There is no mode to choose: Windows
+# ICS and macOS Internet Sharing both pin their own address and run their own
+# DHCP server, so the board accepting their numbering is the only arrangement
+# that works on every host.
 #
 # After changing:  sudo systemctl restart unoq-usb-gadget
-UNOQ_USB_MODE=server
 
 # Uncomment to stop the gadget ever touching the board's default route. It is
 # installed at metric 700, so it already loses to wifi (600) and ethernet (100).
@@ -118,7 +148,7 @@ step "adbd"
 # REVERT: systemctl enable --now adbd
 if unit_exists adbd.service; then
   disable_unit adbd.service
-  skip "adb over TCP still works:  adb connect 10.55.0.1:5555"
+  skip "adb over TCP still works:  adb connect $(hostname).local:5555"
 else
   skip "adbd not present"
 fi
@@ -211,10 +241,15 @@ cat <<EOF
 
 Plug the board's USB-C port into your computer, then on the computer:
 
-  ssh $TARGET_USER@10.55.0.1
-  http://10.55.0.1:8080/            learning content + installers
+  ssh $TARGET_USER@$(hostname).local
+  http://$(hostname).local:8080/    learning content + installers
   the "UNO-Q" drive                 same files, no network needed
 
-Your computer configures itself by DHCP. If you would rather set it by hand,
-give its USB ethernet interface 10.55.0.2/24 - no gateway, no DNS.
+The name is the address here. The board takes whatever address the computer
+leases it - Windows and macOS both insist on their own numbering when they
+share a connection - and falls back to link-local if nothing is serving DHCP
+at all. mDNS is what makes that a single thing you can type: Windows 10+,
+macOS and Linux all resolve it with nothing installed.
+
+If you would rather have the number, ask the board:  usb/status.sh
 EOF

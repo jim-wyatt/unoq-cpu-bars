@@ -18,13 +18,42 @@
 #
 # WHAT THE HOST SEES
 # ------------------
-#   config 1  NCM    + UNO-Q drive   <- Windows 11, macOS, Linux all bind this
-#   config 2  RNDIS  + UNO-Q drive   <- fallback for pre-1903 Windows
+#   config 1   network + UNO-Q drive   <- the only configuration there is
 #
-# Two configurations rather than two functions in one: a host must not bind two
-# network interfaces to the same device, and each OS picks the config whose
-# network function it actually supports. The drive is in both, so it is there
-# either way.
+# ONE configuration, not two. An earlier version of this script put NCM in c.1
+# and RNDIS in c.2 and let each host pick the one it supported. That cost us
+# the drive on Windows completely, and took a long time to see, because the
+# half that broke was not the half that was clever.
+#
+# Windows only treats a device as composite - and so only loads usbccgp.sys,
+# which is the thing that gives each function its own driver - when all three
+# of these hold:
+#
+#   - bDeviceClass is 0, or class/subclass/protocol are 0xEF/0x02/0x01
+#   - the device has multiple interfaces
+#   - the device has a SINGLE configuration
+#
+# Two configurations failed the third. No USB\COMPOSITE compatible id was
+# generated, no generic parent driver loaded, and one driver bound to the whole
+# device: networking worked, and the mass storage interface was never
+# enumerated at all. Not hidden, not unmountable - absent. Windows offers one
+# way out, an INF naming the configuration for usbccgp in the registry, which
+# means shipping a signed driver package for a device whose ids belong to the
+# Linux Foundation.
+#
+# So the network function is chosen here at BUILD time rather than by the host
+# at enumeration time - UNOQ_GADGET_PRIMARY decides what goes in the single
+# config. That trades host autodetection for a drive that actually appears.
+#
+# BUILD time means exactly that: this script leaves an existing gadget alone, so
+# setting UNOQ_GADGET_PRIMARY and re-running it does NOTHING on a board that
+# already has one. Switching function means purging first:
+#
+#   sudo usb/gadget-down.sh --purge
+#   sudo UNOQ_GADGET_PRIMARY=rndis usb/gadget-up.sh
+#
+# It says so at runtime too, rather than leaving that to be discovered - see the
+# warning where the existing-gadget case is handled below.
 set -uo pipefail
 
 CONFIGFS=/sys/kernel/config/usb_gadget
@@ -50,6 +79,21 @@ modprobe libcomposite 2>/dev/null
 
 if [ -d "$G" ]; then
   log "gadget already defined at $G"
+  # Say so when UNOQ_GADGET_PRIMARY asks for something the built gadget is not.
+  #
+  # Being idempotent means an existing definition is left alone, which is right
+  # - but it also means setting the variable and re-running this script looks
+  # like it should switch NCM<->RNDIS and does absolutely nothing. Silently
+  # ignoring the one setting somebody reaches for while troubleshooting a host
+  # that will not bind is the worst possible time to be quiet about it.
+  want_fn="ncm.usb0"
+  [ "${UNOQ_GADGET_PRIMARY:-ncm}" = rndis ] && want_fn="rndis.usb0"
+  if [ ! -d "$G/functions/$want_fn" ]; then
+    log "WARNING: this gadget has no $want_fn, and an existing definition is"
+    log "  never rebuilt. To actually switch, purge it first:"
+    log "    sudo $(dirname "$0")/gadget-down.sh --purge"
+    log "    sudo UNOQ_GADGET_PRIMARY=${UNOQ_GADGET_PRIMARY:-ncm} $0"
+  fi
 else
   mkdir -p "$G" || die "could not create $G"
 
@@ -61,6 +105,18 @@ else
   echo 0x0104 >"$G/idProduct"
   echo 0x0200 >"$G/bcdUSB" # USB 2.0
   echo 0x0100 >"$G/bcdDevice"
+
+  # 0xEF/0x02/0x01 is "Miscellaneous / Common Class / Interface Association
+  # Descriptor": the device saying its interfaces are grouped into functions by
+  # IADs rather than being one function. A network function is two interfaces
+  # by itself, so without this a host is entitled to read interface 0 as the
+  # whole device - which is exactly what Windows did, reporting this board as
+  # USB\Class_02&SubClass_02&Prot_FF, the RNDIS control interface. A plain 0x00
+  # also satisfies Windows' first composite condition, but this one says what
+  # is actually true.
+  echo 0xEF >"$G/bDeviceClass"
+  echo 0x02 >"$G/bDeviceSubClass"
+  echo 0x01 >"$G/bDeviceProtocol"
 
   mkdir -p "$G/strings/0x409"
   echo "Arduino" >"$G/strings/0x409/manufacturer"
@@ -84,17 +140,34 @@ else
   DEV_MAC="$(fmt_mac 42)"  # the board's end
   HOST_MAC="$(fmt_mac 46)" # the host's end
 
-  # --- functions ---
-  for fn in ncm.usb0 rndis.usb0; do
-    mkdir -p "$G/functions/$fn"
-    echo "$DEV_MAC" >"$G/functions/$fn/dev_addr" 2>/dev/null
-    echo "$HOST_MAC" >"$G/functions/$fn/host_addr" 2>/dev/null
-  done
+  # --- which network function ---
+  #
+  # NCM is the default and RNDIS is not, which is the opposite of most gadget
+  # recipes. Those recipes predate Windows 10 version 1903, which ships a
+  # native NCM class driver (UsbNcm.sys) needing no driver and no INF. macOS
+  # has had NCM since Catalina and Linux has always had it, so NCM is the right
+  # default for every host that is not genuinely old. RNDIS is deprecated at
+  # Microsoft's end and is the one to be leaving behind.
+  #
+  # Only the chosen function gets created. An unused function sitting in
+  # configfs would bind to nothing and cost nothing, but building exactly what
+  # we bind keeps the gadget the host sees the same as the gadget described
+  # here - and this file has already been bitten once by a leftover that was
+  # supposed to be inert.
+  #
+  # Set UNOQ_GADGET_PRIMARY=rndis for a host with no NCM driver: a Windows
+  # older than 1903, or a newer one where NCM will not attach.
+  PRIMARY="${UNOQ_GADGET_PRIMARY:-ncm}"
+  case "$PRIMARY" in
+    ncm) NET_FN=ncm.usb0 CFG_NAME="NCM + fileshare" ;;
+    rndis) NET_FN=rndis.usb0 CFG_NAME="RNDIS + fileshare" ;;
+    *) die "UNOQ_GADGET_PRIMARY must be ncm or rndis, not '$PRIMARY'" ;;
+  esac
 
-  # Windows will not bind RNDIS without these: they are what makes it load
-  # its built-in driver instead of asking for a disk.
-  echo "RNDIS" >"$G/functions/rndis.usb0/os_desc/interface.rndis/compatible_id"
-  echo "5162001" >"$G/functions/rndis.usb0/os_desc/interface.rndis/sub_compatible_id"
+  # --- functions ---
+  mkdir -p "$G/functions/$NET_FN"
+  echo "$DEV_MAC" >"$G/functions/$NET_FN/dev_addr" 2>/dev/null
+  echo "$HOST_MAC" >"$G/functions/$NET_FN/host_addr" 2>/dev/null
 
   mkdir -p "$G/functions/mass_storage.0"
   if [ -f "$IMG" ]; then
@@ -112,63 +185,39 @@ else
     log "WARNING: $IMG missing - build it with share/build-image.sh"
   fi
 
-  # --- configurations ---
+  # --- configuration ---
   #
-  # A host enumerates configuration 1 and stops, so whatever goes in c.1 is
-  # what almost every computer will actually use. c.2 exists as a fallback you
-  # can select by hand.
-  #
-  # NCM is the default primary, and RNDIS is NOT, which is the opposite of most
-  # gadget recipes. Those recipes predate two changes at Microsoft's end:
-  #
-  #   - Windows ships a native NCM class driver (UsbNcm.sys) from Windows 10
-  #     version 1903 onwards, so NCM needs no driver and no INF.
-  #   - RNDIS is deprecated, and the driver has been removed from recent
-  #     Windows 11 builds. A Windows 11 host offered RNDIS in c.1 binds nothing
-  #     for networking - you get the drive and no IP, with no obvious error.
-  #
-  # macOS (NCM since Catalina) and Linux both prefer NCM too, so NCM-first is
-  # the right default for every host that is not genuinely old.
-  #
-  # Set UNOQ_GADGET_PRIMARY=rndis for a pre-1903 Windows host.
-  PRIMARY="${UNOQ_GADGET_PRIMARY:-ncm}"
-  case "$PRIMARY" in
-    ncm)
-      C1_FN=ncm.usb0 C1_NAME="NCM + fileshare"
-      C2_FN=rndis.usb0 C2_NAME="RNDIS + fileshare"
-      ;;
-    rndis)
-      C1_FN=rndis.usb0 C1_NAME="RNDIS + fileshare"
-      C2_FN=ncm.usb0 C2_NAME="NCM + fileshare"
-      ;;
-    *) die "UNOQ_GADGET_PRIMARY must be ncm or rndis, not '$PRIMARY'" ;;
-  esac
-
+  # Exactly one. WHAT THE HOST SEES at the top of this file explains why a
+  # second one is not a free fallback but the loss of the drive.
   mkdir -p "$G/configs/c.1/strings/0x409"
-  echo "$C1_NAME" >"$G/configs/c.1/strings/0x409/configuration"
+  echo "$CFG_NAME" >"$G/configs/c.1/strings/0x409/configuration"
   echo 250 >"$G/configs/c.1/MaxPower" # mA, i.e. 500mA
-  ln -sf "$G/functions/$C1_FN" "$G/configs/c.1/"
+  ln -sf "$G/functions/$NET_FN" "$G/configs/c.1/"
   ln -sf "$G/functions/mass_storage.0" "$G/configs/c.1/"
 
-  mkdir -p "$G/configs/c.2/strings/0x409"
-  echo "$C2_NAME" >"$G/configs/c.2/strings/0x409/configuration"
-  echo 250 >"$G/configs/c.2/MaxPower"
-  ln -sf "$G/functions/$C2_FN" "$G/configs/c.2/"
-  ln -sf "$G/functions/mass_storage.0" "$G/configs/c.2/"
-
-  # The Microsoft OS descriptors carry the RNDIS compatible ID, so they belong
-  # on whichever configuration actually holds rndis. They are harmless when
-  # that is the fallback config - Windows simply never asks.
-  echo 1 >"$G/os_desc/use"
-  echo 0xcd >"$G/os_desc/b_vendor_code"
-  echo MSFT100 >"$G/os_desc/qw_sign"
+  # --- Microsoft OS descriptors ---
+  #
+  # These exist for one reason: Windows will not bind RNDIS without them. So
+  # they are published only when RNDIS is what we actually built.
+  #
+  # Publishing them for an NCM gadget is not merely pointless, it is harmful,
+  # and it was the other half of the bug above. The old code linked them to
+  # whichever config held rndis and called that harmless "because Windows
+  # simply never asks". Windows always asks: it follows b_vendor_code during
+  # enumeration, and the compatible id it got back - USB\MS_COMP_RNDIS - came
+  # back at the TOP of this board's compatible id list, ahead of everything
+  # derived from the descriptors. That is what steered Windows onto the RNDIS
+  # configuration, the one we had filed as the fallback nobody would choose.
   if [ "$PRIMARY" = rndis ]; then
+    echo "RNDIS" >"$G/functions/rndis.usb0/os_desc/interface.rndis/compatible_id"
+    echo "5162001" >"$G/functions/rndis.usb0/os_desc/interface.rndis/sub_compatible_id"
+    echo 1 >"$G/os_desc/use"
+    echo 0xcd >"$G/os_desc/b_vendor_code"
+    echo MSFT100 >"$G/os_desc/qw_sign"
     ln -sf "$G/configs/c.1" "$G/os_desc/" 2>/dev/null
-  else
-    ln -sf "$G/configs/c.2" "$G/os_desc/" 2>/dev/null
   fi
 
-  log "gadget built (c.1=$C1_FN, c.2=$C2_FN, both + mass_storage)"
+  log "gadget built (c.1 = $NET_FN + mass_storage)"
 fi
 
 [ "$BUILD_ONLY" = 1 ] && {

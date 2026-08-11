@@ -74,34 +74,43 @@ single cable gives you both.
 ~/two-computers-one-board/usb/status.sh
 ```
 
-That prints the whole picture: the role, the controller, both configurations and
-their functions, the bridge, the addresses, and the recent log.
+That prints the whole picture: the role, the controller, the configuration and
+its functions, the bridge, the address, and the recent log.
 
-## Why the address is unusual
+## Why you type a name, not an address
 
 Two computers connected by a cable both need IP addresses, and something has to
-hand them out.
+hand them out. The obvious arrangement is for the board to do it — pick a range,
+run a DHCP server, give the laptop an address.
 
-Normally the board runs a DHCP server and gives your laptop an address on
-`10.55.0.0/24` — a deliberately obscure range, because a board handing out
-`192.168.0.x` on a cable would collide with the network the laptop is already on
-and break its real connection.
+It does not survive contact with the other two operating systems. Turn on
+**internet sharing** on your computer — which is how the board reaches the
+internet through it — and Windows and macOS stop negotiating. Windows pins its
+end to `192.168.137.1` and runs *its own* DHCP server; macOS does the same at
+`192.168.2.1`. Neither will ever accept an address from us.
 
-But if you turn on **internet sharing** on your computer — so the board can reach
-the internet through it — Windows and macOS stop negotiating. Windows pins its
-end to `192.168.137.1` and runs *its own* DHCP server. It will never accept an
-address from us.
-
-So the board has two modes, and the setting lives in `/etc/default/unoq-usb`:
-
-| Mode | Board | Right when |
-|---|---|---|
-| `server` | is `10.55.0.1`, hands the computer an address | the computer is just something you reach the board from |
-| `client` | asks the computer for an address | the computer is sharing its internet with the board |
-
-If both ends try to be the server, you get two computers on one wire with
+If both ends insist on being the server, you get two computers on one wire with
 addresses on different networks, unable to see each other — which looks exactly
 like a dead cable, with nothing logged anywhere.
+
+So the board gives in. It always asks, and takes whatever the computer offers.
+That solves reachability and creates a smaller problem: the address is now
+different on every host, and different again tomorrow.
+
+The answer to *that* is to stop typing addresses. The board publishes its name
+over **mDNS**, and Windows, macOS and Linux all resolve `.local` names with
+nothing installed:
+
+```bash
+ssh arduino@quentin.local
+```
+
+And if the computer is not sharing anything, so nothing answers the board's
+DHCP request at all? Both ends independently fall back to a **link-local**
+address — `169.254.something`, which every desktop OS self-assigns in exactly
+this situation. They land on the same network by coincidence that is not a
+coincidence, the name still resolves, and nothing had to be configured at
+either end.
 
 ## The cable is also the power
 

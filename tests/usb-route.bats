@@ -2,10 +2,10 @@
 # Copyright (c) 2026 Jim Wyatt
 # SPDX-License-Identifier: MIT
 #
-# usb/usb-route.sh is a dnsmasq lease hook. It runs as root, with an address
-# that came off the wire, and it decides whether to move the board's DEFAULT
-# ROUTE - which is the setting most able to break a machine remotely while
-# leaving it looking fine.
+# usb/usb-route.sh is the lease hook usb-dhcp.sh calls. It runs as root, with an
+# address that came off the wire, and it decides whether to move the board's
+# DEFAULT ROUTE - which is the setting most able to break a machine remotely
+# while leaving it looking fine.
 #
 # It has broken one already. The metric was 500, which BEAT NetworkManager's
 # 600 for wifi, so plugging the board into a computer silently handed that
@@ -30,8 +30,10 @@ exit 0
 SH
 }
 
-# The hook's argv, as dnsmasq calls it: <action> <mac> <ip> [hostname]
-lease() { run "$ROUTE" "$1" 02:00:00:00:00:01 "${2-}" "${3-}"; }
+# The hook's argv: <action> <gateway-ip>. There was a <mac> between them while
+# this was a dnsmasq --dhcp-script; dropping the DHCP server took the caller
+# that supplied it with it.
+lease() { run "$ROUTE" "$1" "${2-}"; }
 
 @test "a new lease points the default route at the host that issued it" {
   lease add 192.168.137.1
@@ -47,10 +49,10 @@ lease() { run "$ROUTE" "$1" 02:00:00:00:00:01 "${2-}" "${3-}"; }
   ran_like 'ip route replace default via [0-9.]+ dev br-usb metric 700$'
 }
 
-@test "dnsmasq replaying an existing lease re-asserts the route" {
-  # `old` is what dnsmasq emits for leases it already knew about when it
-  # starts. Treating it as an event is what makes a dnsmasq restart restore the
-  # route without waiting for a renewal.
+@test "a renewal re-asserts the route" {
+  # `old` is what usb-dhcp.sh passes on a renew rather than a fresh bind.
+  # Treating it as an event is what re-installs the route if something else
+  # removed it between renewals, without waiting for a new lease.
   lease old 192.168.137.1
   [ "$status" -eq 0 ]
   ran "ip route replace default via 192.168.137.1 dev br-usb metric 700"
@@ -101,9 +103,10 @@ lease() { run "$ROUTE" "$1" 02:00:00:00:00:01 "${2-}" "${3-}"; }
 
 # --- events and inputs that must be ignored ---------------------------------
 
-@test "dnsmasq events we do not care about are ignored" {
-  # dnsmasq calls the same script for tftp and arp-* events. Acting on those
-  # would mean running ip(8) with an argument that is not an address at all.
+@test "actions we do not recognise are ignored" {
+  # These were dnsmasq's - it called the same script for tftp and arp-* events.
+  # The allowlist stays now that it has one caller, because the failure it
+  # prevents is running ip(8) with an argument that is not an address at all.
   for action in tftp arp-add arp-del init ""; do
     : >"$STUB_LOG"
     lease "$action" 192.168.137.1

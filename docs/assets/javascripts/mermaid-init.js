@@ -39,6 +39,23 @@
 (() => {
   let done = false;
 
+  // Snapshot every fence's source NOW, synchronously, as this script tag runs -
+  // before DOMContentLoaded, and so before anything else can rewrite it.
+  //
+  // The class these blocks carry is `unoq-mermaid`, not `mermaid`, and that is
+  // deliberate (see mkdocs.yml): Material's own bundle renders anything classed
+  // `mermaid`, it used to get there first, and it drew an error graphic and left
+  // its temp container behind on every page. Renaming took it out of the race,
+  // so this file is now the only renderer.
+  //
+  // The snapshot stays anyway. It is what render() replays to strip the <code>
+  // wrapper below, and it means a fence survives anything else that might one
+  // day touch it before we do.
+  const SRC = new WeakMap();
+  document.querySelectorAll("pre.unoq-mermaid").forEach((el) => {
+    SRC.set(el, el.textContent);
+  });
+
   const render = () => {
     if (done) return;
     // The library is loaded by a plain <script> AFTER this file, and its very
@@ -70,8 +87,34 @@
       flowchart: { htmlLabels: true, curve: "basis" },
     });
 
-    const blocks = document.querySelectorAll("pre.mermaid:not([data-processed])");
-    if (blocks.length) mermaid.run({ nodes: blocks });
+    // UNWRAP BEFORE RENDERING. superfences emits each fence as
+    //
+    //   <pre class="unoq-mermaid"><code>flowchart LR ...</code></pre>
+    //
+    // and mermaid parses the element's innerHTML, so the source it is handed
+    // literally begins with the string "<code>". That is a syntax error, and it
+    // is why every diagram on this site drew mermaid's "Syntax error in text"
+    // graphic. Replaying the snapshot as textContent replaces the <code> child
+    // with a plain text node holding the decoded source.
+    //
+    // Measured, not guessed. Three variants through the vendored library:
+    //
+    //   <pre class="mermaid"><code>src</code></pre>   mermaid.run threw
+    //   the same, unwrapped to textContent first      rendered
+    //   <pre class="mermaid">src</pre>                rendered
+    const todo = [];
+    document.querySelectorAll("pre.unoq-mermaid").forEach((el) => {
+      const src = SRC.get(el);
+      if (!src) return;
+      el.textContent = src;
+      // Cleared so mermaid.run will consider the element at all - it skips
+      // anything already marked, and a re-render after a theme switch would
+      // otherwise be a no-op.
+      el.removeAttribute("data-processed");
+      todo.push(el);
+    });
+
+    if (todo.length) mermaid.run({ nodes: todo });
   };
 
   // Three chances, deliberately. DOMContentLoaded is usually enough; `load`

@@ -128,6 +128,19 @@ render() {
     echo broken
     return
   fi
+  # A rendered ERROR is not a rendered diagram, and counting data-processed
+  # alone could not tell them apart. mermaid sets data-processed on the element
+  # whether it drew the flowchart or its own "Syntax error in text" graphic, so
+  # this gate reported eleven confident passes while every diagram on the site
+  # was an error box. Same class of failure it was written to catch, one level
+  # down. The error graphic is identifiable by its role:
+  #
+  #   <svg ... aria-roledescription="error">
+  #     <text class="error-text">Syntax error in text</text>
+  if grep -q 'aria-roledescription="error"\|class="error-text"' <<<"$dom"; then
+    echo syntax-error
+    return
+  fi
   grep -c 'data-processed="true"' <<<"$dom"
 }
 
@@ -146,10 +159,21 @@ if [ -z "$lib" ]; then
   echo "no vendored mermaid in $SITE - run tools/check-diagram-assets.sh for why" >&2
   exit 1
 fi
+# The fixture uses the <code> wrapper because THAT IS WHAT MKDOCS EMITS.
+#
+# It did not, and that single difference is why this gate passed while every
+# real page failed. superfences renders a fence as
+# `<pre class="mermaid"><code>...</code></pre>`, mermaid parses innerHTML, and
+# the `<code>` made the source a syntax error - but the fixture wrote bare text
+# inside the <pre>, which parses fine. A fixture that does not reproduce the
+# real markup only proves the browser works.
+#
+# Entities too: mkdocs escapes `-->` to `--&gt;` inside the block, so the
+# fixture has to carry it escaped or it is not testing the decode path either.
 cat >"$SITE/_selftest.html" <<EOF
 <!doctype html><html><body>
-<pre class="mermaid">graph LR
-  A[in] --> B[out]</pre>
+<pre class="unoq-mermaid"><code>graph LR
+  A[in] --&gt; B[out]</code></pre>
 <script src="$lib"></script>
 <script src="assets/javascripts/mermaid-init.js"></script>
 </body></html>
@@ -203,13 +227,18 @@ checked=0
 total=0
 
 while IFS= read -r page; do
-  want="$(grep -c 'class="mermaid"' "$SITE/$page")"
+  want="$(grep -c 'class="unoq-mermaid"' "$SITE/$page")"
   [ "$want" = 0 ] && continue
   checked=$((checked + 1))
   got="$(render "http://127.0.0.1:$PORT/$page")"
   if [ "$got" = broken ]; then
     printf '  FAIL  %-46s the browser produced nothing (timed out after %ss?)\n' \
       "$page" "$PAGE_TIMEOUT"
+    fail=1
+    continue
+  fi
+  if [ "$got" = syntax-error ]; then
+    printf '  FAIL  %-46s mermaid drew its "Syntax error in text" graphic\n' "$page"
     fail=1
     continue
   fi

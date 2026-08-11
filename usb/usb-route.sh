@@ -2,19 +2,22 @@
 # Copyright (c) 2026 Jim Wyatt
 # SPDX-License-Identifier: MIT
 # Default route out through whichever computer is on the other end of the USB
-# cable. Called by dnsmasq, not by you.
+# cable. Called by usb-dhcp.sh on a lease event, not by you.
 #
-#   dnsmasq --dhcp-script=/home/arduino/two-computers-one-board/usb/usb-route.sh
-#   argv: <add|old|del> <mac> <ip> [hostname]
+#   usb/usb-route.sh <add|old|del> <gateway-ip>
 #
-# WHY A DHCP HOOK
-# ---------------
-# The host's address is not knowable in advance - it is whatever our own
-# dnsmasq leased it, and it changes if the pool moves or a different machine is
-# plugged in. The lease event is the only moment the address is authoritative,
-# so the route is set from there rather than polled for or hardcoded. dnsmasq
-# also replays existing leases as `old` when it starts, so a restart re-asserts
-# the route without waiting for a renewal.
+# WHY A LEASE HOOK
+# ----------------
+# The host's gateway address is not knowable in advance. Windows ICS uses
+# 192.168.137.1, macOS Internet Sharing 192.168.2.1, a Linux host whatever it
+# was configured with - and which computer is on the other end of the cable can
+# change between one plug-in and the next. The lease is the only moment that
+# address is authoritative, so the route is set from there rather than polled
+# for or hardcoded.
+#
+# It took a <mac> second argument until recently, because it was a dnsmasq
+# --dhcp-script back when the board could also be the DHCP server on this link.
+# It has one caller now.
 #
 # WHAT THIS DOES NOT DO
 # ---------------------
@@ -56,7 +59,7 @@
 set -uo pipefail
 
 ACTION="${1:-}"
-HOST_IP="${3:-}"
+HOST_IP="${2:-}"
 
 BRIDGE="${UNOQ_USB_BRIDGE:-br-usb}"
 METRIC="${UNOQ_USB_ROUTE_METRIC:-700}"
@@ -64,7 +67,6 @@ ENABLED="${UNOQ_USB_DEFAULT_ROUTE:-1}"
 
 [ "$ENABLED" = "1" ] || exit 0
 
-# dnsmasq calls the script for events we do not care about (tftp, arp-*).
 case "$ACTION" in
   add | old | del) ;;
   *) exit 0 ;;

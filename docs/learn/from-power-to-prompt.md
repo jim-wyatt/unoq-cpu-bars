@@ -28,15 +28,15 @@ before it could not yet do what the stage after it needs.
 ```mermaid
 flowchart LR
   subgraph MPU["MPU — Qualcomm QRB2210"]
-    direction LR
-    A["Mask ROM<br/><small>burned at the factory</small>"] --> B["XBL<br/><small>trains the DDR</small>"]
+    direction TB
+    A["Mask ROM<br/><small>factory-burned</small>"] --> B["XBL<br/><small>trains the DDR</small>"]
     B --> C["TrustZone<br/>+ hypervisor"]
     C --> D["U-Boot<br/><small>presents UEFI</small>"]
     D --> E["Linux kernel<br/>+ initrd"]
     E --> F["systemd<br/><small>~200 units</small>"]
   end
   subgraph MCU["MCU — STM32U585"]
-    direction LR
+    direction TB
     G["Boot ROM"] --> H["MCUboot<br/><small>checks the signature</small>"]
     H --> I["Zephyr<br/>+ your firmware"]
   end

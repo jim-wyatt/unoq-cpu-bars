@@ -170,6 +170,12 @@ else
   # this changes nothing if it does - but Windows ICS and macOS both honour it
   # in practice, which keeps the numeric address stable across reboots for
   # anyone who prefers typing it to typing the name.
+  #
+  # Read once, here, which is why usb-dhcp.sh deletes the file on a NAK rather
+  # than leaving it for the next lease to overwrite: a refusal that is not
+  # written down is a refusal this line repeats on every restart. That is the
+  # case where the cable moved between a PC and a Mac, whose shared adapters
+  # number from subnets neither will lease the other's addresses out of.
   REQUEST=()
   LAST="${UNOQ_STATE_DIR:-/var/lib/unoq}/usb-dhcp-last"
   if [ -r "$LAST" ]; then

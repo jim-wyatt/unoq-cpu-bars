@@ -238,6 +238,15 @@ The address is still sticky, for anyone who prefers typing numbers: the last
 lease is remembered in `/var/lib/unoq/usb-dhcp-last` and re-requested next
 time, and ICS honours the request in practice.
 
+Move the cable to a different computer and that request is the wrong one to
+make - ICS shares from `192.168.137.0/24`, macOS Internet Sharing from
+`192.168.2.0/24`, and neither hands out an address from the other's subnet. The
+new host answers with a NAK, and `usb-dhcp.sh` takes that as its cue to forget
+the remembered address: the running client re-discovers either way, but the
+file is read once when `udhcpc` starts, so a refusal left on disk is one the
+board repeats after every reboot. Nothing to do at your end; the first lease
+from the new host becomes the sticky one.
+
 ---
 
 ## Running on the USB link alone

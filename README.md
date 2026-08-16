@@ -145,6 +145,7 @@ at [Start here](docs/learn/start-here.md).
 │   ├── gadget-up.sh        build the configfs gadget, bind when a UDC appears
 │   ├── usb-net-up.sh       br-usb, and asking the computer for an address
 │   ├── usb-dhcp.sh         client mode: take an address from a sharing host
+│   ├── usb-profile.sh      the host's own numbering, when it serves no DHCP
 │   ├── bind-guard.sh       stop a brownout loop becoming permanent
 │   ├── uplink-fallback.sh  wifi back on if USB gives no internet after boot
 │   ├── wifi.sh             radio off, once the USB link can carry the traffic

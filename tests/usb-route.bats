@@ -154,3 +154,113 @@ SH
   [ "$status" -eq 0 ]
   [[ "$output" == *"could not set default route"* ]]
 }
+
+# --- prefer: the promotion, and why it needs proof --------------------------
+#
+# `prefer` is what makes plugging the cable in enough to use it, instead of
+# having to turn wifi off by hand. It installs metric 550, which BEATS wifi's
+# 600 - the same side of the line as the 500 that caused the bug this file
+# opens with.
+#
+# The difference, and the only thing making it safe, is that it happens after a
+# packet has reached the internet through the bridge. These tests are that
+# condition. If promotion ever stops depending on the probe, the 500 bug is
+# back with a different number on it.
+
+@test "prefer promotes ahead of wifi once the internet answers" {
+  stub ping 0
+  lease prefer 192.168.137.1
+  [ "$status" -eq 0 ]
+  ran "ip route replace default via 192.168.137.1 dev br-usb metric 550"
+}
+
+@test "the promoted metric beats NetworkManager's 600 for wifi" {
+  # 550 < 600 is the entire point of the action. Ethernet's 100 still wins.
+  stub ping 0
+  lease prefer 192.168.137.1
+  ran_like 'ip route replace default via [0-9.]+ dev br-usb metric 550$'
+}
+
+@test "promoting removes the unpromoted route, so there is only one" {
+  stub ping 0
+  lease prefer 192.168.137.1
+  ran "ip route del default via 192.168.137.1 dev br-usb metric 700"
+}
+
+@test "NO promotion when nothing answers through the bridge" {
+  # The load-bearing test. A gateway that is present but not forwarding must
+  # never get the default route ahead of a working wifi connection.
+  stub ping 1
+  stub curl 1
+  lease prefer 192.168.137.1
+  [ "$status" -eq 0 ]
+  ! ran_like 'ip route replace default via [0-9.]+ dev br-usb metric 550'
+}
+
+@test "a link that stops working is demoted again" {
+  # Promotion is not permanent. Every lease event re-runs this, so a host that
+  # goes away loses the default route it was promoted to instead of keeping it
+  # on the strength of having worked once.
+  stub ping 1
+  stub curl 1
+  lease prefer 192.168.137.1
+  ran "ip route del default via 192.168.137.1 dev br-usb metric 550"
+  ran "ip route replace default via 192.168.137.1 dev br-usb metric 700"
+}
+
+@test "the probe is bound to the bridge, not just to the internet at large" {
+  # Without -I br-usb this would answer "yes" whenever the board has wifi,
+  # which is exactly when the question is being asked. It would promote the
+  # USB route on the strength of the wifi it is about to overtake.
+  stub ping 0
+  lease prefer 192.168.137.1
+  ran_like 'ping .*-I br-usb'
+}
+
+@test "TCP is tried when ICMP is dropped but the host still NATs" {
+  # Windows firewalls outbound ping on some profiles while forwarding TCP
+  # perfectly. Refusing to promote on that basis would refuse the common case.
+  stub ping 1
+  stub curl 0
+  lease prefer 192.168.137.1
+  ran_like 'curl .*--interface br-usb'
+  ran "ip route replace default via 192.168.137.1 dev br-usb metric 550"
+}
+
+@test "UNOQ_USB_PREFER_OVER_WIFI=0 keeps the old fallback-only behaviour" {
+  # The route is left exactly as `add` installed it. `ip link show` still runs -
+  # that is the "is the bridge there" probe every action does first - so this
+  # asserts on the routing table rather than on ip(8) being untouched.
+  export UNOQ_USB_PREFER_OVER_WIFI=0
+  stub ping 0
+  lease prefer 192.168.137.1
+  [ "$status" -eq 0 ]
+  ! ran_like 'ip route'
+  never_ran ping
+}
+
+@test "the promoted metric can be overridden" {
+  export UNOQ_USB_ROUTE_METRIC_PREFERRED=120
+  stub ping 0
+  lease prefer 192.168.137.1
+  ran "ip route replace default via 192.168.137.1 dev br-usb metric 120"
+}
+
+@test "releasing a lease withdraws the promoted route too" {
+  # A promoted route left behind on release is a default route pointing at a
+  # host that has gone away, at a priority that beats wifi. That is the worst
+  # of the states this file exists to prevent.
+  lease del 192.168.137.1
+  ran "ip route del default via 192.168.137.1 dev br-usb metric 700"
+  ran "ip route del default via 192.168.137.1 dev br-usb metric 550"
+}
+
+@test "prefer rejects rubbish addresses like every other action" {
+  stub ping 0
+  for bad in "hello" ";reboot" ""; do
+    : >"$STUB_LOG"
+    lease prefer "$bad"
+    [ "$status" -eq 0 ]
+    never_ran ip
+  done
+}

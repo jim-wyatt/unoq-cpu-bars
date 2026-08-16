@@ -166,6 +166,13 @@ address_is_free() {
 # hosts firewall outbound ICMP while NAT-ing TCP perfectly, so a ping-only test
 # would condemn a link that works. Bound to the interface, so this is a test of
 # the USB path and not of whatever else the board might have up.
+#
+# -k, because the question is "did packets get there and come back", not "is
+# this certificate valid for this name". The defaults answer to a bare IP -
+# 1.1.1.1 and 8.8.8.8 both carry it in a SAN - but UNOQ_USB_PROBE_IPS is
+# somebody else's to set, and without -k the first probe address whose
+# certificate does not name it would fail TLS and be read here as "the host is
+# not NAT-ing", which is the one conclusion this check must not reach wrongly.
 routes_to_internet() {
   local ip
   for ip in $PROBES; do
@@ -173,7 +180,7 @@ routes_to_internet() {
   done
   if command -v curl >/dev/null 2>&1; then
     for ip in $PROBES; do
-      curl --interface "$BRIDGE" --max-time 5 -sS -o /dev/null \
+      curl --interface "$BRIDGE" --max-time 5 -sS -k -o /dev/null \
         "https://$ip/" >/dev/null 2>&1 && return 0
     done
   fi
@@ -231,6 +238,12 @@ do_up() {
     # because it is the difference between "ICS is off" and "ICS is half on",
     # and the fix is at the other end either way.
     log "$gw answers on $BRIDGE but nothing routes through it - giving the address back"
+    # And actually give it back, here, rather than leaving that to whoever
+    # called. usb-dhcp.sh does call `down` on this path, but a caller having to
+    # remember is a caller that can forget - and running this by hand is the
+    # case where nobody is going to. `down` after this is a no-op, by design:
+    # the state file it keys off is gone.
+    do_down "$name"
     return 1
   fi
 

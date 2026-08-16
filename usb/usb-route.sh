@@ -135,6 +135,12 @@ case "$ACTION" in
     #
     # ICMP first, then TCP: some hosts drop outbound ping while NAT-ing TCP
     # perfectly, and a ping-only test would refuse to promote a link that works.
+    #
+    # The TCP half runs with -k. What is being asked is whether packets reach
+    # the internet through this bridge, not whether a certificate is valid for
+    # an address - and a probe IP whose certificate does not name it would
+    # otherwise fail TLS and be read as "no internet here", which refuses to
+    # promote a link that works.
     if [ "$PREFER" != "1" ]; then
       log "not promoting the USB route (UNOQ_USB_PREFER_OVER_WIFI=0)"
       exit 0
@@ -148,7 +154,7 @@ case "$ACTION" in
     done
     if [ "$reached" != 0 ] && command -v curl >/dev/null 2>&1; then
       for probe in $PROBES; do
-        curl --interface "$BRIDGE" --max-time 5 -sS -o /dev/null \
+        curl --interface "$BRIDGE" --max-time 5 -sS -k -o /dev/null \
           "https://$probe/" >/dev/null 2>&1 && {
           reached=0
           break

@@ -224,6 +224,11 @@ SH
   stub curl 0
   lease prefer 192.168.137.1
   ran_like 'curl .*--interface br-usb'
+  # -k, because the question is whether packets got there and back, not whether
+  # a certificate is valid for an address. Without it the first probe IP whose
+  # certificate does not name it fails TLS and reads as "no internet", which
+  # refuses to promote a link that works.
+  ran_like 'curl .*-k'
   ran "ip route replace default via 192.168.137.1 dev br-usb metric 550"
 }
 

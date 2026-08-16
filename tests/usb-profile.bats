@@ -182,10 +182,37 @@ CONF
   [[ "$output" == *"nothing routes through it"* ]]
 }
 
+@test "an up that cannot prove itself takes its own address back off" {
+  # "Giving the address back" has to be something this script DOES, not
+  # something it says while relying on the caller to do it. usb-dhcp.sh does
+  # call `down` on this path - and a caller that has to remember is a caller
+  # that can forget, which running this by hand is the case nobody covers.
+  ANSWERS="192.168.137.1" fake_arping
+  stub ping 1
+  stub curl 1
+  run_profile up windows-ics
+  [ "$status" -ne 0 ]
+  ran "ip addr del 192.168.137.210/24 dev br-usb"
+  [ ! -e "$UNOQ_USB_PROFILE_STATE" ]
+}
+
 @test "the reachability probe goes through the bridge" {
   ANSWERS="192.168.137.1" fake_arping
   run_profile up windows-ics
   ran_like 'ping .*-I br-usb'
+}
+
+@test "the TCP half of the probe does not turn on certificate validation" {
+  # It asks whether packets reach the internet, not whether a certificate is
+  # valid for a bare IP. Without -k, a probe address whose certificate does not
+  # name it fails TLS and is read here as "the host is not NAT-ing" - which
+  # hands back a perfectly good address.
+  ANSWERS="192.168.137.1" fake_arping
+  stub ping 1
+  stub curl 0
+  run_profile up windows-ics
+  [ "$status" -eq 0 ]
+  ran_like 'curl .*-k'
 }
 
 @test "a working profile asks for the route to be promoted" {
@@ -208,15 +235,17 @@ CONF
   [ "$gw" = "192.168.137.1" ]
 }
 
-@test "state is written before the route, so a half-finished up can be undone" {
-  # If the route step or the probe kills the script, the address is already on
-  # the bridge. Without the state file nothing would know to take it off.
-  ANSWERS="192.168.137.1" fake_arping
-  stub ping 1
-  stub curl 1
-  run_profile up windows-ics
-  [ "$status" -ne 0 ]
-  [ -r "$UNOQ_USB_PROFILE_STATE" ]
+@test "state is written before the route, so a killed up can still be undone" {
+  # The graceful failure above cleans up after itself. This is the ungraceful
+  # one: if the script is killed between claiming the address and proving the
+  # route - a power cut on a board that is powered over the cable it is
+  # configuring - the address is on the bridge with nothing running that knows
+  # it. The state file written before the route is what the next `down`
+  # recovers from, so it has to be complete by then.
+  printf 'windows-ics 192.168.137.210/24 192.168.137.1\n' >"$UNOQ_USB_PROFILE_STATE"
+  run_profile down
+  [ "$status" -eq 0 ]
+  ran "ip addr del 192.168.137.210/24 dev br-usb"
 }
 
 @test "an unknown profile name is refused" {

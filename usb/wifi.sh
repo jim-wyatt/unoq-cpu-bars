@@ -106,15 +106,30 @@ usb_gateway() {
 # back to the neighbour table rather than refusing outright keeps `off` usable
 # for the "reach the board from this one machine" case, which is a legitimate
 # thing to want - preflight still warns that nothing else is reachable.
+#
+# BOTH FAMILIES, because this used to ask only IPv4 and got the answer wrong in
+# the exact case it exists for. With no DHCP server on the other end the board
+# autoconfigures 169.254/16 and the host does too, but nothing makes the two
+# ARP for each other until something sends v4 traffic - while IPv6 link-local
+# comes up on its own and carries the ssh session. So the v4 table held one
+# FAILED entry with no lladdr, the v6 table held the host REACHABLE, and this
+# function reported "no computer on br-usb" to a person connected through it.
+#
+# v4 is still asked first: an address the host routes with is a better answer
+# than one it merely answers on. Multicast is excluded because a neighbour that
+# is not a host is not a way back in.
 usb_peer() {
-  local gw
+  local gw peer
   gw="$(usb_gateway)"
   if [ -n "$gw" ]; then
     echo "$gw"
     return 0
   fi
-  ip -4 neigh show dev "$BRIDGE" 2>/dev/null |
-    awk '$0 ~ /lladdr/ {print $1; exit}'
+  peer="$(ip -4 neigh show dev "$BRIDGE" 2>/dev/null |
+    awk '$0 ~ /lladdr/ {print $1; exit}')"
+  [ -n "$peer" ] || peer="$(ip -6 neigh show dev "$BRIDGE" 2>/dev/null |
+    awk '$0 ~ /lladdr/ && $1 !~ /^[Ff][Ff]/ {print $1; exit}')"
+  [ -n "$peer" ] && echo "$peer"
 }
 
 # Whether the computer on the other end is actually there.
@@ -126,9 +141,17 @@ usb_peer() {
 # fails it has still forced ARP, which is the check that matters. A resolved
 # neighbour means frames cross the wire and get answered, which is exactly the
 # property "will I still be able to reach this board" depends on.
+#
+# The family is taken from the address rather than left to `ping` to guess,
+# because a link-local v6 peer is meaningless without a scope: -6 with -I names
+# the interface the fe80:: address belongs to, and without it the ping fails on
+# an address that is perfectly reachable.
 peer_reachable() {
   local peer="$1" entry
-  ping -c1 -W2 -I "$BRIDGE" "$peer" >/dev/null 2>&1 && return 0
+  case "$peer" in
+    *:*) ping -6 -c1 -W2 -I "$BRIDGE" "$peer" >/dev/null 2>&1 && return 0 ;;
+    *) ping -c1 -W2 -I "$BRIDGE" "$peer" >/dev/null 2>&1 && return 0 ;;
+  esac
   entry="$(ip neigh show "$peer" dev "$BRIDGE" 2>/dev/null)"
   case "$entry" in
     *FAILED* | *INCOMPLETE*) return 1 ;;
@@ -164,7 +187,7 @@ preflight() {
     die "$BRIDGE does not exist - run usb/usb-net-up.sh first."
   peer="$(usb_peer)"
   [ -n "$peer" ] ||
-    die "no computer on $BRIDGE: no gateway, and no neighbour answering either.
+    die "no computer on $BRIDGE: no gateway, and no IPv4 or IPv6 neighbour either.
        Plug the cable in and check usb/status.sh. If the host is meant to be
        sharing its connection, that is the thing to turn on - on Windows,
        Internet Connection Sharing on the adapter the board appears as."

@@ -274,6 +274,18 @@ does not answer a ping, and refusing on that basis would refuse in the normal
 case. A resolved neighbour proves frames cross the wire and get answered, which
 is the property "will I still be able to reach this board" actually depends on.
 
+**It looks in both address families, and the second one is not decoration.**
+When nothing serves DHCP, the board autoconfigures a `169.254/16` address and
+the host does the same, but neither side ARPs for the other until something
+sends IPv4 traffic — whereas IPv6 link-local comes up unprompted and is what
+carries the ssh session. Asking only IPv4 therefore failed in exactly the
+no-DHCP case the neighbour fallback exists for: the v4 table held one `FAILED`
+entry with no `lladdr`, the v6 table held the host `REACHABLE`, and `check`
+reported *"no computer on br-usb"* to someone logged in over that very link. A
+gateway still wins when there is one — an address the host routes with beats one
+it merely answers on — then IPv4 neighbours, then IPv6. Multicast is never a
+peer.
+
 `off` also kicks the DHCP client into renewing, because NetworkManager owns
 `/etc/resolv.conf` and rewrites it — without our nameservers — the moment the
 radio goes down. `usb-dhcp.sh` puts them back on a lease event, and without the

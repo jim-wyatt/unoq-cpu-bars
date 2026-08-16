@@ -44,7 +44,9 @@ set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ENABLED="${UNOQ_USB_DEFAULT_ROUTE:-1}"
-STATE="/run/unoq-usb-dhcp.state"
+# Overridable only so the tests do not write into /run; nothing in the running
+# system sets it, and status.sh reads the default path literally.
+STATE="${UNOQ_USB_DHCP_STATE:-/run/unoq-usb-dhcp.state}"
 # Survives a reboot, unlike the one above, and exists for one reason: so the
 # board asks for the same address it had last time. "What do I ssh to?" has to
 # have a durable answer on a board whose whole point is that wifi is off, and a
@@ -254,7 +256,29 @@ case "${1:-}" in
     ;;
 
   nak)
+    # A refusal, and the one refusal we can name in advance: the cable moved to
+    # a different computer. usb-net-up.sh opens by asking for the address this
+    # link had last time, and Windows ICS numbers from 192.168.137.0/24 while
+    # macOS Internet Sharing numbers from 192.168.2.0/24 - neither will lease an
+    # address out of the other's subnet, so the very first request after a swap
+    # is the one that gets NAKed.
+    #
+    # So stop remembering it. The running client recovers by itself - it goes
+    # back to discovery and `bound` writes down whatever this host actually
+    # offers - but the file is read once at STARTUP, so without this every
+    # restart on the new host opens by asking for the old host's address again
+    # and taking another refusal to get past it.
+    #
+    # Forgetting costs nothing when the NAK was not a swap: the address is a
+    # request, not a claim, and a host that refused it once was not going to
+    # honour it the second time either.
     log "DHCP NAK from the host - the lease was refused"
+    if [ -e "$LAST" ]; then
+      refused=""
+      [ -r "$LAST" ] && read -r refused <"$LAST"
+      rm -f "$LAST" &&
+        log "forgetting ${refused:-the remembered address} - asking fresh from here"
+    fi
     ;;
 
   leasefail)

@@ -276,8 +276,15 @@ case "${1:-}" in
     if [ -e "$LAST" ]; then
       refused=""
       [ -r "$LAST" ] && read -r refused <"$LAST"
-      rm -f "$LAST" &&
+      # Both outcomes are logged. A failed rm leaves the board doing exactly
+      # what this branch exists to stop - asking for the refused address again
+      # after every reboot - and the whole value of the branch is that it says
+      # so somewhere a person will read it.
+      if rm -f "$LAST"; then
         log "forgetting ${refused:-the remembered address} - asking fresh from here"
+      else
+        log "could not remove $LAST - the next start will ask for ${refused:-the same address} again"
+      fi
     fi
     ;;
 

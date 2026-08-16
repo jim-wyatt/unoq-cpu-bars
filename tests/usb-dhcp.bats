@@ -68,6 +68,22 @@ setup() {
   [[ "$output" == *"192.168.137.42"* ]]
 }
 
+@test "a NAK that cannot forget says so" {
+  # The failure mode is silence: the file stays, the board keeps asking for the
+  # refused address after every reboot, and the only sign was a log line that
+  # did not appear. Whatever went wrong with the filesystem, this has to say
+  # which file it could not remove.
+  [ "$(id -u)" -eq 0 ] && skip "root writes through a read-only directory"
+  echo "192.168.137.42" >"$LAST"
+  chmod a-w "$UNOQ_STATE_DIR"
+  run "$DHCP" nak
+  chmod u+w "$UNOQ_STATE_DIR"
+  [ "$status" -eq 0 ]
+  [ -e "$LAST" ]
+  [[ "$output" == *"could not remove"* ]]
+  [[ "$output" == *"$LAST"* ]]
+}
+
 @test "a NAK with nothing remembered is still a clean exit" {
   # The ordinary case on a board that has never held a lease on this link.
   [ ! -e "$LAST" ]

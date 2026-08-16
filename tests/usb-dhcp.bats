@@ -2,8 +2,10 @@
 # Copyright (c) 2026 Jim Wyatt
 # SPDX-License-Identifier: MIT
 #
-# usb/usb-dhcp.sh is udhcpc's handler script. These tests cover one thing it
-# does: the remembered address in /var/lib/unoq/usb-dhcp-last, which is what
+# usb/usb-dhcp.sh is udhcpc's handler script. These tests cover two things it
+# does.
+#
+# THE REMEMBERED ADDRESS in /var/lib/unoq/usb-dhcp-last, which is what
 # `udhcpc --request` asks for at startup so the numeric address survives a
 # reboot.
 #
@@ -19,6 +21,14 @@
 # file at every opportunity. What makes it a behaviour is that `bound` writes
 # it and `deconfig` - which runs on every stop and every start - leaves it
 # alone.
+#
+# AND RESOLV.CONF, which is the other thing a lease hands over and the one that
+# fails least visibly. The host that this link most often meets is a Windows box
+# sharing its connection with half the stack running: it NATs, and it answers
+# neither DHCP nor DNS. Writing its gateway down as the nameserver on that
+# evidence produces a board that routes and cannot resolve - `ping 8.8.8.8`
+# works, `apt` hangs - so the nameserver is asked a question first and DNS goes
+# public when it cannot answer.
 
 setup() {
   load helpers/stub
@@ -41,9 +51,54 @@ setup() {
   export UNOQ_AUTOIPD="$BATS_TEST_TMPDIR/no-such-autoipd"
   export interface=br-usb
 
+  export UNOQ_USB_PROFILE_STATE="$BATS_TEST_TMPDIR/profile.state"
+
   LAST="$UNOQ_STATE_DIR/usb-dhcp-last"
   mkdir -p "$UNOQ_STATE_DIR"
   : >"$UNOQ_RESOLV_CONF"
+}
+
+# --- the DNS half -----------------------------------------------------------
+#
+# resolv.conf is only written when the USB link is the default route, so the
+# routing table has to say so. `stub ip` answers nothing, which reads as "no
+# default route at all" - correct for the tests above, useless for these.
+usb_is_the_uplink() {
+  stub_body ip <<'SH'
+case "$*" in
+  "-4 route show default") echo "default via 192.168.137.1 dev br-usb metric 550" ;;
+esac
+exit 0
+SH
+  # usb-route.sh runs for real here, and its `prefer` probes the internet.
+  stub ping 0
+  stub curl 0
+}
+
+# The nameserver probe: `timeout <n> nslookup <name> <server>`.
+#
+# timeout is shadowed by a passthrough rather than stubbed out, so the decision
+# still reaches the nslookup stub and the argv of both is on record.
+#
+#   DNS_ANSWERS="a.b.c.d ..."  - these servers resolve; anything else does not.
+fake_dns() {
+  stub_body timeout <<'SH'
+shift
+exec "$@"
+SH
+  stub_body nslookup <<SH
+case " ${DNS_ANSWERS:-} " in *" \${2:-} "*) exit 0 ;; esac
+exit 1
+SH
+}
+
+# The nameservers actually written, in order.
+resolvers() {
+  sed -n 's/^nameserver //p' "$UNOQ_RESOLV_CONF" | tr '\n' ' '
+}
+
+lease() {
+  run env ip=192.168.137.210 subnet=255.255.255.0 router=192.168.137.1 "$@" "$DHCP" bound
 }
 
 @test "a lease is written down for the next startup to ask for" {
@@ -111,4 +166,130 @@ setup() {
   run env ip=192.168.2.7 subnet=255.255.255.0 "$DHCP" bound
   [ "$status" -eq 0 ]
   [ "$(cat "$LAST")" = "192.168.2.7" ]
+}
+
+# --- resolv.conf: the nameserver has to answer ------------------------------
+
+@test "a gateway that resolves is the nameserver written down" {
+  # The ordinary case, and the reason the gateway is a candidate at all: ICS
+  # proxies DNS on the same address it NATs from, so a lease with no option 6
+  # is still perfectly usable.
+  usb_is_the_uplink
+  DNS_ANSWERS="192.168.137.1" fake_dns
+  lease
+  [ "$status" -eq 0 ]
+  [ "$(resolvers)" = "192.168.137.1 " ]
+}
+
+@test "a gateway that does NOT answer DNS is replaced by public resolvers" {
+  # The load-bearing one. A host NAT-ing with its DNS proxy off gives a board
+  # that routes and cannot resolve, which reads at the terminal as "the network
+  # is fine but apt is broken" - the single most misleading state this link has.
+  usb_is_the_uplink
+  DNS_ANSWERS="1.1.1.1 8.8.8.8" fake_dns
+  lease
+  [ "$status" -eq 0 ]
+  [ "$(resolvers)" = "1.1.1.1 8.8.8.8 " ]
+  [[ "$output" == *"answers no DNS"* ]]
+}
+
+@test "the public fallback is not taken while the link's own resolver works" {
+  # It is a fallback, not a preference. Sending every lookup off the board when
+  # the host is willing to answer them would be a change nobody asked for.
+  usb_is_the_uplink
+  DNS_ANSWERS="192.168.137.1 1.1.1.1" fake_dns
+  lease
+  [[ "$(resolvers)" != *"1.1.1.1"* ]]
+}
+
+@test "a lease's own DNS servers are checked, not just the gateway" {
+  # Option 6 is a claim like any other. A host that hands out a nameserver
+  # address it cannot reach itself is the same failure one step removed.
+  usb_is_the_uplink
+  DNS_ANSWERS="1.1.1.1 8.8.8.8" fake_dns
+  lease dns=192.168.137.1
+  [ "$(resolvers)" = "1.1.1.1 8.8.8.8 " ]
+}
+
+@test "a working lease nameserver is kept ahead of the gateway" {
+  usb_is_the_uplink
+  DNS_ANSWERS="10.0.0.53" fake_dns
+  lease dns=10.0.0.53
+  [ "$(resolvers)" = "10.0.0.53 " ]
+}
+
+@test "the whole public list is written, not just the one that answered" {
+  # The probe is a spot check on one server. What ends up in the file should
+  # still have a second entry to fall to when the first one stops answering.
+  usb_is_the_uplink
+  DNS_ANSWERS="8.8.8.8" fake_dns
+  lease
+  [ "$(resolvers)" = "1.1.1.1 8.8.8.8 " ]
+}
+
+@test "the public resolvers can be changed" {
+  usb_is_the_uplink
+  DNS_ANSWERS="9.9.9.9" fake_dns
+  lease UNOQ_USB_DNS_PUBLIC=9.9.9.9
+  [ "$(resolvers)" = "9.9.9.9 " ]
+}
+
+@test "UNOQ_USB_DNS_PUBLIC= refuses to send lookups off the board at all" {
+  # For anyone who would rather have no DNS than DNS somebody else can see.
+  # What is left is what the link offered, which is what it would have been
+  # before any of this existed.
+  usb_is_the_uplink
+  DNS_ANSWERS="" fake_dns
+  lease UNOQ_USB_DNS_PUBLIC=
+  [ "$(resolvers)" = "192.168.137.1 " ]
+}
+
+@test "when nothing answers, the link's nameserver is kept rather than nothing" {
+  # A resolv.conf with no nameserver in it resolves nothing at all, which is
+  # strictly worse than one that might be early. This is rewritten on every
+  # lease event, so a resolver that starts working is picked up on the next one.
+  usb_is_the_uplink
+  DNS_ANSWERS="" fake_dns
+  lease
+  [ "$(resolvers)" = "192.168.137.1 " ]
+  [[ "$output" == *"no nameserver answers"* ]]
+}
+
+@test "the probe is bounded in time" {
+  # udhcpc runs this script synchronously and will not process the next lease
+  # event until it returns. An unbounded lookup against a host that drops packets
+  # is a lease handler that never finishes.
+  usb_is_the_uplink
+  DNS_ANSWERS="192.168.137.1" fake_dns
+  lease
+  ran_like '^timeout [0-9]+ nslookup example\.com 192\.168\.137\.1$'
+}
+
+@test "a board with no nslookup writes what the link offered" {
+  # No way to ask the question is not the same as an answer of no. Without this
+  # the fallback would fire on every board that has no dnsutils and no busybox
+  # nslookup, sending DNS public on links whose own resolver was fine.
+  usb_is_the_uplink
+  DNS_ANSWERS="1.1.1.1" fake_dns
+  lease UNOQ_NSLOOKUP="$BATS_TEST_TMPDIR/no-such-nslookup"
+  [ "$(resolvers)" = "192.168.137.1 " ]
+  never_ran nslookup
+}
+
+@test "no resolv.conf is written when the USB link is not the uplink" {
+  # NetworkManager owns the file. Taking it while wifi is carrying the traffic
+  # would leave the board pointing at a gateway it loses when the cable comes
+  # out - which is the regression the device check exists to prevent.
+  stub_body ip <<'SH'
+case "$*" in
+  "-4 route show default") echo "default via 192.168.0.1 dev wlan0 metric 600" ;;
+esac
+exit 0
+SH
+  stub ping 0
+  stub curl 0
+  DNS_ANSWERS="1.1.1.1" fake_dns
+  lease
+  [ -z "$(resolvers)" ]
+  never_ran nslookup
 }

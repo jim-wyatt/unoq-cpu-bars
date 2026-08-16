@@ -161,7 +161,8 @@ type is a name.**
 | | |
 |---|---|
 | Board | whatever the computer leases it, on `br-usb` |
-| If nothing serves DHCP | IPv4 link-local, `169.254.x.y` (RFC 3927) |
+| If the host routes but serves no DHCP | an address on *its* subnet, self-assigned |
+| If nothing at all is there | IPv4 link-local, `169.254.x.y` (RFC 3927) |
 | Reachable as | `<hostname>.local`, over mDNS |
 | Runs DHCP | the computer, never us |
 
@@ -198,19 +199,117 @@ busybox is already here.
 ### When nothing is serving DHCP
 
 The cable is in a computer that is not sharing anything, ICS is off, or the
-host is still booting. `udhcpc` reports `leasefail`, and the board claims an
-IPv4 link-local address instead, via `avahi-autoipd`.
+host is still booting. `udhcpc` reports `leasefail`, and the board falls back —
+to the host's own numbering if it can prove there is a working host on the
+other end, and to IPv4 link-local if it cannot.
 
-That is the same thing Windows, macOS and Linux each do when their own DHCP
-finds nothing, so **both ends land on `169.254.0.0/16` by themselves** and can
-talk with no configuration at either. `avahi-autoipd` rather than picking an
-address ourselves because RFC 3927 is more than choosing one — it ARP-probes
-before claiming, defends the claim, and re-picks on a conflict, which matters
-precisely because the host is self-assigning from the same range at the same
-moment on the same wire.
+**Link-local is the floor.** It is the same thing Windows, macOS and Linux each
+do when their own DHCP finds nothing, so **both ends land on `169.254.0.0/16` by
+themselves** and can talk with no configuration at either. `avahi-autoipd`
+rather than picking an address ourselves because RFC 3927 is more than choosing
+one — it ARP-probes before claiming, defends the claim, and re-picks on a
+conflict, which matters precisely because the host is self-assigning from the
+same range at the same moment on the same wire.
 
-The moment a real lease arrives, `bound` takes the link-local address back
-down. Never both at once — see below for why that is not merely tidiness.
+What link-local cannot do is get you *off* the wire: RFC 3927 forbids routing
+off-link through a `169.254` next hop, so a board on link-local reaches the one
+computer it is plugged into and nothing beyond it. That is the whole reason for
+the fallback above it.
+
+The moment a real lease arrives, `bound` takes whichever fallback is in place
+back down. Never two at once — see below for why that is not merely tidiness.
+
+### The host that NATs but will not lease
+
+Windows ICS with its firewall profile dropping inbound DHCP is the case: the
+gateway is up at `192.168.137.1`, it forwards and NATs to the internet in about
+17 ms, and it answers no DHCP discover at all. Everything the board needs is on
+the other end of the cable and reachable. The only missing thing is somebody to
+hand over an address — so `usb-profile.sh` takes one.
+
+```
+  host profile           windows-ics (192.168.137.210/24 via 192.168.137.1)
+                         self-assigned - the host is NAT-ing but not serving DHCP
+```
+
+It identifies the host **by asking the wire**, not by guessing from a config
+file. Each profile names the address that kind of host puts on its own shared
+adapter, and detection is an ARP request for it — ARP rather than ping because
+Windows firewalls ICMP to the ICS adapter by default, so a ping-based check
+would report "no host" for the most common host this will ever meet.
+
+| Profile | Gateway | The board takes |
+|---|---|---|
+| `windows-ics` | `192.168.137.1` | `192.168.137.210/24` |
+| `macos-sharing` | `192.168.2.1` | `192.168.2.210/24` |
+
+`.210` rather than `.2`, because both shared adapters lease from the low end of
+their range: a high address keeps the board clear of anything the host hands
+out if its DHCP half comes back to life.
+
+**Nothing is claimed without two proofs**, because an address claimed wrongly is
+worse than no address at all:
+
+1. **The address is free** — an RFC 5227 ARP probe (`arping -D`, sourced from
+   `0.0.0.0`, so it is a question rather than a claim) before taking it. The
+   board never collides with the host, or with a second board on the same
+   machine.
+2. **The route works** — an actual packet to the internet through `br-usb`
+   after the route is in. A gateway that answers ARP and forwards nothing gets
+   the address handed straight back, and the board falls through to link-local,
+   which at least reaches the computer.
+
+It will not guess. If no profile's gateway answers, this reports nothing and
+link-local takes over; it does not sweep the subnet or invent numbering. A
+Linux host with its own numbering is a line in a file:
+
+```bash
+# /etc/unoq/usb-profiles.conf - name, gateway, address, prefix length
+my-linux-box  10.9.0.1  10.9.0.210  24
+```
+
+```bash
+UNOQ_USB_PROFILE_FALLBACK=0   # link-local only, nothing cleverer
+```
+
+### DNS, when the host routes but does not resolve
+
+A host that is not serving DHCP usually is not serving DNS either — the ICS
+resolver is the other half of the same service that is not running, and a Linux
+box NAT-ing with plain nftables never had one on that address to begin with.
+
+Writing that gateway into `resolv.conf` anyway produces the least obvious
+failure on this link: traffic routes, `ping 8.8.8.8` answers, and every name
+lookup hangs until it times out. `apt` stops working while the network looks
+perfect.
+
+So the nameserver is **asked a question before it is written down** — a lookup
+sent to that address specifically, bounded by `timeout` because a resolver that
+is not there drops the query rather than refusing it. If it cannot answer, DNS
+goes to public resolvers over the link that has just been proved to carry
+traffic:
+
+```
+unoq-usb-dhcp: the host on br-usb answers no DNS - resolving through 1.1.1.1 8.8.8.8 instead
+unoq-usb-dhcp: resolv.conf -> 1.1.1.1 8.8.8.8
+```
+
+This applies to a real lease's DNS servers as well, not just to the
+self-assigned case — option 6 is a claim like any other. A nameserver that
+answers is always preferred to the public ones, and the check runs again on
+every lease event, so a resolver that starts working is picked up on the next
+one.
+
+```bash
+UNOQ_USB_DNS_PUBLIC="1.1.1.1 8.8.8.8"   # or "" to keep every lookup on the link
+UNOQ_USB_DNS_PROBE_NAME=example.com     # the name looked up to decide
+UNOQ_USB_DNS_TIMEOUT=5                  # seconds per nameserver
+```
+
+`resolv.conf` is only ever written when the USB link is the board's default
+route — NetworkManager owns the file otherwise, and taking it while wifi is
+carrying traffic would leave the board pointing at a gateway it loses the moment
+the cable comes out.
 
 ### Why the name works now, and did not before
 
@@ -350,20 +449,38 @@ getting it wrong is quiet:
 | Link | Metric | |
 |---|---|---|
 | Ethernet (NetworkManager) | 100 | wins |
-| **Wifi** (NetworkManager) | **600** | wins |
-| USB gadget (this) | **700** | fallback only |
+| USB gadget, **once proved** | **550** | beats wifi |
+| **Wifi** (NetworkManager) | **600** | wins over an unproved cable |
+| USB gadget, as installed | **700** | fallback only |
 
-Higher metric = lower priority, so the USB route is only ever used when the
-board has nothing better. **This was 500 and therefore beat wifi**, which is a
-bad failure to diagnose: SSH keeps working, because that is a connected route
-on the LAN rather than the default, so the board looks reachable and healthy
-while every outbound connection is being sent to a computer that probably is
-not routing. `apt`, `git` and anything else wanting the internet just stop.
+Higher metric = lower priority, so the route a lease installs is only ever used
+when the board has nothing better. **This was 500 and therefore beat wifi**,
+which is a bad failure to diagnose: SSH keeps working, because that is a
+connected route on the LAN rather than the default, so the board looks reachable
+and healthy while every outbound connection is being sent to a computer that
+probably is not routing. `apt`, `git` and anything else wanting the internet
+just stop.
 
-If you never want the gadget touching the default route:
+**550 is that same side of the line, and what makes it safe is the proof.** It
+is not what a lease installs. Every lease event, and every successful host
+profile, runs `usb-route.sh prefer`, which sends a packet to the internet
+*bound to `br-usb`* — ICMP first, then TCP, because some hosts firewall
+outbound ping while NAT-ing TCP perfectly. Only if something answers is the
+route promoted ahead of wifi, and the check is bound to the interface precisely
+because "does this board have internet" would answer yes on the strength of the
+wifi it is about to overtake.
+
+It is not permanent either. The same check runs again on the next event, and a
+host that has stopped forwarding is demoted back to 700 rather than keeping the
+default route on the strength of having worked once. The residual case is worth
+stating: a host that goes to sleep with the cable in leaves a promoted route
+pointing at nothing until the next event —
+`unoq-uplink-fallback.service` is the backstop for the version of that which
+actually strands the board.
 
 ```bash
-UNOQ_USB_DEFAULT_ROUTE=0     # in the unit's environment
+UNOQ_USB_PREFER_OVER_WIFI=0  # never promote; the cable stays a fallback
+UNOQ_USB_DEFAULT_ROUTE=0     # never touch the default route at all
 ```
 
 Check which route actually won, with the cable plugged in:
@@ -499,6 +616,23 @@ interface. `ip -br addr show br-usb` should show one address — leased or
 `169.254.x.y` — and `bridge link` should list a `usb*` port. If the host is an
 old Windows with no NCM driver, rebuild with
 `sudo UNOQ_GADGET_PRIMARY=rndis usb/gadget-up.sh`.
+
+**The internet works but names do not resolve.** `ping 8.8.8.8` answers and
+`apt` hangs. The board is routing through a host whose DNS resolver is not
+running — the usual shape of a half-configured ICS adapter. This is handled
+automatically now: `usb-dhcp.sh` tests the nameserver before writing it down and
+switches to public resolvers when it cannot answer. What to check is whether
+that happened.
+
+```bash
+cat /etc/resolv.conf                        # what is actually being used
+journalctl -t unoq-usb-dhcp | grep -i dns   # and why
+nslookup example.com 192.168.137.1          # ask the host's resolver yourself
+```
+
+A nameserver line pointing at the gateway, with the lookup above timing out,
+means the check has not run since the resolver died — kick a renew with
+`sudo kill -USR1 "$(cat /run/unoq-usb-udhcpc.pid)"`.
 
 **`<hostname>.local` resolves to something unreachable.** There is more than
 one address on `br-usb`; avahi advertises all of them. `usb/status.sh` warns

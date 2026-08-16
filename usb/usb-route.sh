@@ -4,7 +4,7 @@
 # Default route out through whichever computer is on the other end of the USB
 # cable. Called by usb-dhcp.sh on a lease event, not by you.
 #
-#   usb/usb-route.sh <add|old|del> <gateway-ip>
+#   usb/usb-route.sh <add|old|del|prefer> <gateway-ip>
 #
 # WHY A LEASE HOOK
 # ----------------
@@ -56,6 +56,27 @@
 # 100, while still beating the 1024 the kernel hands an unconfigured route. If
 # you would rather it never touched the default route at all, the escape hatch
 # is UNOQ_USB_DEFAULT_ROUTE=0.
+#
+# AND THE OTHER METRIC, 550
+# -------------------------
+# `prefer` is the answer to "I plugged the cable in, why am I still on wifi".
+# 700 means the USB link never carries traffic while the radio is on, so the
+# only way to use the cable was to turn wifi off by hand. 550 beats wifi's 600
+# and still loses to ethernet's 100, so the cable wins as soon as it is in.
+#
+# What makes that safe is that it is NOT what a lease installs. The bug this
+# file documents above - metric 500 handing the default route to a machine that
+# was not NAT-ing - was not caused by the number being low. It was caused by the
+# number being low WITHOUT ANYONE CHECKING. So `add` still installs 700, and the
+# promotion to 550 happens only after a packet has actually reached the internet
+# through this bridge. No proof, no promotion, and a route that was promoted and
+# then stops working is demoted again by the next event that re-runs the check.
+#
+# The residual case is honest to state: a host that goes to sleep with the cable
+# in leaves a promoted route pointing at nothing until the next lease event or
+# profile run. uplink-fallback.sh is the backstop for the version of that which
+# actually strands the board - wifi off, nothing to fall back to - and turns the
+# radio back on at boot.
 set -uo pipefail
 
 ACTION="${1:-}"
@@ -63,12 +84,17 @@ HOST_IP="${2:-}"
 
 BRIDGE="${UNOQ_USB_BRIDGE:-br-usb}"
 METRIC="${UNOQ_USB_ROUTE_METRIC:-700}"
+# Below NetworkManager's 600 for wifi, above ethernet's 100. Only ever used by
+# `prefer`, and only with proof - see the note above.
+METRIC_PREFERRED="${UNOQ_USB_ROUTE_METRIC_PREFERRED:-550}"
+PREFER="${UNOQ_USB_PREFER_OVER_WIFI:-1}"
+PROBES="${UNOQ_USB_PROBE_IPS:-1.1.1.1 8.8.8.8}"
 ENABLED="${UNOQ_USB_DEFAULT_ROUTE:-1}"
 
 [ "$ENABLED" = "1" ] || exit 0
 
 case "$ACTION" in
-  add | old | del) ;;
+  add | old | del | prefer) ;;
   *) exit 0 ;;
 esac
 
@@ -99,11 +125,77 @@ case "$ACTION" in
       log "could not set default route via $HOST_IP"
     fi
     ;;
+  prefer)
+    # Promote this route above wifi, but ONLY on proof that it goes anywhere.
+    #
+    # Bound to the interface, so this asks "does the USB path reach the
+    # internet" rather than "does this board have internet somehow" - which,
+    # with wifi up and winning, would answer yes no matter what the cable was
+    # plugged into. That distinction is the whole check.
+    #
+    # ICMP first, then TCP: some hosts drop outbound ping while NAT-ing TCP
+    # perfectly, and a ping-only test would refuse to promote a link that works.
+    #
+    # The TCP half runs with -k. What is being asked is whether packets reach
+    # the internet through this bridge, not whether a certificate is valid for
+    # an address - and a probe IP whose certificate does not name it would
+    # otherwise fail TLS and be read as "no internet here", which refuses to
+    # promote a link that works.
+    if [ "$PREFER" != "1" ]; then
+      log "not promoting the USB route (UNOQ_USB_PREFER_OVER_WIFI=0)"
+      exit 0
+    fi
+    reached=1
+    for probe in $PROBES; do
+      ping -c1 -W3 -I "$BRIDGE" "$probe" >/dev/null 2>&1 && {
+        reached=0
+        break
+      }
+    done
+    if [ "$reached" != 0 ] && command -v curl >/dev/null 2>&1; then
+      for probe in $PROBES; do
+        curl --interface "$BRIDGE" --max-time 5 -sS -k -o /dev/null \
+          "https://$probe/" >/dev/null 2>&1 && {
+          reached=0
+          break
+        }
+      done
+    fi
+
+    if [ "$reached" = 0 ]; then
+      if ip route replace default via "$HOST_IP" dev "$BRIDGE" metric "$METRIC_PREFERRED" 2>/dev/null; then
+        # The unpromoted route goes, so there is one default route via this
+        # gateway rather than two at different priorities. Two is not broken,
+        # but it makes `ip route` unreadable at exactly the moment somebody is
+        # reading it to find out why traffic is going the way it is.
+        ip route del default via "$HOST_IP" dev "$BRIDGE" metric "$METRIC" 2>/dev/null
+        log "the internet answers over $BRIDGE - default route -> $HOST_IP metric $METRIC_PREFERRED (ahead of wifi)"
+      else
+        log "could not promote the route via $HOST_IP"
+      fi
+    else
+      # Not a failure to report loudly: this is the normal state whenever the
+      # host is not sharing its connection. What matters is that anything left
+      # promoted from a previous run comes back down, so a link that stopped
+      # working stops taking the traffic.
+      if ip route del default via "$HOST_IP" dev "$BRIDGE" metric "$METRIC_PREFERRED" 2>/dev/null; then
+        log "no internet over $BRIDGE any more - route demoted to metric $METRIC"
+      fi
+      ip route replace default via "$HOST_IP" dev "$BRIDGE" metric "$METRIC" 2>/dev/null
+    fi
+    ;;
+
   del)
     # Only our own route, matched on all three fields, so a LAN default route
-    # someone else installed is never touched.
+    # someone else installed is never touched. Both metrics, because `prefer`
+    # may have promoted it - leaving the promoted one behind on a released
+    # lease would be a default route pointing at a host that has gone away, at
+    # a priority that beats wifi.
     if ip route del default via "$HOST_IP" dev "$BRIDGE" metric "$METRIC" 2>/dev/null; then
       log "default route via $HOST_IP withdrawn (lease released)"
+    fi
+    if ip route del default via "$HOST_IP" dev "$BRIDGE" metric "$METRIC_PREFERRED" 2>/dev/null; then
+      log "promoted default route via $HOST_IP withdrawn (lease released)"
     fi
     ;;
 esac

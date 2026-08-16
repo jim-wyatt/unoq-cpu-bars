@@ -114,6 +114,15 @@ if pid_is /run/unoq-usb-udhcpc.pid busybox udhcpc; then
 else
   val "dhcp" "<udhcpc is not running>"
 fi
+# The host profile, when DHCP gave up but the computer on the other end was
+# recognised anyway. Worth a line of its own because the address on the bridge
+# then looks exactly like a leased one - same subnet, same gateway - and the
+# difference matters when something goes wrong: this address was claimed by the
+# board, not handed to it, so the host has no idea it exists.
+if [ -r /run/unoq-usb-profile.state ]; then
+  val "host profile" "$(awk '{print $1" ("$2" via "$3")"}' /run/unoq-usb-profile.state 2>/dev/null)"
+  val "" "self-assigned - the host is NAT-ing but not serving DHCP"
+fi
 # Link-local is not a fault, it is the documented answer to "no DHCP server on
 # the other end". It IS worth saying out loud, because it is also the state
 # where the board is reachable from that one computer and from nowhere else.
@@ -121,6 +130,21 @@ AUTOIPD="${UNOQ_AUTOIPD:-/usr/sbin/avahi-autoipd}"
 if [ -x "$AUTOIPD" ] && "$AUTOIPD" --check "$BRIDGE" 2>/dev/null; then
   val "link-local" "active - no DHCP server on the other end"
 fi
+# Which default route the USB link actually holds, and therefore whether it is
+# carrying traffic or just sitting there. 550 means usb-route.sh proved the
+# internet answers through the cable and promoted it ahead of wifi; 700 means it
+# is the fallback of last resort it has always been.
+usb_default="$(ip -4 route show default dev "$BRIDGE" 2>/dev/null | head -1)"
+case "$usb_default" in
+  *"metric ${UNOQ_USB_ROUTE_METRIC_PREFERRED:-550}"*)
+    val "default route" "$usb_default"
+    val "" "promoted ahead of wifi - the cable is carrying this board's traffic"
+    ;;
+  *metric*)
+    val "default route" "$usb_default"
+    val "" "fallback only - a real uplink still wins"
+    ;;
+esac
 val "reachable as" "$(hostname).local"
 # Exactly one address, and that is load-bearing rather than tidy: avahi
 # advertises every address an interface has, so a second one makes

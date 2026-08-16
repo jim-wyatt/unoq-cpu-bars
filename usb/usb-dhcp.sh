@@ -40,6 +40,22 @@
 #
 # So: link-local goes on when DHCP gives up, and comes off the moment a real
 # lease arrives. Never both.
+#
+# AND BEFORE LINK-LOCAL, THE HOST PROFILE
+# ---------------------------------------
+# Link-local has one weakness, and it is the one that matters to somebody who
+# plugged the cable in to get online: it has no gateway, and RFC 3927 forbids
+# routing off-link through a 169.254 next hop. The board is reachable from that
+# one computer and from nowhere else.
+#
+# There is a host that deserves better than that, and it is not rare - it is a
+# Windows box whose ICS is NAT-ing perfectly while its DHCP half answers
+# nothing. The gateway is up, it forwards, and the only thing missing is the
+# address. usb-profile.sh recognises that host by ARP, takes an address on its
+# subnet, and keeps it only if a packet actually reaches the internet.
+#
+# So the order on leasefail is: a recognised host that routes, else link-local.
+# Still exactly one address on the bridge, whichever it is.
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -53,7 +69,31 @@ STATE="${UNOQ_USB_DHCP_STATE:-/run/unoq-usb-dhcp.state}"
 # lease that moves after every power cut - which on this board is every cable
 # change - does not give you one. See usb-net-up.sh, which passes it to udhcpc.
 LAST="${UNOQ_STATE_DIR:-/var/lib/unoq}/usb-dhcp-last"
+# Written by usb-profile.sh when it claims an address on a host that will not
+# lease one: "<profile> <addr>/<plen> <gateway>". Read here for the gateway,
+# which is the only nameserver a self-assigned address comes with.
+PROFILE_STATE="${UNOQ_USB_PROFILE_STATE:-/run/unoq-usb-profile.state}"
 RESOLV="${UNOQ_RESOLV_CONF:-/etc/resolv.conf}"
+# Where DNS goes when the host on the other end of the cable does not do DNS.
+# Cloudflare then Google, the same pair the reachability probes use, so a board
+# that has proved it can reach 1.1.1.1 is pointed at something it has just
+# pinged. Set UNOQ_USB_DNS_PUBLIC="" to refuse the fallback entirely.
+DNS_PUBLIC="${UNOQ_USB_DNS_PUBLIC:-1.1.1.1 8.8.8.8}"
+# The name looked up to decide whether a nameserver is answering. It has to be
+# one that exists, because "does not resolve" and "does not exist" come back as
+# the same failure - example.com is reserved by IANA for exactly this and is not
+# going anywhere.
+DNS_PROBE_NAME="${UNOQ_USB_DNS_PROBE_NAME:-example.com}"
+# Five seconds, matching the reachability probes rather than a resolver's usual
+# patience. A gateway with no resolver behind it does not refuse the query, it
+# drops it, so this whole timeout is spent on every check the fallback exists
+# for - and udhcpc will not process the next lease event until this script
+# returns. Long enough for a cold answer over a NAT, short enough to bound that.
+DNS_TIMEOUT="${UNOQ_USB_DNS_TIMEOUT:-5}"
+# Overridable for the same reason as UNOQ_AUTOIPD above: a name is not a seam,
+# and "what happens on a board that has no nslookup" is a behaviour worth being
+# able to test rather than reason about.
+NSLOOKUP="${UNOQ_NSLOOKUP:-nslookup}"
 # udhcpc exports this; default it once here rather than at every use, because
 # under `set -u` an unset $interface is a crash rather than a fallback, and the
 # link-local helpers below are reached on the path where udhcpc is least happy.
@@ -89,46 +129,141 @@ is_ipv4() {
 # uplink, and a regression if wifi is up, because unplugging the cable would
 # then leave the board pointing at a nameserver it can no longer reach.
 #
-# "Actually carrying it" is decided by the routing table rather than by a flag:
-# our route is metric 700 and loses to every real link (see usb-route.sh), so if
-# no default route beats ours, there is no real link. That makes this
-# self-correcting - turn wifi off and the next renew takes DNS over, turn it
-# back on and the next one hands it back - and it is why wifi.sh kicks a renew
-# rather than editing resolv.conf itself.
+# "Actually carrying it" is decided by the routing table rather than by a flag,
+# which makes it self-correcting: turn wifi off and the next renew takes DNS
+# over, turn it back on and the next one hands it back. It is why wifi.sh kicks
+# a renew rather than editing resolv.conf itself.
+#
+# This asks WHICH INTERFACE wins, rather than comparing our metric to a number.
+# It used to do the latter - "is the best metric >= 700" - which was a correct
+# reading of the routing table only while our route was always the worst one on
+# it. usb-route.sh's `prefer` broke that assumption the day it was added: a
+# promoted route is metric 550, the best default route on the board becomes
+# 550, and `550 >= 700` is false - so the check would conclude the USB link was
+# NOT carrying traffic at the exact moment it had just taken it over, and hand
+# resolv.conf back to NetworkManager. Comparing devices cannot rot that way.
 usb_route_is_the_default() {
-  local best
-  best="$(ip -4 route show default 2>/dev/null |
-    sed -n 's/.*metric \([0-9]*\).*/\1/p' | sort -n | head -1)"
-  [ -n "$best" ] && [ "$best" -ge "${UNOQ_USB_ROUTE_METRIC:-700}" ]
+  local best_dev
+  best_dev="$(ip -4 route show default 2>/dev/null |
+    awk '{
+      m = 1024; d = ""
+      for (i = 1; i <= NF; i++) {
+        if ($i == "metric") m = $(i + 1)
+        if ($i == "dev") d = $(i + 1)
+      }
+      if (d != "") print m, d
+    }' | sort -n | head -1 | awk '{print $2}')"
+  [ -n "$best_dev" ] && [ "$best_dev" = "$interface" ]
+}
+
+# Does this nameserver actually answer a query? Asked of the address directly,
+# so it tests that resolver rather than whatever resolv.conf currently says.
+#
+# `timeout` rather than nslookup's own flags: this runs with busybox nslookup on
+# a board with no dnsutils just as often as with bind9's, and the two disagree
+# about which timeout options they take. They agree about "name, then server".
+dns_answers() {
+  timeout "$DNS_TIMEOUT" "$NSLOOKUP" "$DNS_PROBE_NAME" "$1" >/dev/null 2>&1
+}
+
+# A verified list of nameservers to write, given the ones this link offered.
+#
+# WHY THE LINK'S OWN NAMESERVER IS NOT TAKEN ON TRUST
+# ---------------------------------------------------
+# Because the host this whole fallback path exists for is a host with half its
+# services working. Windows ICS NATs perfectly while answering no DHCP - that is
+# what usb-profile.sh is for - and the same adapter answers no DNS on the
+# gateway address either, since the DNS proxy is the other half of the service
+# that is not running. A Linux host NAT-ing with plain nftables never had a
+# resolver on that address to begin with.
+#
+# Pointing resolv.conf at that gateway anyway gives the worst-shaped failure in
+# this file: traffic routes, `ping 8.8.8.8` works, and every name lookup hangs
+# until it times out. "apt does not work but the network is fine" is a long
+# afternoon, and it is indistinguishable at the terminal from the wifi-off
+# symptom that wifi.sh's renew kick already exists to prevent.
+#
+# So the nameserver is asked a question before it is written down, and if it
+# cannot answer, DNS goes to a public resolver over the link that has already
+# been proved to carry traffic. Routing and resolving are separate capabilities
+# and this is the one host that has one without the other.
+#
+# It ASSIGNS its answer - RESOLVERS for the list, DNS_NOTE for the reason - and
+# logs nothing itself. Both are deliberate:
+#
+# An earlier version printed the list and was read through a command
+# substitution, so the first log line it emitted went into resolv.conf as a
+# nameserver. That is not a hypothetical either; it happened on the board this
+# was written on, and produced a resolv.conf of eleven English words.
+#
+# Leaving the logging to the caller is what keeps the journal readable. This
+# runs on every lease event, and on a host that serves no DHCP that is every 35
+# seconds for as long as the cable is in. write_resolv says the reason when the
+# file actually changes, which is when somebody would want to read it.
+choose_resolvers() {
+  local candidates="$1" answering="" public="" s
+  RESOLVERS="$candidates"
+  DNS_NOTE=""
+  # No nslookup - no verification, and the old behaviour rather than a guess.
+  # A board that cannot ask the question has not learned that the answer is no.
+  command -v "$NSLOOKUP" >/dev/null 2>&1 || return 0
+  for s in $candidates; do
+    dns_answers "$s" && answering="$answering $s"
+  done
+  if [ -n "$answering" ]; then
+    RESOLVERS="$answering"
+    return 0
+  fi
+  for s in $DNS_PUBLIC; do
+    is_ipv4 "$s" && public="$public $s"
+  done
+  for s in $public; do
+    dns_answers "$s" || continue
+    # All of them, not just the one that answered. The check is a spot check;
+    # what goes in the file should still have a second entry to fall to.
+    RESOLVERS="$public"
+    DNS_NOTE="the host on $interface answers no DNS - resolving through$public instead"
+    return 0
+  done
+  # Neither end answered. The link's own nameserver goes in anyway, because the
+  # honest reading of "nothing answers" on a link that has only just come up is
+  # that the check was early - and this is written on every lease event, so a
+  # resolver that starts working gets picked up on the next one.
+  DNS_NOTE="no nameserver answers on $interface - keeping$candidates for now"
 }
 
 write_resolv() {
-  local servers="$1" tmp added=0 s
+  local servers="$1" tmp chosen="" s
+  for s in $servers; do
+    is_ipv4 "$s" || continue
+    chosen="$chosen $s"
+  done
+  # ICS proxies DNS on the gateway itself when it is working, so a lease with no
+  # option 6 is still usable - fall back to the router rather than leaving no
+  # resolver at all. Whether it IS working is decided below, not here.
+  if [ -z "$chosen" ] && is_ipv4 "${router:-}"; then
+    chosen=" $router"
+  fi
+  [ -n "$chosen" ] || return 1
+  choose_resolvers "$chosen"
+  chosen="$RESOLVERS"
+  [ -n "$chosen" ] || return 1
   tmp="$(mktemp)" || return 1
   {
     echo "# Written by unoq usb-dhcp.sh - the USB gadget link is this board's"
     echo "# only uplink. NetworkManager takes this file back when wifi returns."
+    for s in $chosen; do
+      echo "nameserver $s"
+    done
   } >"$tmp"
-  for s in $servers; do
-    is_ipv4 "$s" || continue
-    echo "nameserver $s" >>"$tmp"
-    added=$((added + 1))
-  done
-  # ICS proxies DNS on the gateway itself, so a lease with no option 6 is still
-  # perfectly usable - fall back to the router rather than leaving no resolver.
-  if [ "$added" = 0 ] && is_ipv4 "${router:-}"; then
-    echo "nameserver $router" >>"$tmp"
-    added=1
-  fi
-  if [ "$added" = 0 ]; then
-    rm -f "$tmp"
-    return 1
-  fi
   if cmp -s "$tmp" "$RESOLV"; then
     rm -f "$tmp"
     return 0
   fi
-  install -m 0644 "$tmp" "$RESOLV" && log "resolv.conf -> ${servers:-$router}"
+  if install -m 0644 "$tmp" "$RESOLV"; then
+    [ -n "$DNS_NOTE" ] && log "$DNS_NOTE"
+    log "resolv.conf ->$chosen"
+  fi
   rm -f "$tmp"
 }
 
@@ -212,6 +347,14 @@ case "${1:-}" in
     # would be a lease and a link-local address on one bridge, which is the
     # two-A-record state that makes <hostname>.local a coin flip.
     autoipd_stop
+    # Same rule, other fallback. If the host's DHCP was dead when we last
+    # looked, usb-profile.sh will have claimed an address on its subnet - and a
+    # lease arriving now supersedes it exactly as it supersedes link-local. It
+    # also has to go before the lease lands, and for a sharper reason than the
+    # A records: the profile address is one we assigned ourselves on the host's
+    # subnet, and leaving it there alongside a lease is two addresses on one
+    # /24 with only one of them known to the host that issued the other.
+    "$HERE/usb-profile.sh" down >/dev/null 2>&1
     # busybox gives the mask as dotted quad; ip(8) wants a prefix length.
     mask="${subnet:-255.255.255.0}"
     case "$mask" in
@@ -246,6 +389,11 @@ case "${1:-}" in
     # place that decides how the gadget ranks against a real link.
     if [ "$ENABLED" = "1" ] && is_ipv4 "${router:-}"; then
       "$HERE/usb-route.sh" "$([ "$1" = bound ] && echo add || echo old)" "$router" >/dev/null
+      # Then ask whether it has earned the right to beat wifi. Every lease event
+      # re-runs the check, which is what makes the promotion self-correcting: a
+      # host that stops forwarding gets demoted on the next renew rather than
+      # holding the default route on the strength of having worked once.
+      "$HERE/usb-route.sh" prefer "$router" >/dev/null
     fi
 
     if [ "$ENABLED" = "1" ] && usb_route_is_the_default; then
@@ -292,9 +440,57 @@ case "${1:-}" in
     # Normal while the cable is out or the host has not brought its shared
     # adapter up yet, and udhcpc keeps retrying by itself either way. What is
     # NOT normal is leaving the board with no address while it retries, so this
-    # is where link-local comes up. If a lease turns up later, `bound` takes it
-    # straight back down again.
+    # is where the two fallbacks come up. If a lease turns up later, `bound`
+    # takes whichever one is in place straight back down again.
     log "no DHCP offer on $interface yet - is the host sharing its connection?"
+
+    # A known host is the better fallback, because it comes with a GATEWAY.
+    # Link-local never can: RFC 3927 forbids using a 169.254 next hop for
+    # off-link traffic, so a board on link-local can reach the one computer it
+    # is plugged into and nothing beyond it. If usb-profile.sh recognises what
+    # is on the other end and can prove traffic gets out through it, that is
+    # worth strictly more than an address nobody can route.
+    #
+    # detect is read-only, so nothing is disturbed when it finds nothing - which
+    # is the common case, and the one that must stay cheap.
+    #
+    # stderr is NOT suppressed, and that is deliberate: the first run of this
+    # went straight past with no explanation because usb-profile.sh had been
+    # written without its execute bit, and "permission denied" was the one line
+    # that would have said so. A failure here is meant to be a quiet fall
+    # through to link-local, not a silent one.
+    if profile="$("$HERE/usb-profile.sh" detect)" && [ -n "$profile" ]; then
+      log "the host on $interface looks like $profile - trying its addressing"
+      # Link-local first, because there is exactly one address on this bridge
+      # and the profile is about to be it. This ordering is the whole invariant.
+      autoipd_stop
+      if "$HERE/usb-profile.sh" up "$profile"; then
+        # DNS, on the same terms as a lease. There is no lease here to carry
+        # option 6, so the gateway is the only nameserver on offer - which is
+        # exactly what write_resolv falls back to, and it is asked to prove it
+        # answers before it is written down. That check matters most on this
+        # path: a host that is not serving DHCP is a host with half its sharing
+        # stack off, and the DNS proxy is usually the other half. Public
+        # resolvers take over when it cannot answer.
+        #
+        # Without this the board routes over the cable and resolves over wifi,
+        # which works until wifi goes off and then fails as "ping 8.8.8.8 works,
+        # apt does not" - the symptom wifi.sh's renew kick exists to prevent.
+        if [ "$ENABLED" = "1" ] && [ -r "$PROFILE_STATE" ]; then
+          read -r _ _ router <"$PROFILE_STATE"
+          if is_ipv4 "${router:-}" && usb_route_is_the_default; then
+            write_resolv "" || log "no usable nameserver on this link"
+          fi
+        fi
+        exit 0
+      fi
+      # It did not work out - the address was taken, or the gateway answered
+      # and forwarded nothing. Undo it and fall through, so the board still ends
+      # up reachable from the machine it is plugged into.
+      "$HERE/usb-profile.sh" down "$profile" >/dev/null 2>&1
+      log "$profile did not produce a working route - falling back to link-local"
+    fi
+
     autoipd_start
     ;;
 esac

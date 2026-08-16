@@ -77,9 +77,14 @@ reachable() {
   done
   # Some hosts firewall outbound ICMP while happily NAT-ing TCP, which would
   # make a ping-only check condemn a link that works perfectly.
+  #
+  # -k, for the same reason the other two copies of this probe carry it (see
+  # usb-profile.sh): the question is whether packets get out through this
+  # bridge, and a probe address whose certificate does not name it would fail
+  # TLS and be read as "no internet" - here, that turns the radio back on.
   if command -v curl >/dev/null 2>&1; then
     for ip in $PROBES; do
-      curl --interface "$BRIDGE" --max-time 5 -sS -o /dev/null \
+      curl --interface "$BRIDGE" --max-time 5 -sS -k -o /dev/null \
         "https://$ip/" >/dev/null 2>&1 && return 0
     done
   fi
